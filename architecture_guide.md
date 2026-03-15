@@ -11,33 +11,33 @@
 ```mermaid
 graph TD
     %% 1. 클라이언트 파트
-    subgraph Client [사용자 및 관리자 클라이언트]
+    subgraph Client ["사용자 및 관리자 클라이언트"]
         FE_APP["프론트엔드 (Next.js / React)"]
         FE_ADMIN["관리자 페이지 (사용자 통계 및 모니터링)"]
     end
 
     %% 2. 서버 및 DB 파트
-    subgraph Backend [백엔드 시스템]
-        BE_API["API 서버 (Node.js/Spring Boot 등)"]
+    subgraph Backend ["백엔드 시스템"]
+        BE_API["API 서버 (Node.js / Spring Boot 등)"]
         DB[("사용자 및 로깅 DB")]
     end
 
     %% 3. AI 연산 파트
-    subgraph AI [AI Core 시스템]
-        AI_SERVER["AI 서버 (FastAPI/LangChain)"]
+    subgraph AI ["AI Core 시스템"]
+        AI_SERVER["AI 서버 (FastAPI / LangChain)"]
         GEMINI["Gemini Flash API"]
     end
 
     %% 흐름도 연결
-    FE_APP -->|"1. 사용자 요청 (채팅/상태 변경)"| BE_API
-    BE_API -->|2. 유저 컨텍스트 조회 및 로깅| DB
-    BE_API -->|3. 컨텍스트 및 요청 전달| AI_SERVER
-    AI_SERVER -->|4. 프롬프트 구성 (LangChain)| GEMINI
-    GEMINI -->|5. 생성된 답변 및 UI 제어 명령| AI_SERVER
-    AI_SERVER -->|6. JSON 포맷 정제| BE_API
-    BE_API -->|7. 응답 반환| FE_APP
+    FE_APP -->|"1. 사용자 요청 (채팅 / 상태 변경)"| BE_API
+    BE_API -->|"2. 유저 컨텍스트 조회 및 로깅"| DB
+    BE_API -->|"3. 컨텍스트 및 요청 전달"| AI_SERVER
+    AI_SERVER -->|"4. 프롬프트 구성 (LangChain)"| GEMINI
+    GEMINI -->|"5. 생성된 답변 및 UI 제어 명령"| AI_SERVER
+    AI_SERVER -->|"6. JSON 포맷 정제"| BE_API
+    BE_API -->|"7. 응답 반환"| FE_APP
     
-    FE_ADMIN -->|데이터 집계 요청| BE_API
+    FE_ADMIN -->|"데이터 집계 요청"| BE_API
 ```
 
 ---
