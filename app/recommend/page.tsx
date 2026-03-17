@@ -1,24 +1,57 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { Info, Clock, Flame, ChevronRight, Apple, Calendar as CalendarIcon, ChevronLeft } from 'lucide-react';
+import { Info, Clock, Flame, ChevronRight, Apple, Calendar as CalendarIcon, ChevronLeft, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function RecommendPage() {
   const [currentDate, setCurrentDate] = useState(new Date('2026-03-01'));
   const [today, setToday] = useState<Date | null>(null);
 
+  const [userData, setUserData] = useState<{name: string, goal: string} | null>(null);
+
   useEffect(() => {
     const now = new Date();
     setToday(now);
     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+
+    const stored = localStorage.getItem('healthAppUser');
+    if (stored) {
+      setUserData(JSON.parse(stored));
+    }
   }, []);
 
   const mockPlans = [
-    { date: '2026-03-16', task: '맞춤형 유산소 15분' },
-    { date: '2026-03-18', task: 'AI 추천: 스쿼트 3세트' },
-    { date: '2026-03-20', task: '가벼운 조깅' },
-    { date: '2026-03-25', task: '코어 강화 데드버그' },
+    { 
+      date: '2026-03-16', 
+      task: '맞춤형 유산소 15분',
+      workout: { type: '런닝머신 / 실내 자전거', sets: '15분 (강도: 중)' },
+      diet: { breakfast: '그릭 요거트 & 그래놀라', lunch: '닭가슴살 현미 볶음밥', dinner: '연어 샐러드' }
+    },
+    { 
+      date: '2026-03-18', 
+      task: 'AI 추천: 스쿼트 3세트',
+      workout: { type: '맨몸 스쿼트', sets: '15회 x 3세트' },
+      diet: { breakfast: '오트밀 & 바나나', lunch: '소고기 야채구이', dinner: '두부 버섯 샐러드' }
+    },
+    { 
+      date: '2026-03-20', 
+      task: '가벼운 조깅',
+      workout: { type: '야외 조깅', sets: '30분 (페이스: 6:30)' },
+      diet: { breakfast: '통밀 식빵 샌드위치', lunch: '닭안심 샐러드 파스타', dinner: '소고기 무국 (건더기 위주)' }
+    },
+    { 
+      date: '2026-03-25', 
+      task: '코어 강화 데드버그',
+      workout: { type: '데드버그 / 플랭크', sets: '데드버그 20회 x 3세트, 플랭크 1분 x 3세트' },
+      diet: { breakfast: '스크램블 에그 & 아보카도', lunch: '연어 포케 보울', dinner: '닭가슴살 스테이크' }
+    },
   ];
+
+  type PlanType = typeof mockPlans[0];
+  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const currentYear = currentDate.getFullYear();
@@ -49,6 +82,22 @@ export default function RecommendPage() {
     { name: "오트밀 쉐이크", desc: "간편한 아침 식사", img: "🥛", kcal: "210 kcal" },
   ];
 
+  let headerMessage = "꾸준한 식단 관리가<br />성공의 가장 빠른 지름길이에요!";
+  let subMessage = "사용자님의 다이어트 목표 달성을 응원합니다.";
+
+  if (userData) {
+    if (userData.goal === '다이어트') {
+      headerMessage = `${userData.name} 님의 다이어트 목표 달성을<br/>AI가 끝까지 응원합니다!`;
+      subMessage = '꾸준한 식단과 유산소로 목표를 이루어봐요!';
+    } else if (userData.goal === '건강 유지') {
+      headerMessage = `오늘도 건강한 밸런스를 유지하는<br/>${userData.name} 님이 멋져요!`;
+      subMessage = '규칙적인 생활로 활기찬 하루를 보내세요.';
+    } else if (userData.goal === '근력 향상') {
+      headerMessage = `강력한 근력을 위해 오늘 추천된<br/>운동을 완료해 보세요!`;
+      subMessage = `${userData.name} 님의 한계 돌파를 응원합니다.`;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans pb-28">
       {/* Top Message Section with Pastel Background */}
@@ -63,10 +112,22 @@ export default function RecommendPage() {
             <Info className="w-4 h-4 text-[#2563eb]" />
             <span className="text-xs font-bold text-[#2563eb]">오늘의 건강 메시지</span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-snug mb-2">
-            "꾸준한 식단 관리가<br />성공의 가장 빠른 지름길이에요!"
-          </h1>
-          <p className="text-gray-600 font-medium text-sm">현성님의 다이어트 목표 달성을 응원합니다.</p>
+          <motion.h1 
+            key={headerMessage}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-snug mb-2"
+            dangerouslySetInnerHTML={{ __html: `"${headerMessage}"` }}
+          />
+          <motion.p 
+            key={subMessage}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="text-gray-600 font-medium text-sm"
+          >
+            {subMessage}
+          </motion.p>
         </div>
       </div>
 
@@ -117,6 +178,12 @@ export default function RecommendPage() {
                 return (
                   <div
                     key={`day-${day}`}
+                    onClick={() => {
+                      if (planForDay) {
+                        setSelectedPlan(planForDay);
+                        setIsModalOpen(true);
+                      }
+                    }}
                     className={`h-16 md:h-20 lg:h-24 p-1 md:p-2 rounded-xl flex flex-col items-center md:items-start border border-transparent transition-all hover:bg-gray-50 cursor-pointer ${isToday ? 'bg-blue-50/50 border-blue-100' : ''
                       }`}
                   >
@@ -196,6 +263,76 @@ export default function RecommendPage() {
         </section>
 
       </div>
+
+      {/* Plan Detail Modal */}
+      <AnimatePresence>
+        {isModalOpen && selectedPlan && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" 
+              onClick={() => setIsModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-3xl shadow-[0_20px_60px_-12px_rgba(0,0,0,0.15)] w-full max-w-md overflow-hidden z-10"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-blue-50/50">
+                <div className="flex items-center space-x-2">
+                  <CalendarIcon className="w-5 h-5 text-[#2563eb]" />
+                  <h3 className="font-bold text-lg text-gray-900">{selectedPlan.date.split('-')[1]}월 {selectedPlan.date.split('-')[2]}일 상세 플랜</h3>
+                </div>
+                <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-1 bg-white rounded-full shadow-sm">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                <div>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Flame className="w-5 h-5 text-orange-500" />
+                    <h4 className="font-bold text-gray-900">추천 운동</h4>
+                  </div>
+                  <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm font-semibold text-gray-500">종목</span>
+                      <span className="text-sm font-bold text-gray-900 text-right ml-4">{selectedPlan.workout.type}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm font-semibold text-gray-500">세트 수</span>
+                      <span className="text-sm font-bold text-gray-900 text-right ml-4">{selectedPlan.workout.sets}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Apple className="w-5 h-5 text-green-500" />
+                    <h4 className="font-bold text-gray-900">추천 식단</h4>
+                  </div>
+                  <div className="bg-green-50/50 border border-green-100 rounded-xl p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-green-700 bg-white border border-green-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">아침</span>
+                      <span className="text-sm font-bold text-gray-900 text-right ml-4">{selectedPlan.diet.breakfast}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-green-700 bg-white border border-green-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">점심</span>
+                      <span className="text-sm font-bold text-gray-900 text-right ml-4">{selectedPlan.diet.lunch}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-green-700 bg-white border border-green-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">저녁</span>
+                      <span className="text-sm font-bold text-gray-900 text-right ml-4">{selectedPlan.diet.dinner}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <style dangerouslySetInnerHTML={{
         __html: `
