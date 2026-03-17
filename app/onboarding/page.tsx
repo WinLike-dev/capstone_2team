@@ -9,16 +9,20 @@ export default function OnboardingPage() {
   const [formData, setFormData] = useState({
     name: '',
     age: '',
+    gender: '남성',
     height: '',
     weight: '',
     goal: '건강 유지',
     activityLevel: '보통',
     conditions: [] as string[],
+    allergies: [] as string[],
+    otherAllergy: '',
   });
   
   const [errorMsg, setErrorMsg] = useState('');
 
   const conditionOptions = ['고혈압', '당뇨', '관절염', '천식', '심혈관 질환', '없음'];
+  const allergyOptions = ['유제품', '견과류', '갑각류', '밀', '대두', '달걀', '해당 없음'];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +33,7 @@ export default function OnboardingPage() {
     if (!formData.height || Number(formData.height) <= 0) return setErrorMsg('올바른 키를 입력해주세요.');
     if (!formData.weight || Number(formData.weight) <= 0) return setErrorMsg('올바른 몸무게를 입력해주세요.');
     if (formData.conditions.length === 0) return setErrorMsg('기저 질환을 하나 이상 선택해주세요 (해당 없으면 "없음" 선택).');
+    if (formData.allergies.length === 0 && !formData.otherAllergy.trim() && !formData.allergies.includes('기타(직접 입력)')) return setErrorMsg('알레르기 정보를 선택해주세요 (해당 없으면 "해당 없음" 선택).');
 
     localStorage.setItem('healthAppUser', JSON.stringify(formData));
     router.push('/');
@@ -56,6 +61,25 @@ export default function OnboardingPage() {
     });
   };
 
+  const handleAllergyChange = (allergy: string) => {
+    setFormData(prev => {
+      let newAllergies = [...prev.allergies];
+      
+      if (allergy === '해당 없음') {
+        newAllergies = prev.allergies.includes('해당 없음') ? [] : ['해당 없음'];
+        return { ...prev, allergies: newAllergies, otherAllergy: '' };
+      } else {
+        newAllergies = newAllergies.filter(a => a !== '해당 없음');
+        if (newAllergies.includes(allergy)) {
+          newAllergies = newAllergies.filter(a => a !== allergy);
+        } else {
+          newAllergies.push(allergy);
+        }
+      }
+      return { ...prev, allergies: newAllergies };
+    });
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans p-6 py-12 flex flex-col items-center justify-center">
       <motion.div 
@@ -75,17 +99,38 @@ export default function OnboardingPage() {
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Name */}
-          <div className="space-y-1.5 focus-within:text-[#2563eb] transition-colors">
-            <label className="text-sm font-bold ml-1 transition-colors">이름</label>
-            <input 
-              type="text" 
-              name="name" 
-              value={formData.name} 
-              onChange={handleChange} 
-              className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all font-medium placeholder-gray-400 text-gray-900"
-              placeholder="홍길동"
-            />
+          {/* Name & Gender */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2 space-y-1.5 focus-within:text-[#2563eb] transition-colors">
+              <label className="text-sm font-bold ml-1 transition-colors">이름</label>
+              <input 
+                type="text" 
+                name="name" 
+                value={formData.name} 
+                onChange={handleChange} 
+                className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all font-medium placeholder-gray-400 text-gray-900"
+                placeholder="홍길동"
+              />
+            </div>
+            <div className="col-span-1 space-y-1.5 focus-within:text-[#2563eb] transition-colors">
+              <label className="text-sm font-bold ml-1 transition-colors">성별</label>
+              <div className="relative">
+                <select 
+                  name="gender" 
+                  value={formData.gender} 
+                  onChange={handleChange} 
+                  className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all appearance-none font-medium text-gray-900"
+                >
+                  <option value="남성">남성</option>
+                  <option value="여성">여성</option>
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
           
           {/* Age & Height */}
@@ -200,6 +245,56 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Allergies */}
+          <div className="space-y-2.5 pt-1">
+            <label className="text-sm font-bold text-gray-700 ml-1">식품 알레르기 및 주의사항 <span className="text-gray-400 text-xs font-normal ml-1">(다중 선택 가능)</span></label>
+            <div className="flex flex-wrap gap-2">
+              {allergyOptions.map(allergy => (
+                <button
+                  type="button"
+                  key={allergy}
+                  onClick={() => handleAllergyChange(allergy)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    formData.allergies.includes(allergy)
+                      ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20 border-transparent'
+                      : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                  }`}
+                >
+                  {allergy}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => handleAllergyChange('기타(직접 입력)')}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  formData.allergies.includes('기타(직접 입력)')
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20 border-transparent'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                }`}
+              >
+                기타(직접 입력)
+              </button>
+            </div>
+            
+            {/* Conditional input for 'Other' allergy */}
+            {formData.allergies.includes('기타(직접 입력)') && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                className="overflow-hidden"
+              >
+                <input 
+                  type="text" 
+                  name="otherAllergy" 
+                  value={formData.otherAllergy} 
+                  onChange={handleChange} 
+                  className="w-full px-5 py-3 rounded-xl bg-orange-50/50 border border-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:bg-white focus:border-orange-400 transition-all text-sm font-medium placeholder-orange-300 text-gray-900"
+                  placeholder="알레르기 정보를 직접 입력해주세요 (예: 복숭아)"
+                />
+              </motion.div>
+            )}
           </div>
 
           {/* Error Message Container */}

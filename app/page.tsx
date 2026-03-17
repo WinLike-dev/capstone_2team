@@ -36,8 +36,14 @@ export default function Home() {
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
-  const addWater = () => {
+  const addWater = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (waterGlasses < maxWaterGlasses) setWaterGlasses(prev => prev + 1);
+  };
+
+  const removeWater = (e: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (waterGlasses > 0) setWaterGlasses(prev => prev - 1);
   };
 
   useEffect(() => {
@@ -80,7 +86,7 @@ export default function Home() {
             className="px-3 py-3 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/80 text-[#2563eb] hover:bg-blue-50 hover:-translate-y-1 hover:shadow-[0_12px_40px_rgb(37,99,235,0.12)] transition-all duration-300 flex flex-col items-center justify-center min-w-[76px]"
           >
             <Calendar className="w-6 h-6 mb-1 drop-shadow-sm" />
-            <span className="text-[10px] font-bold">나의 플래너</span>
+            <span className="text-[10.5px] font-bold">오늘의 할 일</span>
           </button>
         </header>
 
@@ -163,8 +169,8 @@ export default function Home() {
 
           {/* Hydration Tracker Card (NEW) */}
           <div 
-            onClick={addWater}
-            className="col-span-1 md:col-span-2 lg:col-span-1 bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 flex flex-col justify-between cursor-pointer group hover:shadow-[0_12px_40px_rgb(14,165,233,0.12)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
+            onClick={() => {}}
+            className="col-span-1 md:col-span-2 lg:col-span-1 bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 flex flex-col justify-between group hover:shadow-[0_12px_40px_rgb(14,165,233,0.12)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
           >
             {/* Animated background water fill level */}
             <motion.div 
@@ -183,7 +189,7 @@ export default function Home() {
             </div>
             
             <div className="z-10 relative mt-2">
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-center justify-between">
                 <div className="flex items-baseline space-x-1">
                   <motion.p 
                     key={waterGlasses}
@@ -195,12 +201,17 @@ export default function Home() {
                   </motion.p>
                   <span className="text-sm font-semibold text-gray-400">/ {maxWaterGlasses} 잔</span>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-500 group-hover:bg-sky-500 group-hover:text-white transition-colors">
-                  <Plus className="w-4 h-4 text-inherit" />
+                <div className="flex items-center space-x-2">
+                  <button onClick={removeWater} className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-500 hover:bg-sky-500 hover:text-white transition-colors cursor-pointer disabled:opacity-50" disabled={waterGlasses === 0}>
+                    <span className="text-xl font-bold leading-none mb-0.5">-</span>
+                  </button>
+                  <button onClick={addWater} className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-500 hover:bg-sky-500 hover:text-white transition-colors cursor-pointer disabled:opacity-50" disabled={waterGlasses === maxWaterGlasses}>
+                    <Plus className="w-4 h-4 text-inherit" />
+                  </button>
                 </div>
               </div>
               <p className="text-xs text-sky-600 font-semibold mt-3 text-center opacity-0 group-hover:opacity-100 transition-opacity">
-                터치해서 한 잔 추가하기
+                오늘도 충분한 수분을 섭취하세요!
               </p>
             </div>
           </div>

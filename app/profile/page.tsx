@@ -6,7 +6,18 @@ import { User, Edit3, Target, Bell, LogOut, ChevronRight, CheckCircle2 } from 'l
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [userData, setUserData] = useState<{name: string, goal: string, email?: string} | null>(null);
+  const [userData, setUserData] = useState<{
+    name: string;
+    age: string;
+    gender: string;
+    height: string;
+    weight: string;
+    goal: string;
+    activityLevel: string;
+    allergies: string[];
+    otherAllergy: string;
+    email?: string;
+  } | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('healthAppUser');
@@ -44,16 +55,46 @@ export default function ProfilePage() {
             <User className="w-10 h-10" strokeWidth={1.5} />
           </div>
           
-          <div className="flex-1 relative z-10">
-            <div className="flex items-center space-x-2 mb-1">
-              <h2 className="text-xl font-bold text-gray-900">{userData ? userData.name : '사용자'} 님</h2>
+          <div className="flex-1 relative z-10 w-full">
+            <div className="flex items-center space-x-2 mb-1.5">
+              <h2 className="text-xl font-bold text-gray-900">{userData ? userData.name : '사용자'}</h2>
               <CheckCircle2 className="w-4 h-4 text-[#2563eb]" />
             </div>
-            <p className="text-sm text-gray-500 font-medium mb-2">{userData?.email}</p>
-            <div className="inline-flex items-center bg-blue-50 px-2.5 py-1 rounded-md">
-              <span className="text-[11px] font-extrabold text-[#2563eb] tracking-wide">
-                목표: {userData ? userData.goal : '건강 유지'}
-              </span>
+            
+            {userData ? (
+              <p className="text-[13px] md:text-sm font-semibold text-gray-600 mb-3.5 tracking-tight flex items-center flex-wrap gap-y-1">
+                만 {userData.age}세 <span className="text-gray-300 mx-1.5">|</span> 
+                {userData.gender} <span className="text-gray-300 mx-1.5">|</span> 
+                {userData.height}cm <span className="text-gray-300 mx-1.5">|</span> 
+                {userData.weight}kg
+              </p>
+            ) : (
+              <p className="text-sm text-gray-500 font-medium mb-3">user@example.com</p>
+            )}
+            
+            <div className="flex flex-wrap gap-2">
+              <div className="inline-flex items-center bg-blue-50 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full border border-blue-100 shadow-sm">
+                <span className="text-[10px] md:text-[11px] font-bold text-[#2563eb] tracking-wide">
+                  활동 레벨: {userData ? userData.activityLevel : '보통'}
+                </span>
+              </div>
+              <div className="inline-flex items-center bg-purple-50 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full border border-purple-100 shadow-sm">
+                <span className="text-[10px] md:text-[11px] font-bold text-purple-600 tracking-wide">
+                  목표: {userData ? userData.goal : '건강 유지'}
+                </span>
+              </div>
+              <div className="inline-flex items-center bg-orange-50 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full border border-orange-100 shadow-sm mt-1 md:mt-0">
+                <span className="text-[10px] md:text-[11px] font-bold text-orange-600 tracking-wide whitespace-normal">
+                  알레르기: {userData ? (
+                    userData.allergies.includes('해당 없음') || (userData.allergies.length === 0 && !userData.otherAllergy)
+                      ? '없음'
+                      : [
+                          ...userData.allergies.filter(a => a !== '기타(직접 입력)' && a !== '해당 없음'),
+                          ...(userData.allergies.includes('기타(직접 입력)') && userData.otherAllergy ? [userData.otherAllergy] : [])
+                        ].join(', ')
+                  ) : '없음'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
