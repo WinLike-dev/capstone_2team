@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -11,9 +12,16 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
   
+  // Diet Modal state
+  const [isDietModalOpen, setIsDietModalOpen] = useState(false);
+  const [foodInput, setFoodInput] = useState('');
+  const [dietAnalysis, setDietAnalysis] = useState<{ calories: string, message: string } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   // Water tracker state (glasses of water)
   const [waterGlasses, setWaterGlasses] = useState(2);
   const maxWaterGlasses = 8;
+  const [showWaterGoalAnim, setShowWaterGoalAnim] = useState(false);
 
   const [todos, setTodos] = useState<{id: number, text: string, completed: boolean}[]>([
     { id: 1, text: '아침 스트레칭 10분', completed: false },
@@ -36,9 +44,37 @@ export default function Home() {
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
+  const handleDietSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!foodInput.trim()) return;
+    
+    setIsAnalyzing(true);
+    setTimeout(() => {
+      let mockResult = { calories: '320 kcal', message: '적당한 칼로리네요. 든든한 식사 되세요!' };
+      
+      if (foodInput.includes('떡볶이') || foodInput.includes('마카롱') || foodInput.includes('케이크') || foodInput.includes('아이스크림') || foodInput.includes('초콜릿') || foodInput.includes('과자') || foodInput.includes('콜라') || foodInput.includes('당') || foodInput.includes('단')) {
+        mockResult = { calories: '450 kcal', message: '이 음식은 당분이 높으니 오후엔 가벼운 산책을 추천해요.' };
+      } else if (foodInput.includes('샐러드') || foodInput.includes('닭가슴살') || foodInput.includes('야채')) {
+        mockResult = { calories: '180 kcal', message: '건강한 선택이네요! 목표 달성에 큰 도움이 될 거예요.' };
+      } else if (foodInput.includes('치킨') || foodInput.includes('피자') || foodInput.includes('햄버거') || foodInput.includes('튀김') || foodInput.includes('고기')) {
+        mockResult = { calories: '800 kcal', message: '칼로리가 다소 높아요. 저녁은 가볍게 드시는 것을 추천합니다.' };
+      }
+      
+      setDietAnalysis(mockResult);
+      setIsAnalyzing(false);
+    }, 1500);
+  };
+
   const addWater = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (waterGlasses < maxWaterGlasses) setWaterGlasses(prev => prev + 1);
+    if (waterGlasses < maxWaterGlasses) {
+      const newVal = waterGlasses + 1;
+      setWaterGlasses(newVal);
+      if (newVal === maxWaterGlasses) {
+        setShowWaterGoalAnim(true);
+        setTimeout(() => setShowWaterGoalAnim(false), 3000);
+      }
+    }
   };
 
   const removeWater = (e: React.MouseEvent) => {
@@ -179,6 +215,34 @@ export default function Home() {
               transition={{ type: "spring", stiffness: 60, damping: 15 }}
             />
             
+            {/* Goal Achieved Animation */}
+            <AnimatePresence>
+              {showWaterGoalAnim && (
+                <>
+                  <motion.div
+                    initial={{ y: 20, opacity: 0, scale: 0.5 }}
+                    animate={{ y: -40, opacity: 1, scale: 1.2 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex space-x-1"
+                  >
+                    <Droplets className="w-5 h-5 text-blue-500 drop-shadow-sm" />
+                    <Droplets className="w-6 h-6 text-sky-400 -mt-2 drop-shadow-sm" />
+                    <Droplets className="w-5 h-5 text-blue-500 drop-shadow-sm" />
+                  </motion.div>
+                  <motion.div
+                    initial={{ y: 30, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: 0.2, duration: 0.5 }}
+                    className="absolute top-[80px] left-1/2 -translate-x-1/2 z-20 bg-blue-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-full whitespace-nowrap shadow-md"
+                  >
+                    오늘의 목표 달성! 🎉
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+
             <div className="flex items-center justify-between mb-4 z-10 relative">
               <div className="flex items-center space-x-3">
                 <div className="w-11 h-11 rounded-2xl bg-sky-100/80 flex items-center justify-center text-sky-500 shadow-inner group-hover:scale-110 transition-transform">
@@ -234,7 +298,10 @@ export default function Home() {
                 <Activity className="w-5 h-5" />
               </div>
             </button>
-            <button className="group bg-white p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/80 hover:shadow-[0_12px_40px_rgb(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-between text-left">
+            <button 
+              onClick={() => setIsDietModalOpen(true)}
+              className="group bg-white p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/80 hover:shadow-[0_12px_40px_rgb(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-between text-left"
+            >
               <div>
                 <h3 className="text-gray-900 font-bold text-lg mb-1">식단 기록하기</h3>
                 <p className="text-gray-400 text-xs font-medium">칼로리 관리의 시작</p>
@@ -338,6 +405,95 @@ export default function Home() {
                     <Plus className="w-5 h-5" />
                   </button>
                 </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Diet Modal */}
+      <AnimatePresence>
+        {isDietModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setIsDietModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-3xl shadow-[0_20px_60px_-12px_rgba(0,0,0,0.15)] w-full max-w-sm overflow-hidden z-10"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-blue-50/50">
+                <div className="flex items-center space-x-2">
+                  <Utensils className="w-5 h-5 text-[#2563eb]" />
+                  <h3 className="font-bold text-lg text-gray-900">식단 기록하기</h3>
+                </div>
+                <button onClick={() => { setIsDietModalOpen(false); setTimeout(() => { setDietAnalysis(null); setFoodInput(''); }, 300); }} className="text-gray-400 hover:text-gray-600 transition-colors p-1 bg-white rounded-full shadow-sm">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6">
+                <form onSubmit={handleDietSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">어떤 음식을 드셨나요?</label>
+                    <input 
+                      type="text" 
+                      value={foodInput}
+                      onChange={(e) => setFoodInput(e.target.value)}
+                      placeholder="예) 참치 김밥과 떡볶이" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all"
+                    />
+                  </div>
+                  
+                  <button 
+                    type="submit" 
+                    disabled={!foodInput.trim() || isAnalyzing}
+                    className="w-full bg-[#2563eb] text-white font-bold py-3.5 rounded-xl shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:bg-blue-700 transition-all disabled:opacity-50 disabled:shadow-none flex justify-center items-center h-[52px]"
+                  >
+                    {isAnalyzing ? (
+                      <div className="flex space-x-2 items-center">
+                        <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <span className="ml-2">AI 분석 중...</span>
+                      </div>
+                    ) : (
+                      'AI 분석'
+                    )}
+                  </button>
+                </form>
+
+                <AnimatePresence>
+                  {dietAnalysis && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                      animate={{ opacity: 1, height: 'auto', marginTop: 24 }}
+                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 space-y-3 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl -mr-10 -mt-10"></div>
+                        <div className="flex justify-between items-center relative z-10">
+                          <span className="text-sm font-bold text-gray-600">예상 칼로리</span>
+                          <span className="text-lg font-extrabold text-[#2563eb]">{dietAnalysis.calories}</span>
+                        </div>
+                        <div className="h-px w-full bg-blue-100/50 relative z-10"></div>
+                        <div className="flex items-start space-x-2.5 relative z-10 pt-1">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-[10px]">🤖</span>
+                          </div>
+                          <p className="text-sm text-gray-700 leading-relaxed font-medium">
+                            {dietAnalysis.message}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           </div>

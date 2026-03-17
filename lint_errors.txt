@@ -1,0 +1,48 @@
+C:\Users\박현성\capstone_2team\app\page.tsx:85 [react-hooks/set-state-in-effect] Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\박현성\capstone_2team\app\page.tsx:85:5
+  83 |
+  84 |   useEffect(() => {
+> 85 |     setIsClient(true);
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  86 |     const stored = localStorage.getItem('healthAppUser');
+  87 |     if (!stored) {
+  88 |       router.push('/onboarding');
+C:\Users\박현성\capstone_2team\app\profile\page.tsx:28 [react-hooks/set-state-in-effect] Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\박현성\capstone_2team\app\profile\page.tsx:28:7
+  26 |       // add a mock email if not present
+  27 |       if (!parsed.email) parsed.email = 'user@example.com';
+> 28 |       setUserData(parsed);
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  29 |     }
+  30 |   }, []);
+  31 |
+C:\Users\박현성\capstone_2team\app\recommend\page.tsx:15 [react-hooks/set-state-in-effect] Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\박현성\capstone_2team\app\recommend\page.tsx:15:5
+  13 |   useEffect(() => {
+  14 |     const now = new Date();
+> 15 |     setToday(now);
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  16 |     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  17 |
+  18 |     const stored = localStorage.getItem('healthAppUser');
