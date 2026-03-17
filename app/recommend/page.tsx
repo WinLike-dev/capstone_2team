@@ -55,7 +55,7 @@ export default function RecommendPage() {
       <div className="bg-gradient-to-br from-blue-100 via-sky-50 to-indigo-100 pt-10 pb-8 px-6 md:px-8 rounded-b-[40px] shadow-[0_4px_24px_-8px_rgba(37,99,235,0.15)] relative overflow-hidden">
         <div className="absolute right-0 top-0 opacity-10">
           <svg width="150" height="150" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor"/>
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" />
           </svg>
         </div>
         <div className="max-w-4xl mx-auto relative z-10">
@@ -71,7 +71,7 @@ export default function RecommendPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 md:px-8 mt-8 space-y-10">
-        
+
         {/* AI Plan Calendar Section (NEW) */}
         <section>
           <div className="flex justify-between items-center mb-5">
@@ -80,7 +80,7 @@ export default function RecommendPage() {
               <CalendarIcon className="w-5 h-5 text-indigo-500 mb-0.5 ml-1.5" />
             </h2>
           </div>
-          
+
           <div className="bg-white rounded-3xl p-5 md:p-6 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100">
             {/* Calendar Header */}
             <div className="flex justify-between items-center mb-6">
@@ -94,7 +94,7 @@ export default function RecommendPage() {
                 <ChevronRight className="w-5 h-5 text-gray-500" />
               </button>
             </div>
-            
+
             {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2">
               {weekDays.map((day, idx) => (
@@ -103,23 +103,22 @@ export default function RecommendPage() {
                 </div>
               ))}
             </div>
-            
+
             <div className="grid grid-cols-7 gap-1 md:gap-2">
               {days.map((day, idx) => {
                 if (day === null) return <div key={`empty-${idx}`} className="h-16 md:h-20 lg:h-24 bg-transparent rounded-xl"></div>;
-                
+
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const planForDay = mockPlans.find(p => p.date === dateStr);
-                
+
                 const isToday = today && day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
                 const isWeekend = idx % 7 === 0 || idx % 7 === 6;
-                
+
                 return (
-                  <div 
-                    key={`day-${day}`} 
-                    className={`h-16 md:h-20 lg:h-24 p-1 md:p-2 rounded-xl flex flex-col items-center md:items-start border border-transparent transition-all hover:bg-gray-50 cursor-pointer ${
-                      isToday ? 'bg-blue-50/50 border-blue-100' : ''
-                    }`}
+                  <div
+                    key={`day-${day}`}
+                    className={`h-16 md:h-20 lg:h-24 p-1 md:p-2 rounded-xl flex flex-col items-center md:items-start border border-transparent transition-all hover:bg-gray-50 cursor-pointer ${isToday ? 'bg-blue-50/50 border-blue-100' : ''
+                      }`}
                   >
                     <span className={`text-sm font-semibold ${isToday ? 'text-white bg-[#2563eb] w-6 h-6 rounded-full flex items-center justify-center mb-1' : isWeekend ? 'text-gray-400' : 'text-gray-700'}`}>
                       {day}
@@ -197,8 +196,9 @@ export default function RecommendPage() {
         </section>
 
       </div>
-      
-      <style dangerouslySetInnerHTML={{__html: `
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
         }
