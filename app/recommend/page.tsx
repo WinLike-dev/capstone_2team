@@ -1,8 +1,41 @@
 "use client";
 
-import { Info, Clock, Flame, ChevronRight, Apple } from 'lucide-react';
+import { Info, Clock, Flame, ChevronRight, Apple, Calendar as CalendarIcon, ChevronLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function RecommendPage() {
+  const [currentDate, setCurrentDate] = useState(new Date('2026-03-01'));
+  const [today, setToday] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    setToday(now);
+    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  }, []);
+
+  const mockPlans = [
+    { date: '2026-03-16', task: '맞춤형 유산소 15분' },
+    { date: '2026-03-18', task: 'AI 추천: 스쿼트 3세트' },
+    { date: '2026-03-20', task: '가벼운 조깅' },
+    { date: '2026-03-25', task: '코어 강화 데드버그' },
+  ];
+
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth();
+
+  const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+
+  const days = [];
+  for (let i = 0; i < firstDayOfMonth; i++) days.push(null);
+  for (let i = 1; i <= daysInMonth; i++) days.push(i);
+
+  const prevMonth = () => setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+
+  const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
+
   const exercises = [
     { title: "전신 유산소 버피", time: "15분", level: "상급", calories: "150 kcal", color: "from-blue-500 to-indigo-600" },
     { title: "코어 강화 데드버그", time: "10분", level: "중급", calories: "80 kcal", color: "from-indigo-500 to-purple-600" },
@@ -39,6 +72,73 @@ export default function RecommendPage() {
 
       <div className="max-w-4xl mx-auto px-6 md:px-8 mt-8 space-y-10">
         
+        {/* AI Plan Calendar Section (NEW) */}
+        <section>
+          <div className="flex justify-between items-center mb-5">
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight flex items-center">
+              사용자 문진 기반 AI 맞춤 플랜
+              <CalendarIcon className="w-5 h-5 text-indigo-500 mb-0.5 ml-1.5" />
+            </h2>
+          </div>
+          
+          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100">
+            {/* Calendar Header */}
+            <div className="flex justify-between items-center mb-6">
+              <button onClick={prevMonth} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+                <ChevronLeft className="w-5 h-5 text-gray-500" />
+              </button>
+              <h3 className="text-lg font-bold text-gray-900">
+                {currentYear}년 {currentMonth + 1}월
+              </h3>
+              <button onClick={nextMonth} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+                <ChevronRight className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2">
+              {weekDays.map((day, idx) => (
+                <div key={idx} className={`text-center text-xs font-bold mb-2 ${idx === 0 ? 'text-red-400' : idx === 6 ? 'text-blue-400' : 'text-gray-500'}`}>
+                  {day}
+                </div>
+              ))}
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1 md:gap-2">
+              {days.map((day, idx) => {
+                if (day === null) return <div key={`empty-${idx}`} className="h-16 md:h-20 lg:h-24 bg-transparent rounded-xl"></div>;
+                
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const planForDay = mockPlans.find(p => p.date === dateStr);
+                
+                const isToday = today && day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
+                const isWeekend = idx % 7 === 0 || idx % 7 === 6;
+                
+                return (
+                  <div 
+                    key={`day-${day}`} 
+                    className={`h-16 md:h-20 lg:h-24 p-1 md:p-2 rounded-xl flex flex-col items-center md:items-start border border-transparent transition-all hover:bg-gray-50 cursor-pointer ${
+                      isToday ? 'bg-blue-50/50 border-blue-100' : ''
+                    }`}
+                  >
+                    <span className={`text-sm font-semibold ${isToday ? 'text-white bg-[#2563eb] w-6 h-6 rounded-full flex items-center justify-center mb-1' : isWeekend ? 'text-gray-400' : 'text-gray-700'}`}>
+                      {day}
+                    </span>
+                    {planForDay && (
+                      <div className="mt-auto md:mt-1 w-full flex justify-center md:justify-start">
+                        <span className="md:hidden w-1.5 h-1.5 bg-indigo-500 rounded-full mt-1"></span>
+                        <div className="hidden md:block w-full bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] md:text-xs font-semibold px-1.5 py-1 rounded truncate shadow-[0_2px_4px_rgba(99,102,241,0.05)]">
+                          {planForDay.task}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
         {/* Workout section */}
         <section>
           <div className="flex justify-between items-center mb-5">
