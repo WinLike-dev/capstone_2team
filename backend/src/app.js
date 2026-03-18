@@ -46,14 +46,13 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── API 라우터 ───────────────────────────────────────────────────────
-// Team B(본인)가 작성한 라우터들을 연동합니다.
 app.use('/api/v1/auth', require('./routes/auth'));
 app.use('/api/v1/users', require('./routes/users'));
 app.use('/api/v1/chat', require('./routes/chat'));
+app.use('/api/v1/ai', require('./routes/ai'));
 app.use('/api/v1/admin', require('./routes/admin'));
 
 // ─── 에러 핸들러 (라우터 이후에 위치해야 함) ─────────────────────────
-// Team A가 작성한 공통 에러 핸들러 미들웨어 연동
 app.use(notFoundHandler);
 app.use(errorHandler);
 

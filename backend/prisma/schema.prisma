@@ -14,19 +14,61 @@ model User {
   name         String
   role         String        @default("USER")
   createdAt    DateTime      @default(now())
-  healthData   HealthData[]
+  profile      UserProfile?
+  dailyRecords DailyRecord[]
+  dailyPlans   DailyPlan[]
+  todos        Todo[]
   chatHistory  ChatHistory[]
 }
 
-model HealthData {
+model UserProfile {
   id            Int      @id @default(autoincrement())
-  userId        Int
+  userId        Int      @unique
+  goal          String?
+  activityLevel String?
+  diseases      String[]
+  allergies     String[]
   height        Float?
   weight        Float?
-  bloodPressure String?
-  stressLevel   Int?
-  createdAt     DateTime @default(now())
+  age           Int?
+  gender        String?
   user          User     @relation(fields: [userId], references: [id])
+}
+
+model DailyRecord {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  date         DateTime @default(now()) @db.Date
+  steps        Int      @default(0)
+  calories     Int      @default(0)
+  sleep        String?
+  water        Int      @default(0)
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, date])
+}
+
+model DailyPlan {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  date      DateTime @db.Date
+  exercise  Json
+  diet      Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, date])
+}
+
+model Todo {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  date        DateTime @db.Date
+  content     String
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 model ChatHistory {
