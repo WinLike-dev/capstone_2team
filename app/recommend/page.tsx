@@ -9,7 +9,10 @@ export default function RecommendPage() {
   const [currentDate, setCurrentDate] = useState(new Date('2026-03-01'));
   const [today, setToday] = useState<Date | null>(null);
 
-  const [userData, setUserData] = useState<{name: string, goal: string} | null>(null);
+  const [userData, setUserData] = useState<{name: string, goal: string, allergies?: string[], conditions?: string[]} | null>(null);
+
+  const allergies = userData?.allergies || [];
+  const conditions = userData?.conditions || [];
 
   useEffect(() => {
     const now = new Date();
@@ -209,7 +212,7 @@ export default function RecommendPage() {
         <section>
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl font-bold text-gray-900 tracking-tight flex items-center">
-              맞춤 운동 추천
+              오늘의 운동
               <Flame className="w-5 h-5 text-orange-500 mb-0.5 ml-1.5" />
             </h2>
           </div>
@@ -242,7 +245,7 @@ export default function RecommendPage() {
         <section>
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl font-bold text-gray-900 tracking-tight flex items-center">
-              추천 식단
+              오늘의 식단
               <Apple className="w-5 h-5 text-green-500 mb-0.5 ml-1.5" />
             </h2>
           </div>
