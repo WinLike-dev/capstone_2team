@@ -25,6 +25,11 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [userData, setUserData] = useState<{name: string, goal: string, allergies?: string[], conditions?: string[]} | null>(null);
+
+  const allergies = userData?.allergies || [];
+  const conditions = userData?.conditions || [];
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -32,6 +37,13 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('healthAppUser');
+    if (stored) {
+      setUserData(JSON.parse(stored));
+    }
+  }, []);
 
   // Simulate streaming response
   const simulateStreamingResponse = async (fullText: string) => {
@@ -92,7 +104,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#f8fafc] font-sans">
+    <div className="flex flex-col h-[100dvh] bg-[#f8fafc] font-sans">
       {/* Header */}
       <header className="flex-none pt-12 pb-4 px-6 bg-white/90 backdrop-blur-md border-b border-gray-200/50 shadow-sm z-10 sticky top-0">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
@@ -188,7 +200,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input Area */}
-      <div className="flex-none bg-white border-t border-gray-200/80 p-4 pb-24 md:pb-6 z-10 shadow-[0_-4px_30px_rgba(0,0,0,0.04)] relative">
+      <div className="flex-none bg-white border-t border-gray-200/80 p-4 pb-28 z-10 shadow-[0_-4px_30px_rgba(0,0,0,0.04)] relative">
         <div className="max-w-2xl mx-auto">
           <form onSubmit={handleSubmit} className="flex gap-3 relative items-end">
             <div className="relative flex-1">

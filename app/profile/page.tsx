@@ -26,6 +26,8 @@ export default function ProfilePage() {
       const parsed = JSON.parse(stored);
       // add a mock email if not present
       if (!parsed.email) parsed.email = 'user@example.com';
+      if (!parsed.allergies) parsed.allergies = [];
+      if (!parsed.conditions) parsed.conditions = [];
       setUserData(parsed);
     }
   }, []);
