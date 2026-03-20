@@ -4,78 +4,63 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-model User {
-  id           Int           @id @default(autoincrement())
-  email        String        @unique
-  passwordHash String
-  name         String
-  role         String        @default("USER")
-  createdAt    DateTime      @default(now())
-  profile      UserProfile?
-  dailyRecords DailyRecord[]
-  dailyPlans   DailyPlan[]
-  todos        Todo[]
-  chatHistory  ChatHistory[]
+// ─── 1.1 user_health_profiles ────────────────────────────────────────────────
+// 사용자의 기본 신체 정보 및 개인화된 AI 지시사항을 저장
+
+model UserHealthProfile {
+  user_id          String    @id @db.VarChar(50)   // 사용자 고유 ID (PK)
+  mbti            String?   @db.Char(4)            // MBTI 유형 (nullable)
+  gender          String    @db.VarChar(10)         // 성별
+  age             Int                               // 나이
+  height          Decimal   @db.Decimal(5, 2)       // 키 (cm)
+  weight          Decimal   @db.Decimal(5, 2)       // 몸무게 (kg)
+  bmi             Decimal   @db.Decimal(4, 1)       // BMI 수치
+  goal            String?   @db.VarChar(100)        // 건강 관리 목적 (nullable)
+  activity_level   String?   @db.VarChar(50)         // 평소 활동량 (nullable)
+  medical_history  String?                           // 기저질환 JSON/String (nullable)
+  allergies       String?                           // 알러지 목록 JSON/String (nullable)
+  user_instruction String?                           // AI용 개인 지시사항 (nullable)
+  updated_at       DateTime  @default(now()) @updatedAt
+
+  exercise_plans   UserExercisePlan[]
+  meal_plans       UserMealPlan[]
+
+  @@map("user_health_profiles")
 }
 
-model UserProfile {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique
-  goal          String?
-  activityLevel String?
-  diseases      String[]
-  allergies     String[]
-  height        Float?
-  weight        Float?
-  age           Int?
-  gender        String?
-  user          User     @relation(fields: [userId], references: [id])
+// ─── 1.2 user_exercise_plans ─────────────────────────────────────────────────
+// AI가 추천하거나 사용자가 확정한 운동 플랜을 저장
+
+model UserExercisePlan {
+  exercise_id    BigInt    @id @default(autoincrement())  // 운동 기록 고유 ID
+  user_id        String    @db.VarChar(50)                // 사용자 ID (FK)
+  exercise_name  String    @db.VarChar(100)               // 운동 종류
+  sets_reps      String?   @db.VarChar(100)               // 세트/횟수 정보 (nullable)
+  burn_calories  Int                                       // 소모 칼로리
+  target_date    DateTime  @db.Date                        // 계획 날짜
+  is_completed   Boolean   @default(false)                 // 수행 완료 여부
+  created_at     DateTime  @default(now())
+
+  health_profile UserHealthProfile @relation(fields: [user_id], references: [user_id])
+
+  @@map("user_exercise_plans")
 }
 
-model DailyRecord {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  date         DateTime @default(now()) @db.Date
-  steps        Int      @default(0)
-  calories     Int      @default(0)
-  sleep        String?
-  water        Int      @default(0)
-  createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id])
-  
-  @@unique([userId, date])
-}
+// ─── 1.3 user_meal_plans ─────────────────────────────────────────────────────
+// AI가 추천하거나 사용자가 확정한 식단 플랜을 저장
 
-model DailyPlan {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  date      DateTime @db.Date
-  exercise  Json
-  diet      Json
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  
-  @@unique([userId, date])
-}
+model UserMealPlan {
+  meal_id        BigInt    @id @default(autoincrement())  // 식단 기록 고유 ID
+  user_id        String    @db.VarChar(50)                // 사용자 ID (FK)
+  food_name      String    @db.VarChar(100)               // 식품 종류
+  meal_type      String    @db.VarChar(20)                // 아침/점심/저녁/간식
+  calories      Int                                       // 섭취 칼로리
+  target_date    DateTime  @db.Date                        // 계획 날짜
+  created_at     DateTime  @default(now())
 
-model Todo {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  date        DateTime @db.Date
-  content     String
-  isCompleted Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
-}
+  health_profile UserHealthProfile @relation(fields: [user_id], references: [user_id])
 
-model ChatHistory {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  userMessage String
-  aiResponse  String
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
+  @@map("user_meal_plans")
 }
