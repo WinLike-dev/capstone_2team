@@ -19,7 +19,7 @@ export default function OnboardingPage() {
     allergies: [] as string[],
     otherAllergy: '',
   });
-  
+
   const [errorMsg, setErrorMsg] = useState('');
 
   const conditionOptions = ['고혈압', '당뇨', '관절염', '천식', '심혈관 질환', '없음'];
@@ -28,7 +28,7 @@ export default function OnboardingPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    
+
     if (!formData.name.trim()) return setErrorMsg('이름을 입력해주세요.');
     if (!formData.age || Number(formData.age) <= 0) return setErrorMsg('올바른 나이를 입력해주세요.');
     if (!formData.height || Number(formData.height) <= 0) return setErrorMsg('올바른 키를 입력해주세요.');
@@ -48,7 +48,7 @@ export default function OnboardingPage() {
   const handleCheckboxChange = (condition: string) => {
     setFormData(prev => {
       let newConditions = [...prev.conditions];
-      
+
       if (condition === '없음') {
         newConditions = prev.conditions.includes('없음') ? [] : ['없음'];
       } else {
@@ -66,7 +66,7 @@ export default function OnboardingPage() {
   const handleAllergyChange = (allergy: string) => {
     setFormData(prev => {
       let newAllergies = [...prev.allergies];
-      
+
       if (allergy === '해당 없음') {
         newAllergies = prev.allergies.includes('해당 없음') ? [] : ['해당 없음'];
         return { ...prev, allergies: newAllergies, otherAllergy: '' };
@@ -84,7 +84,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans p-6 py-12 flex flex-col items-center justify-center">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4 }}
@@ -97,7 +97,7 @@ export default function OnboardingPage() {
             </svg>
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">AI 헬스케어</h1>
-          <p className="text-gray-500 font-medium text-sm">보다 정확한 맞춤형 관리를 위해<br/>추가 정보를 입력해주세요.</p>
+          <p className="text-gray-500 font-medium text-sm">보다 정확한 맞춤형 관리를 위해<br />추가 정보를 입력해주세요.</p>
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -105,11 +105,11 @@ export default function OnboardingPage() {
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2 space-y-1.5 focus-within:text-[#2563eb] transition-colors">
               <label className="text-sm font-bold ml-1 transition-colors">이름</label>
-              <input 
-                type="text" 
-                name="name" 
-                value={formData.name} 
-                onChange={handleChange} 
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
                 className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all font-medium placeholder-gray-400 text-gray-900"
                 placeholder="홍길동"
               />
@@ -117,10 +117,10 @@ export default function OnboardingPage() {
             <div className="col-span-1 space-y-1.5 focus-within:text-[#2563eb] transition-colors">
               <label className="text-sm font-bold ml-1 transition-colors">성별</label>
               <div className="relative">
-                <select 
-                  name="gender" 
-                  value={formData.gender} 
-                  onChange={handleChange} 
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
                   className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all appearance-none font-medium text-gray-900"
                 >
                   <option value="남성">남성</option>
@@ -134,17 +134,17 @@ export default function OnboardingPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Age & Height */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5 focus-within:text-[#2563eb]">
               <label className="text-sm font-bold ml-1 transition-colors">나이</label>
               <div className="relative">
-                <input 
-                  type="number" 
-                  name="age" 
-                  value={formData.age} 
-                  onChange={handleChange} 
+                <input
+                  type="number"
+                  name="age"
+                  value={formData.age}
+                  onChange={handleChange}
                   className="w-full pl-5 pr-10 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all font-medium text-gray-900"
                   placeholder="25"
                 />
@@ -154,11 +154,11 @@ export default function OnboardingPage() {
             <div className="space-y-1.5 focus-within:text-[#2563eb]">
               <label className="text-sm font-bold ml-1 transition-colors">키</label>
               <div className="relative">
-                <input 
-                  type="number" 
-                  name="height" 
-                  value={formData.height} 
-                  onChange={handleChange} 
+                <input
+                  type="number"
+                  name="height"
+                  value={formData.height}
+                  onChange={handleChange}
                   className="w-full pl-5 pr-10 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all font-medium text-gray-900"
                   placeholder="175"
                 />
@@ -171,11 +171,11 @@ export default function OnboardingPage() {
           <div className="space-y-1.5 focus-within:text-[#2563eb]">
             <label className="text-sm font-bold ml-1 transition-colors">몸무게</label>
             <div className="relative">
-              <input 
-                type="number" 
-                name="weight" 
-                value={formData.weight} 
-                onChange={handleChange} 
+              <input
+                type="number"
+                name="weight"
+                value={formData.weight}
+                onChange={handleChange}
                 className="w-full pl-5 pr-10 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all font-medium text-gray-900"
                 placeholder="70"
               />
@@ -187,10 +187,10 @@ export default function OnboardingPage() {
           <div className="space-y-1.5 focus-within:text-[#2563eb]">
             <label className="text-sm font-bold ml-1 transition-colors">운동 목적</label>
             <div className="relative">
-              <select 
-                name="goal" 
-                value={formData.goal} 
-                onChange={handleChange} 
+              <select
+                name="goal"
+                value={formData.goal}
+                onChange={handleChange}
                 className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all appearance-none font-medium text-gray-900"
               >
                 <option value="다이어트">🔥 다이어트</option>
@@ -209,10 +209,10 @@ export default function OnboardingPage() {
           <div className="space-y-1.5 focus-within:text-[#2563eb]">
             <label className="text-sm font-bold ml-1 transition-colors">평소 활동량</label>
             <div className="relative">
-              <select 
-                name="activityLevel" 
-                value={formData.activityLevel} 
-                onChange={handleChange} 
+              <select
+                name="activityLevel"
+                value={formData.activityLevel}
+                onChange={handleChange}
                 className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all appearance-none font-medium text-gray-900"
               >
                 <option value="거의 없음">거의 없음 (주로 앉아서 생활)</option>
@@ -231,10 +231,10 @@ export default function OnboardingPage() {
           <div className="space-y-1.5 focus-within:text-[#2563eb]">
             <label className="text-sm font-bold ml-1 transition-colors">MBTI</label>
             <div className="relative">
-              <select 
-                name="mbti" 
-                value={formData.mbti} 
-                onChange={handleChange} 
+              <select
+                name="mbti"
+                value={formData.mbti}
+                onChange={handleChange}
                 className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all appearance-none font-medium text-gray-900"
               >
                 <option value="" disabled>선택해주세요</option>
@@ -272,11 +272,10 @@ export default function OnboardingPage() {
                   type="button"
                   key={condition}
                   onClick={() => handleCheckboxChange(condition)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    formData.conditions.includes(condition)
-                      ? 'bg-[#2563eb] text-white shadow-md shadow-blue-500/20 border-transparent'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${formData.conditions.includes(condition)
+                    ? 'bg-[#2563eb] text-white shadow-md shadow-blue-500/20 border-transparent'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    }`}
                 >
                   {condition}
                 </button>
@@ -293,11 +292,10 @@ export default function OnboardingPage() {
                   type="button"
                   key={allergy}
                   onClick={() => handleAllergyChange(allergy)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    formData.allergies.includes(allergy)
-                      ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20 border-transparent'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
-                  }`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${formData.allergies.includes(allergy)
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20 border-transparent'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                    }`}
                 >
                   {allergy}
                 </button>
@@ -305,28 +303,27 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={() => handleAllergyChange('기타(직접 입력)')}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  formData.allergies.includes('기타(직접 입력)')
-                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20 border-transparent'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
-                }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${formData.allergies.includes('기타(직접 입력)')
+                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20 border-transparent'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                  }`}
               >
                 기타(직접 입력)
               </button>
             </div>
-            
+
             {/* Conditional input for 'Other' allergy */}
             {formData.allergies.includes('기타(직접 입력)') && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, height: 0, marginTop: 0 }}
                 animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
                 className="overflow-hidden"
               >
-                <input 
-                  type="text" 
-                  name="otherAllergy" 
-                  value={formData.otherAllergy} 
-                  onChange={handleChange} 
+                <input
+                  type="text"
+                  name="otherAllergy"
+                  value={formData.otherAllergy}
+                  onChange={handleChange}
                   className="w-full px-5 py-3 rounded-xl bg-orange-50/50 border border-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:bg-white focus:border-orange-400 transition-all text-sm font-medium placeholder-orange-300 text-gray-900"
                   placeholder="알레르기 정보를 직접 입력해주세요 (예: 복숭아)"
                 />
@@ -336,7 +333,7 @@ export default function OnboardingPage() {
 
           {/* Error Message Container */}
           {errorMsg && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
               className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center space-x-2 text-red-600"
             >
@@ -346,8 +343,8 @@ export default function OnboardingPage() {
           )}
 
           <div className="pt-6">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="w-full bg-[#2563eb] text-white font-bold text-lg py-4 rounded-xl shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:bg-blue-700 hover:shadow-[0_8px_24px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_2px_8px_rgba(37,99,235,0.3)] transition-all duration-300"
             >
               시작하기
