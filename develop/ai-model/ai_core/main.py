@@ -41,12 +41,17 @@ async def lifespan(app: FastAPI):
 settings = get_settings()
 
 app = FastAPI(
-    title="AI Core - Healthcare AI Microservice",
+    title="AI Core - HealthMate AI Microservice",
     description=(
-        "LangChain + Gemini Flash 기반 헬스케어 AI 마이크로서비스. "
-        "Backend 서버에서 사용자 컨텍스트를 전달받아 구조화된 JSON 응답을 생성합니다."
+        "LangChain + Gemini Flash 기반 헬스케어 AI 마이크로서비스.\n\n"
+        "## 엔드포인트\n"
+        "| 경로 | 설명 | 모드 |\n"
+        "|------|------|------|\n"
+        "| `POST /ai-chat` | 채팅 (Router AI → Worker AI) | 1~6 |\n"
+        "| `POST /process-meal` | 식단 기록 (Router AI 바이패스) | 7 |\n"
+        "| `POST /recommend` | 운동·식단 추천 (AI 전체 바이패스) | 8 |"
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 

@@ -1,53 +1,108 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
 
-from models.request_models import GenerateRequest
-from models.response_models import GenerateResponse, ErrorResponse
-from chains.health_chain import run_health_chain
+from models.request_models import AIChatRequest, MealRequest, RecommendRequest
+from models.response_models import AIChatResponse, MealResponse, RecommendResponse, ErrorResponse
+from chains.health_chain import run_chat_chain, run_meal_chain, run_recommend_chain
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1", tags=["AI Generate"])
+router = APIRouter(tags=["AI Core"])
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /ai-chat — 채팅 (모드 1~6, Router AI 경유)
+# ──────────────────────────────────────────────────────────────────────────────
 
 @router.post(
-    "/generate",
-    response_model=GenerateResponse,
-    responses={
-        500: {"model": ErrorResponse, "description": "AI 처리 중 내부 오류"},
-    },
-    summary="AI 헬스케어 응답 생성",
+    "/ai-chat",
+    response_model=AIChatResponse,
+    responses={500: {"model": ErrorResponse}},
+    summary="AI 채팅 (모드 1~6)",
     description=(
-        "사용자의 채팅 메시지와 컨텍스트(키, 체중, MBTI 등)를 받아 "
-        "AI 라우터가 의도를 분류한 뒤 Gemini로 맞춤 응답을 생성합니다.\n\n"
-        "**인텐트 분류**\n"
-        "- 1. 단순 질문 → action_type: advice\n"
-        "- 2. 계획 추가/수정 → action_type: ui_update, widget: plan_editor\n"
-        "- 3. 사용자 정보 수정 → action_type: ui_update, widget: profile_editor\n"
-        "- 4. 식단 구성 → action_type: ui_update, widget: diet_planner"
+        "사용자 채팅 메시지를 Router AI가 모드 1~6으로 분류한 후 Worker AI가 응답을 생성합니다.\n\n"
+        "| 모드 | 설명 | 응답 필드 |\n"
+        "|------|------|-----------|\n"
+        "| 1 | 단순 대화/질문 | `data.message` |\n"
+        "| 2 | 운동 플랜 작성 | `data.message` + `data.plan` |\n"
+        "| 3 | 운동 플랜 수정 | `data.message` + `data.plan` |\n"
+        "| 4 | 식단 플랜 작성 | `data.message` + `data.plan` |\n"
+        "| 5 | 식단 플랜 수정 | `data.message` + `data.plan` |\n"
+        "| 6 | 사용자 정보 수정 | `data.message` + `data.db_update` (프론트 비노출) |"
     ),
 )
-async def generate(request: GenerateRequest) -> GenerateResponse:
-    """
-    POST /api/v1/generate
-
-    [흐름]
-    1. AI 라우터: 사용자 발화를 1~4 인텐트로 분류
-    2. 메인 AI: 인텐트별 특화 프롬프트 + 사용자 DB 기반 답변 생성
-    3. 응답 래핑: GenerateResponse 형태로 반환
-    """
+async def ai_chat(request: AIChatRequest) -> AIChatResponse:
     logger.info(
-        "generate 요청 수신. user_id=%s, message=%r",
+        "/ai-chat 요청. user_id=%s, message=%r",
         request.user_id,
-        request.current_message[:50],
+        request.user_message[:50],
     )
-
     try:
-        result = await run_health_chain(request)
-        return GenerateResponse(**result)
+        result = await run_chat_chain(request)
+        return AIChatResponse(**result)
     except Exception as e:
-        logger.exception("AI 체인 실행 중 예외 발생. user_id=%s", request.user_id)
+        logger.exception("/ai-chat 예외. user_id=%s", request.user_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI 처리 중 오류가 발생했습니다: {str(e)}",
+            detail=str(e),
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /process-meal — 식단 기록 (모드 7, Router AI 바이패스)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/process-meal",
+    response_model=MealResponse,
+    responses={500: {"model": ErrorResponse}},
+    summary="식단 기록 (모드 7)",
+    description=(
+        "사용자가 먹은 식사를 텍스트로 입력하면 Gemini가 칼로리를 분석하고 피드백을 반환합니다.\n\n"
+        "Router AI를 거치지 않고 Worker AI Mode 7로 직행합니다.\n\n"
+        "**요청 예시** `user_message`: `'점심에 닭가슴살 샐러드 먹었어'`"
+    ),
+)
+async def process_meal(request: MealRequest) -> MealResponse:
+    logger.info(
+        "/process-meal 요청. user_id=%s, message=%r",
+        request.user_id,
+        request.user_message[:50],
+    )
+    try:
+        result = await run_meal_chain(request)
+        return MealResponse(**result)
+    except Exception as e:
+        logger.exception("/process-meal 예외. user_id=%s", request.user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /recommend — 운동·식단 추천 (모드 8, AI 전체 바이패스)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/recommend",
+    response_model=RecommendResponse,
+    responses={500: {"model": ErrorResponse}},
+    summary="운동·식단 추천 (모드 8)",
+    description=(
+        "사용자 프로필(BMI, 목표, 활동량)을 기반으로 맞춤 운동과 식단을 추천합니다.\n\n"
+        "Router AI와 Worker AI를 모두 거치지 않으며, 배경 실행 또는 새로고침 시 호출됩니다.\n\n"
+        "사용자가 추천 항목을 수락하면 `/confirm-recommendation` (WAS 담당)으로 캘린더에 등록합니다."
+    ),
+)
+async def recommend(request: RecommendRequest) -> RecommendResponse:
+    logger.info("/recommend 요청. user_id=%s", request.user_id)
+    try:
+        result = await run_recommend_chain(request)
+        return RecommendResponse(**result)
+    except Exception as e:
+        logger.exception("/recommend 예외. user_id=%s", request.user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
         )
