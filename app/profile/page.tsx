@@ -15,6 +15,7 @@ export default function ProfilePage() {
     weight: string;
     goal: string;
     activityLevel: string;
+    mbti?: string;
     allergies: string[];
     otherAllergy: string;
     email?: string;
@@ -96,6 +97,11 @@ export default function ProfilePage() {
                           ...(userData.allergies.includes('기타(직접 입력)') && userData.otherAllergy ? [userData.otherAllergy] : [])
                         ].join(', ')
                   ) : '없음'}
+                </span>
+              </div>
+              <div className="inline-flex items-center bg-[#facc15]/15 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full border border-[#facc15]/40 shadow-sm mt-1 md:mt-0">
+                <span className="text-[10px] md:text-[11px] font-bold text-[#ca8a04] tracking-wide whitespace-normal">
+                  MBTI: {userData?.mbti || '미설정'}
                 </span>
               </div>
             </div>

@@ -14,6 +14,7 @@ export default function OnboardingPage() {
     weight: '',
     goal: '건강 유지',
     activityLevel: '보통',
+    mbti: '',
     conditions: [] as string[],
     allergies: [] as string[],
     otherAllergy: '',
@@ -32,6 +33,7 @@ export default function OnboardingPage() {
     if (!formData.age || Number(formData.age) <= 0) return setErrorMsg('올바른 나이를 입력해주세요.');
     if (!formData.height || Number(formData.height) <= 0) return setErrorMsg('올바른 키를 입력해주세요.');
     if (!formData.weight || Number(formData.weight) <= 0) return setErrorMsg('올바른 몸무게를 입력해주세요.');
+    if (!formData.mbti) return setErrorMsg('MBTI를 선택해주세요.');
     if (formData.conditions.length === 0) return setErrorMsg('기저 질환을 하나 이상 선택해주세요 (해당 없으면 "없음" 선택).');
     if (formData.allergies.length === 0 && !formData.otherAllergy.trim() && !formData.allergies.includes('기타(직접 입력)')) return setErrorMsg('알레르기 정보를 선택해주세요 (해당 없으면 "해당 없음" 선택).');
 
@@ -217,6 +219,41 @@ export default function OnboardingPage() {
                 <option value="가벼운 활동">가벼운 활동 (주 1~3회 가벼운 운동)</option>
                 <option value="보통">보통 (주 3~5회 적당한 운동)</option>
                 <option value="격렬한 활동">격렬한 활동 (매일 심한 운동/스포츠)</option>
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          {/* MBTI */}
+          <div className="space-y-1.5 focus-within:text-[#2563eb]">
+            <label className="text-sm font-bold ml-1 transition-colors">MBTI</label>
+            <div className="relative">
+              <select 
+                name="mbti" 
+                value={formData.mbti} 
+                onChange={handleChange} 
+                className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all appearance-none font-medium text-gray-900"
+              >
+                <option value="" disabled>선택해주세요</option>
+                <option value="INFP">INFP</option>
+                <option value="INFJ">INFJ</option>
+                <option value="INTP">INTP</option>
+                <option value="INTJ">INTJ</option>
+                <option value="ISFP">ISFP</option>
+                <option value="ISFJ">ISFJ</option>
+                <option value="ISTP">ISTP</option>
+                <option value="ISTJ">ISTJ</option>
+                <option value="ENFP">ENFP</option>
+                <option value="ENFJ">ENFJ</option>
+                <option value="ENTP">ENTP</option>
+                <option value="ENTJ">ENTJ</option>
+                <option value="ESFP">ESFP</option>
+                <option value="ESFJ">ESFJ</option>
+                <option value="ESTP">ESTP</option>
+                <option value="ESTJ">ESTJ</option>
               </select>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
