@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///C:/projects/capstone_2team/app/template.tsx"],"sourcesContent":["\"use client\";\r\n\r\nimport { motion } from \"framer-motion\";\r\n\r\nexport default function Template({ children }: { children: React.ReactNode }) {\r\n  return (\r\n    <motion.main\r\n      initial={{ opacity: 0, y: 15 }}\r\n      animate={{ opacity: 1, y: 0 }}\r\n      exit={{ opacity: 0, y: -15 }}\r\n      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}\r\n      className=\"w-full h-full min-h-screen\"\r\n    >\r\n      {children}\r\n    </motion.main>\r\n  );\r\n}\r\n"],"names":[],"mappings":";;;;;AAEA;AAFA;;;AAIe,SAAS,SAAS,EAAE,QAAQ,EAAiC;IAC1E,qBACE,8OAAC,oMAAM,CAAC,IAAI;QACV,SAAS;YAAE,SAAS;YAAG,GAAG;QAAG;QAC7B,SAAS;YAAE,SAAS;YAAG,GAAG;QAAE;QAC5B,MAAM;YAAE,SAAS;YAAG,GAAG,CAAC;QAAG;QAC3B,YAAY;YAAE,UAAU;YAAK,MAAM;gBAAC;gBAAM;gBAAG;gBAAM;aAAE;QAAC;QACtD,WAAU;kBAET;;;;;;AAGP"}}]
+}
