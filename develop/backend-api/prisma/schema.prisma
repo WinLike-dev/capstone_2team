@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  passwordHash String
+  name         String
+  role         String        @default("USER")
+  createdAt    DateTime      @default(now())
+  profile      UserProfile?
+  dailyRecords DailyRecord[]
+  dailyPlans   DailyPlan[]
+  todos        Todo[]
+  chatHistory  ChatHistory[]
+}
+
+model UserProfile {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  goal          String?
+  activityLevel String?
+  diseases      String[]
+  allergies     String[]
+  height        Float?
+  weight        Float?
+  age           Int?
+  gender        String?
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model DailyRecord {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  date         DateTime @default(now()) @db.Date
+  steps        Int      @default(0)
+  calories     Int      @default(0)
+  sleep        String?
+  water        Int      @default(0)
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, date])
+}
+
+model DailyPlan {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  date      DateTime @db.Date
+  exercise  Json
+  diet      Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, date])
+}
+
+model Todo {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  date        DateTime @db.Date
+  content     String
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model ChatHistory {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  userMessage String
+  aiResponse  String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
