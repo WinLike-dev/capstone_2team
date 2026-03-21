@@ -23,9 +23,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Embedding
 
-- [ ] **EMBD-01**: sentence-transformers multilingual 모델 로딩 (paraphrase-multilingual-MiniLM-L12-v2, 768-dim)
-- [ ] **EMBD-02**: 텍스트 임베딩 생성 (run_in_threadpool로 event loop 블록 방지)
-- [ ] **EMBD-03**: Pinecone 인덱스 dimension과 임베딩 모델 dimension 일치 보장
+- [x] **EMBD-01**: sentence-transformers multilingual 모델 로딩 (paraphrase-multilingual-MiniLM-L12-v2, 768-dim)
+- [x] **EMBD-02**: 텍스트 임베딩 생성 (run_in_threadpool로 event loop 블록 방지)
+- [x] **EMBD-03**: Pinecone 인덱스 dimension과 임베딩 모델 dimension 일치 보장
 
 ### Gemini Flash
 
@@ -106,9 +106,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | PINE-02 | Phase 2 | Pending |
 | PINE-03 | Phase 2 | Pending |
 | PINE-04 | Phase 2 | Pending |
-| EMBD-01 | Phase 2 | Pending |
-| EMBD-02 | Phase 2 | Pending |
-| EMBD-03 | Phase 2 | Pending |
+| EMBD-01 | Phase 2 | Complete |
+| EMBD-02 | Phase 2 | Complete |
+| EMBD-03 | Phase 2 | Complete |
 | GEMI-01 | Phase 2 | Pending |
 | GEMI-02 | Phase 2 | Pending |
 | GEMI-03 | Phase 2 | Pending |
