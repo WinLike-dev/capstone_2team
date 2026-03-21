@@ -16,10 +16,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Pinecone Integration
 
-- [ ] **PINE-01**: PineconeAsyncio 클라이언트 연동 (async 검색/저장)
-- [ ] **PINE-02**: namespace 기반 사용자 격리 (user_id별 namespace 강제)
-- [ ] **PINE-03**: 벡터 검색 (user_id + 메시지 기반 맥락 검색, 결과 반환)
-- [ ] **PINE-04**: 벡터 저장 (임베딩 값 + user_id + 요약 데이터 upsert)
+- [x] **PINE-01**: PineconeAsyncio 클라이언트 연동 (async 검색/저장)
+- [x] **PINE-02**: namespace 기반 사용자 격리 (user_id별 namespace 강제)
+- [x] **PINE-03**: 벡터 검색 (user_id + 메시지 기반 맥락 검색, 결과 반환)
+- [x] **PINE-04**: 벡터 저장 (임베딩 값 + user_id + 요약 데이터 upsert)
 
 ### Embedding
 
@@ -102,10 +102,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | FOUND-02 | Phase 1 | Complete |
 | FOUND-03 | Phase 1 | Pending |
 | FOUND-04 | Phase 1 | Pending |
-| PINE-01 | Phase 2 | Pending |
-| PINE-02 | Phase 2 | Pending |
-| PINE-03 | Phase 2 | Pending |
-| PINE-04 | Phase 2 | Pending |
+| PINE-01 | Phase 2 | Complete |
+| PINE-02 | Phase 2 | Complete |
+| PINE-03 | Phase 2 | Complete |
+| PINE-04 | Phase 2 | Complete |
 | EMBD-01 | Phase 2 | Complete |
 | EMBD-02 | Phase 2 | Complete |
 | EMBD-03 | Phase 2 | Complete |
