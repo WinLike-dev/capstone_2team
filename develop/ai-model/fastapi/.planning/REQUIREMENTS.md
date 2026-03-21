@@ -109,29 +109,29 @@ Deferred to future release. Tracked but not in current roadmap.
 | EMBD-01 | Phase 2 | Pending |
 | EMBD-02 | Phase 2 | Pending |
 | EMBD-03 | Phase 2 | Pending |
-| GEMI-01 | Phase 3 | Pending |
-| GEMI-02 | Phase 3 | Pending |
-| GEMI-03 | Phase 3 | Pending |
-| GEMI-04 | Phase 3 | Pending |
-| GEMI-05 | Phase 3 | Pending |
-| ROUT-01 | Phase 3 | Pending |
-| ROUT-02 | Phase 3 | Pending |
-| ROUT-03 | Phase 3 | Pending |
-| MEAL-01 | Phase 4 | Pending |
-| MEAL-02 | Phase 4 | Pending |
-| MEAL-03 | Phase 4 | Pending |
-| MEAL-04 | Phase 4 | Pending |
-| MEAL-05 | Phase 4 | Pending |
-| RECOM-01 | Phase 4 | Pending |
-| RECOM-02 | Phase 4 | Pending |
-| RECOM-03 | Phase 4 | Pending |
-| RECOM-04 | Phase 4 | Pending |
-| RECOM-05 | Phase 4 | Pending |
-| BGSM-01 | Phase 4 | Pending |
-| BGSM-02 | Phase 4 | Pending |
-| BGSM-03 | Phase 4 | Pending |
-| BGSM-04 | Phase 4 | Pending |
-| BGSM-05 | Phase 4 | Pending |
+| GEMI-01 | Phase 2 | Pending |
+| GEMI-02 | Phase 2 | Pending |
+| GEMI-03 | Phase 2 | Pending |
+| GEMI-04 | Phase 2 | Pending |
+| GEMI-05 | Phase 2 | Pending |
+| ROUT-01 | Phase 2 | Pending |
+| ROUT-02 | Phase 2 | Pending |
+| ROUT-03 | Phase 2 | Pending |
+| MEAL-01 | Phase 3 | Pending |
+| MEAL-02 | Phase 3 | Pending |
+| MEAL-03 | Phase 3 | Pending |
+| MEAL-04 | Phase 3 | Pending |
+| MEAL-05 | Phase 3 | Pending |
+| RECOM-01 | Phase 3 | Pending |
+| RECOM-02 | Phase 3 | Pending |
+| RECOM-03 | Phase 3 | Pending |
+| RECOM-04 | Phase 3 | Pending |
+| RECOM-05 | Phase 3 | Pending |
+| BGSM-01 | Phase 3 | Pending |
+| BGSM-02 | Phase 3 | Pending |
+| BGSM-03 | Phase 3 | Pending |
+| BGSM-04 | Phase 3 | Pending |
+| BGSM-05 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 30 total
@@ -140,4 +140,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-03-21*
-*Last updated: 2026-03-21 after initial definition*
+*Last updated: 2026-03-21 after roadmap creation (coarse granularity: 3 phases)*
