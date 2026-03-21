@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const aiController = require('../controllers/aiController');
-const auth = require('../middleware/authMiddleware');
 
-// 모든 ai 라우트에 JWT 인증 적용
-router.use(auth);
+// 프로토타입: 인증 미들웨어 없음, 추후 추가 예정
 
 // 운동/식단 캘린더 데이터 조회 (기간별)
 router.get('/plans', aiController.getPlans);

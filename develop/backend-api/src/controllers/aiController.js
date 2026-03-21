@@ -6,17 +6,18 @@ const AI_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT) || 30000;
 
 // @route   GET /api/v1/ai/plans
 // @desc    특정 기간의 운동/식단 플랜 조회
-// @access  Private
+// @access  Public (프로토타입)
 exports.getPlans = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { user_id, startDate, endDate } = req.query;
+    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
     if (!startDate || !endDate) return res.status(400).json({ error: 'startDate와 endDate가 필요합니다.' });
 
     // 운동 플랜 조회
     const { data: exercises, error: exErr } = await supabase
       .from('user_exercise_plans')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('user_id', user_id)
       .gte('target_date', startDate)
       .lte('target_date', endDate)
       .order('target_date', { ascending: true });
@@ -25,7 +26,7 @@ exports.getPlans = async (req, res) => {
     const { data: meals, error: mlErr } = await supabase
       .from('user_meal_plans')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('user_id', user_id)
       .gte('target_date', startDate)
       .lte('target_date', endDate)
       .order('target_date', { ascending: true });
@@ -42,21 +43,22 @@ exports.getPlans = async (req, res) => {
 
 // @route   POST /api/v1/ai/process-meal
 // @desc    식단 기록 → AI 서버로 칼로리 분석 중계 (DataFormat_2_ai_api 1번)
-// @access  Private
+// @access  Public (프로토타입)
 exports.processMeal = async (req, res) => {
   try {
-    const { user_message } = req.body;
+    const { user_id, user_message } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
     if (!user_message) return res.status(400).json({ error: '식단 메시지를 입력해주세요.' });
 
     // 유저 프로필 조회
     const { data: profile } = await supabase
       .from('user_health_profiles')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('user_id', user_id)
       .single();
 
     const payload = {
-      user_id: req.user.id,
+      user_id,
       user_profile: profile ? {
         gender: profile.gender,
         age: profile.age,
@@ -91,18 +93,21 @@ exports.processMeal = async (req, res) => {
 
 // @route   POST /api/v1/ai/recommend
 // @desc    운동/식단 추천 요청 (DataFormat_2_ai_api 2번)
-// @access  Private
+// @access  Public (프로토타입)
 exports.recommend = async (req, res) => {
   try {
+    const { user_id } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+
     // 유저 프로필 조회
     const { data: profile } = await supabase
       .from('user_health_profiles')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('user_id', user_id)
       .single();
 
     const payload = {
-      user_id: req.user.id,
+      user_id,
       user_profile: profile ? {
         gender: profile.gender,
         age: profile.age,

@@ -1,32 +1,17 @@
 const supabase = require('../config/db');
 
-// @route   GET /api/v1/users/me
-// @desc    내 기본 정보 조회
-// @access  Private
-exports.getMe = async (req, res) => {
-  try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, email, name, role')
-      .eq('id', req.user.id)
-      .single();
-
-    if (error || !user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
-
 // @route   GET /api/v1/users/profile
-// @desc    내 상세 프로필(건강 정보) 조회
-// @access  Private
+// @desc    건강 프로필 조회
+// @access  Public (프로토타입)
 exports.getProfile = async (req, res) => {
   try {
+    const userId = req.query.user_id;
+    if (!userId) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+
     const { data: profile, error } = await supabase
       .from('user_health_profiles')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('user_id', userId)
       .single();
 
     res.json(profile || {});
@@ -36,15 +21,15 @@ exports.getProfile = async (req, res) => {
 };
 
 // @route   POST /api/v1/users/profile
-// @desc    내 상세 프로필(건강 정보) 생성 및 수정 (Upsert)
-// @access  Private
+// @desc    건강 프로필 생성 및 수정 (Upsert)
+// @access  Public (프로토타입)
 exports.saveProfile = async (req, res) => {
   try {
-    const { mbti, gender, age, height, weight, bmi, goal, activity_level, medical_history, allergies, user_instruction } = req.body;
+    const { user_id, mbti, gender, age, height, weight, bmi, goal, activity_level, medical_history, allergies, user_instruction } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
 
     const profileData = {
-      user_id: req.user.id,
-      mbti, gender, age, height, weight, bmi,
+      user_id, mbti, gender, age, height, weight, bmi,
       goal, activity_level, medical_history, allergies, user_instruction
     };
 
@@ -64,15 +49,18 @@ exports.saveProfile = async (req, res) => {
 
 // @route   GET /api/v1/users/exercises
 // @desc    특정 날짜의 운동 플랜 조회
-// @access  Private
+// @access  Public (프로토타입)
 exports.getExercises = async (req, res) => {
   try {
+    const userId = req.query.user_id;
+    if (!userId) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+
     const targetDate = req.query.date || new Date().toISOString().split('T')[0];
 
     const { data: exercises, error } = await supabase
       .from('user_exercise_plans')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('user_id', userId)
       .eq('target_date', targetDate)
       .order('created_at', { ascending: true });
 
@@ -85,19 +73,18 @@ exports.getExercises = async (req, res) => {
 
 // @route   POST /api/v1/users/exercises
 // @desc    운동 플랜 추가 (추천 확정)
-// @access  Private
+// @access  Public (프로토타입)
 exports.addExercise = async (req, res) => {
   try {
-    const { exercise_name, sets_reps, burn_calories, target_date } = req.body;
-
-    if (!exercise_name || burn_calories == null) {
-      return res.status(400).json({ error: '운동 이름과 소모 칼로리를 입력해주세요.' });
+    const { user_id, exercise_name, sets_reps, burn_calories, target_date } = req.body;
+    if (!user_id || !exercise_name || burn_calories == null) {
+      return res.status(400).json({ error: 'user_id, 운동 이름, 소모 칼로리를 입력해주세요.' });
     }
 
     const { data: exercise, error } = await supabase
       .from('user_exercise_plans')
       .insert({
-        user_id: req.user.id,
+        user_id,
         exercise_name,
         sets_reps,
         burn_calories,
@@ -115,7 +102,7 @@ exports.addExercise = async (req, res) => {
 
 // @route   PUT /api/v1/users/exercises/:id
 // @desc    운동 플랜 완료 상태 변경
-// @access  Private
+// @access  Public (프로토타입)
 exports.updateExercise = async (req, res) => {
   try {
     const exerciseId = parseInt(req.params.id);
@@ -125,7 +112,6 @@ exports.updateExercise = async (req, res) => {
       .from('user_exercise_plans')
       .update({ is_completed })
       .eq('exercise_id', exerciseId)
-      .eq('user_id', req.user.id)
       .select()
       .single();
 
@@ -138,7 +124,7 @@ exports.updateExercise = async (req, res) => {
 
 // @route   DELETE /api/v1/users/exercises/:id
 // @desc    운동 플랜 삭제
-// @access  Private
+// @access  Public (프로토타입)
 exports.deleteExercise = async (req, res) => {
   try {
     const exerciseId = parseInt(req.params.id);
@@ -146,8 +132,7 @@ exports.deleteExercise = async (req, res) => {
     const { error } = await supabase
       .from('user_exercise_plans')
       .delete()
-      .eq('exercise_id', exerciseId)
-      .eq('user_id', req.user.id);
+      .eq('exercise_id', exerciseId);
 
     if (error) throw error;
     res.json({ message: '삭제 완료' });
@@ -158,15 +143,18 @@ exports.deleteExercise = async (req, res) => {
 
 // @route   GET /api/v1/users/meals
 // @desc    특정 날짜의 식단 플랜 조회
-// @access  Private
+// @access  Public (프로토타입)
 exports.getMeals = async (req, res) => {
   try {
+    const userId = req.query.user_id;
+    if (!userId) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+
     const targetDate = req.query.date || new Date().toISOString().split('T')[0];
 
     const { data: meals, error } = await supabase
       .from('user_meal_plans')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('user_id', userId)
       .eq('target_date', targetDate)
       .order('created_at', { ascending: true });
 
@@ -179,19 +167,18 @@ exports.getMeals = async (req, res) => {
 
 // @route   POST /api/v1/users/meals
 // @desc    식단 플랜 추가 (추천 확정)
-// @access  Private
+// @access  Public (프로토타입)
 exports.addMeal = async (req, res) => {
   try {
-    const { food_name, meal_type, calories, target_date } = req.body;
-
-    if (!food_name || !meal_type || calories == null) {
-      return res.status(400).json({ error: '음식 이름, 식사 타입, 칼로리를 입력해주세요.' });
+    const { user_id, food_name, meal_type, calories, target_date } = req.body;
+    if (!user_id || !food_name || !meal_type || calories == null) {
+      return res.status(400).json({ error: 'user_id, 음식 이름, 식사 타입, 칼로리를 입력해주세요.' });
     }
 
     const { data: meal, error } = await supabase
       .from('user_meal_plans')
       .insert({
-        user_id: req.user.id,
+        user_id,
         food_name,
         meal_type,
         calories,
@@ -209,7 +196,7 @@ exports.addMeal = async (req, res) => {
 
 // @route   DELETE /api/v1/users/meals/:id
 // @desc    식단 플랜 삭제
-// @access  Private
+// @access  Public (프로토타입)
 exports.deleteMeal = async (req, res) => {
   try {
     const mealId = parseInt(req.params.id);
@@ -217,8 +204,7 @@ exports.deleteMeal = async (req, res) => {
     const { error } = await supabase
       .from('user_meal_plans')
       .delete()
-      .eq('meal_id', mealId)
-      .eq('user_id', req.user.id);
+      .eq('meal_id', mealId);
 
     if (error) throw error;
     res.json({ message: '삭제 완료' });
