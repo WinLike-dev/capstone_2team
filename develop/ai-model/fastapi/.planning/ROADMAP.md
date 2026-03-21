@@ -27,7 +27,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `/process-meal`, `/recommend` 엔드포인트의 요청/응답 Pydantic 스키마가 존재하고, 잘못된 요청 본문에 422 에러를 반환한다
   3. `.env` 파일의 환경변수(API 키, Pinecone URL, WAS URL)가 누락되면 서버 시작 시 즉시 에러로 종료된다
   4. lifespan 이벤트에서 외부 클라이언트 초기화 코드가 실행 위치에 배치되어 있다 (실제 연결은 Phase 2에서 완성)
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — 프로젝트 4계층 구조 + Settings + lifespan + /health
+- [ ] 01-02-PLAN.md — Pydantic 스키마 + 스텁 엔드포인트 (/process-meal, /recommend)
 
 ### Phase 2: Core Integrations
 **Goal**: 모든 외부 시스템 클라이언트가 독립적으로 동작하고 테스트 가능하다
@@ -60,6 +63,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/2 | Planning | - |
 | 2. Core Integrations | 0/TBD | Not started | - |
 | 3. Endpoints and Memory | 0/TBD | Not started | - |
