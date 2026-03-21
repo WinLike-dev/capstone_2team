@@ -37,9 +37,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Router AI
 
-- [ ] **ROUT-01**: LLM 기반 의도 분류 모듈 구현 (6가지 모드: 단순대화/플랜작성/플랜수정/식단작성/식단수정/DB수정)
-- [ ] **ROUT-02**: Router 시스템 지침서 프롬프트 적용 (JSON 출력: mode + reason)
-- [ ] **ROUT-03**: Router AI 단독 테스트 가능한 인터페이스
+- [x] **ROUT-01**: LLM 기반 의도 분류 모듈 구현 (6가지 모드: 단순대화/플랜작성/플랜수정/식단작성/식단수정/DB수정)
+- [x] **ROUT-02**: Router 시스템 지침서 프롬프트 적용 (JSON 출력: mode + reason)
+- [x] **ROUT-03**: Router AI 단독 테스트 가능한 인터페이스
 
 ### Meal Recording (Mode 7)
 
@@ -114,9 +114,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | GEMI-03 | Phase 2 | Pending |
 | GEMI-04 | Phase 2 | Pending |
 | GEMI-05 | Phase 2 | Pending |
-| ROUT-01 | Phase 2 | Pending |
-| ROUT-02 | Phase 2 | Pending |
-| ROUT-03 | Phase 2 | Pending |
+| ROUT-01 | Phase 2 | Complete |
+| ROUT-02 | Phase 2 | Complete |
+| ROUT-03 | Phase 2 | Complete |
 | MEAL-01 | Phase 3 | Pending |
 | MEAL-02 | Phase 3 | Pending |
 | MEAL-03 | Phase 3 | Pending |

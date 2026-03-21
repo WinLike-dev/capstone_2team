@@ -42,7 +42,7 @@ Plans:
   3. Gemini Flash 클라이언트가 Mode 7(식단 분석)과 Mode 8(추천) 프롬프트로 호출 시 지정된 JSON 스키마 형식의 응답을 반환한다
   4. Router AI가 테스트 입력 문장에 대해 6가지 모드 중 하나와 reason을 JSON으로 반환한다
   5. Gemini API가 429 에러를 반환할 때 exponential backoff로 재시도한다
-**Plans:** 5 plans
+**Plans:** 2/5 plans executed
 Plans:
 - [ ] 02-01-PLAN.md — Settings 환경변수 + 의존성 + EmbeddingClient
 - [ ] 02-02-PLAN.md — PineconeClient (async 검색/저장, namespace 격리)
@@ -70,5 +70,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-03-21 |
-| 2. Core Integrations | 0/5 | Planning complete | - |
+| 2. Core Integrations | 2/5 | In Progress|  |
 | 3. Endpoints and Memory | 0/TBD | Not started | - |

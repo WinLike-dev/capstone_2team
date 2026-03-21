@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-21T18:07:46.118Z"
+stopped_at: Completed 02-core-integrations/02-01-PLAN.md
+last_updated: "2026-03-21T18:37:12.171Z"
 last_activity: 2026-03-21 — Plan 01-02 complete (Pydantic schemas + stub endpoints)
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 7
+  completed_plans: 4
   percent: 33
 ---
 
@@ -50,6 +50,8 @@ Progress: [███░░░░░░░] 33%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 02-core-integrations P04 | 5 | 2 tasks | 4 files |
+| Phase 02-core-integrations P01 | 5 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -69,6 +71,11 @@ Recent decisions affecting current work:
 - 01-02: UserProfile unified model with all-optional fields shared across /process-meal and /recommend
 - 01-02: Stubs return hardcoded data; Phase 3 replaces only stub body, interface stays stable
 - 01-02: Routers registered without API prefix (routes are /process-meal, /recommend as-is)
+- [Phase 02-core-integrations]: RouterClient uses separate ROUTER_API_KEY and ROUTER_MODEL_NAME (not shared with GeminiClient)
+- [Phase 02-core-integrations]: Router output schema is mode+reason only, no confidence score
+- [Phase 02-core-integrations]: EMBEDDING_DIM=384: paraphrase-multilingual-MiniLM-L12-v2 outputs 384-dim (CONTEXT.md 768 was incorrect)
+- [Phase 02-core-integrations]: EmbeddingClient takes model via constructor for DI and easy test mocking
+- [Phase 02-core-integrations]: run_in_threadpool used for encode() to keep asyncio event loop unblocked
 
 ### Pending Todos
 
@@ -81,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T18:07:46.112Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-core-integrations/02-CONTEXT.md
+Last session: 2026-03-21T18:37:12.168Z
+Stopped at: Completed 02-core-integrations/02-01-PLAN.md
+Resume file: None
