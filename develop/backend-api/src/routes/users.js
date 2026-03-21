@@ -9,18 +9,19 @@ router.use(auth);
 // 기본 유저 정보
 router.get('/me', userController.getMe);
 
-// 1. 온보딩 / 프로필 정보
+// 1. 건강 프로필 (user_health_profiles)
 router.get('/profile', userController.getProfile);
 router.post('/profile', userController.saveProfile);
 
-// 2. 대시보드 통계 (걸음수, 칼로리 등)
-router.get('/dashboard', userController.getDashboard);
-router.post('/dashboard', userController.saveDashboard);
+// 2. 운동 플랜 (user_exercise_plans)
+router.get('/exercises', userController.getExercises);
+router.post('/exercises', userController.addExercise);
+router.put('/exercises/:id', userController.updateExercise);
+router.delete('/exercises/:id', userController.deleteExercise);
 
-// 3. 할 일 (Todos)
-router.get('/todos', userController.getTodos);
-router.post('/todos', userController.addTodo);
-router.put('/todos/:id', userController.updateTodo);
-router.delete('/todos/:id', userController.deleteTodo);
+// 3. 식단 플랜 (user_meal_plans)
+router.get('/meals', userController.getMeals);
+router.post('/meals', userController.addMeal);
+router.delete('/meals/:id', userController.deleteMeal);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const prisma = require('../config/db');
+const supabase = require('../config/db');
 
 // @route   POST /api/v1/auth/register
 // @desc    유저 회원가입
@@ -15,9 +15,11 @@ exports.register = async (req, res) => {
     }
 
     // 2. 이미 존재하는 이메일인지 확인
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
 
     if (existingUser) {
       return res.status(400).json({ error: '이미 사용 중인 이메일입니다.' });
@@ -28,20 +30,13 @@ exports.register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     // 4. DB에 유저 생성
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        name,
-      },
-      select: { // 민감한 정보(passwordHash)는 응답에서 제외
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true
-      }
-    });
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert({ email, password_hash: passwordHash, name })
+      .select('id, email, name, role, created_at')
+      .single();
+
+    if (error) throw error;
 
     res.status(201).json({ message: '회원가입이 완료되었습니다.', user });
   } catch (err) {
@@ -63,16 +58,18 @@ exports.login = async (req, res) => {
     }
 
     // 2. 유저 존재 확인
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
 
-    if (!user) {
+    if (error || !user) {
       return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' });
     }
 
     // 3. 비밀번호 일치 확인
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
       return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' });

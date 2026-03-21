@@ -1,4 +1,4 @@
-const prisma = require('../config/db');
+const supabase = require('../config/db');
 
 // @route   GET /api/v1/admin/stats
 // @desc    전체 이용 통계 조회 (관리자 전용)
@@ -12,29 +12,28 @@ exports.getStats = async (req, res) => {
 
     // 2. 통계 집계 병렬 처리
     const [
-      totalUsers,
-      totalHealthData,
-      totalChatMessages,
-      recentUsers
+      { count: totalUsers },
+      { count: totalProfiles },
+      { count: totalChatMessages },
+      { data: recentUsers }
     ] = await Promise.all([
-      prisma.user.count(),
-      prisma.healthData.count(),
-      prisma.chatHistory.count(),
-      prisma.user.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: { id: true, email: true, name: true, createdAt: true }
-      })
+      supabase.from('users').select('*', { count: 'exact', head: true }),
+      supabase.from('user_health_profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('chat_history').select('*', { count: 'exact', head: true }),
+      supabase.from('users')
+        .select('id, email, name, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5)
     ]);
 
     // 3. 통계 결과 응답
     res.json({
       overview: {
-        totalUsers,
-        totalHealthData,
-        totalChatMessages
+        totalUsers: totalUsers || 0,
+        totalProfiles: totalProfiles || 0,
+        totalChatMessages: totalChatMessages || 0
       },
-      recentSignups: recentUsers
+      recentSignups: recentUsers || []
     });
     
   } catch (err) {

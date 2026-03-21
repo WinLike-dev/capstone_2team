@@ -1,15 +1,17 @@
-const prisma = require('../config/db');
+const supabase = require('../config/db');
 
 // @route   GET /api/v1/users/me
 // @desc    내 기본 정보 조회
 // @access  Private
 exports.getMe = async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, email: true, name: true, role: true }
-    });
-    if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email, name, role')
+      .eq('id', req.user.id)
+      .single();
+
+    if (error || !user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
@@ -17,13 +19,16 @@ exports.getMe = async (req, res) => {
 };
 
 // @route   GET /api/v1/users/profile
-// @desc    내 상세 프로필(온보딩 데이터) 조회
+// @desc    내 상세 프로필(건강 정보) 조회
 // @access  Private
 exports.getProfile = async (req, res) => {
   try {
-    const profile = await prisma.userProfile.findUnique({
-      where: { userId: req.user.id }
-    });
+    const { data: profile, error } = await supabase
+      .from('user_health_profiles')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .single();
+
     res.json(profile || {});
   } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
@@ -31,121 +36,191 @@ exports.getProfile = async (req, res) => {
 };
 
 // @route   POST /api/v1/users/profile
-// @desc    내 상세 프로필(온보딩) 생성 및 수정 (Upsert)
+// @desc    내 상세 프로필(건강 정보) 생성 및 수정 (Upsert)
 // @access  Private
 exports.saveProfile = async (req, res) => {
   try {
-    const { goal, activityLevel, diseases, allergies, height, weight, age, gender } = req.body;
+    const { mbti, gender, age, height, weight, bmi, goal, activity_level, medical_history, allergies, user_instruction } = req.body;
 
-    const profile = await prisma.userProfile.upsert({
-      where: { userId: req.user.id },
-      update: { goal, activityLevel, diseases, allergies, height, weight, age, gender },
-      create: { 
-        userId: req.user.id, 
-        goal, activityLevel, diseases, allergies, height, weight, age, gender 
-      }
-    });
+    const profileData = {
+      user_id: req.user.id,
+      mbti, gender, age, height, weight, bmi,
+      goal, activity_level, medical_history, allergies, user_instruction
+    };
+
+    const { data: profile, error } = await supabase
+      .from('user_health_profiles')
+      .upsert(profileData, { onConflict: 'user_id' })
+      .select()
+      .single();
+
+    if (error) throw error;
     res.json({ message: '프로필 저장 성공', profile });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
 
-// @route   GET /api/v1/users/dashboard
-// @desc    특정 날짜의 대시보드 스탯 조회
+// @route   GET /api/v1/users/exercises
+// @desc    특정 날짜의 운동 플랜 조회
 // @access  Private
-exports.getDashboard = async (req, res) => {
+exports.getExercises = async (req, res) => {
   try {
-    const queryDate = req.query.date ? new Date(req.query.date) : new Date();
-    
-    const record = await prisma.dailyRecord.findUnique({
-      where: { userId_date: { userId: req.user.id, date: queryDate } }
-    });
-    res.json(record || { steps: 0, calories: 0, water: 0, sleep: null });
+    const targetDate = req.query.date || new Date().toISOString().split('T')[0];
+
+    const { data: exercises, error } = await supabase
+      .from('user_exercise_plans')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .eq('target_date', targetDate)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    res.json(exercises || []);
   } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
 
-// @route   POST /api/v1/users/dashboard
-// @desc    특정 날짜의 대시보드 스탯 저장/업데이트
+// @route   POST /api/v1/users/exercises
+// @desc    운동 플랜 추가 (추천 확정)
 // @access  Private
-exports.saveDashboard = async (req, res) => {
+exports.addExercise = async (req, res) => {
   try {
-    const { date, steps, calories, sleep, water } = req.body;
-    const targetDate = date ? new Date(date) : new Date();
+    const { exercise_name, sets_reps, burn_calories, target_date } = req.body;
 
-    const record = await prisma.dailyRecord.upsert({
-      where: { userId_date: { userId: req.user.id, date: targetDate } },
-      update: { steps, calories, sleep, water },
-      create: { userId: req.user.id, date: targetDate, steps, calories, sleep, water }
-    });
-    res.json({ message: '대시보드 저장 성공', record });
+    if (!exercise_name || burn_calories == null) {
+      return res.status(400).json({ error: '운동 이름과 소모 칼로리를 입력해주세요.' });
+    }
+
+    const { data: exercise, error } = await supabase
+      .from('user_exercise_plans')
+      .insert({
+        user_id: req.user.id,
+        exercise_name,
+        sets_reps,
+        burn_calories,
+        target_date: target_date || new Date().toISOString().split('T')[0]
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(201).json(exercise);
   } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
 
-// @route   GET /api/v1/users/todos
-// @desc    특정 날짜의 할 일 목록 조회
+// @route   PUT /api/v1/users/exercises/:id
+// @desc    운동 플랜 완료 상태 변경
 // @access  Private
-exports.getTodos = async (req, res) => {
+exports.updateExercise = async (req, res) => {
   try {
-    const targetDate = req.query.date ? new Date(req.query.date) : new Date();
-    const todos = await prisma.todo.findMany({
-      where: { userId: req.user.id, date: targetDate },
-      orderBy: { createdAt: 'asc' }
-    });
-    res.json(todos);
+    const exerciseId = parseInt(req.params.id);
+    const { is_completed } = req.body;
+
+    const { data: exercise, error } = await supabase
+      .from('user_exercise_plans')
+      .update({ is_completed })
+      .eq('exercise_id', exerciseId)
+      .eq('user_id', req.user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(exercise);
   } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
 
-// @route   POST /api/v1/users/todos
-// @desc    새로운 할 일 생성
+// @route   DELETE /api/v1/users/exercises/:id
+// @desc    운동 플랜 삭제
 // @access  Private
-exports.addTodo = async (req, res) => {
+exports.deleteExercise = async (req, res) => {
   try {
-    const { date, content } = req.body;
-    const targetDate = date ? new Date(date) : new Date();
-    
-    if (!content) return res.status(400).json({ error: '내용을 입력해주세요.' });
+    const exerciseId = parseInt(req.params.id);
 
-    const todo = await prisma.todo.create({
-      data: { userId: req.user.id, date: targetDate, content }
-    });
-    res.status(201).json(todo);
+    const { error } = await supabase
+      .from('user_exercise_plans')
+      .delete()
+      .eq('exercise_id', exerciseId)
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    res.json({ message: '삭제 완료' });
   } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
 
-// @route   PUT /api/v1/users/todos/:id
-// @desc    할 일 상태 변경 (완료 처리 등)
+// @route   GET /api/v1/users/meals
+// @desc    특정 날짜의 식단 플랜 조회
 // @access  Private
-exports.updateTodo = async (req, res) => {
+exports.getMeals = async (req, res) => {
   try {
-    const todoId = parseInt(req.params.id);
-    const { isCompleted } = req.body;
+    const targetDate = req.query.date || new Date().toISOString().split('T')[0];
 
-    const todo = await prisma.todo.update({
-      where: { id: todoId },
-      data: { isCompleted }
-    });
-    res.json(todo);
+    const { data: meals, error } = await supabase
+      .from('user_meal_plans')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .eq('target_date', targetDate)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    res.json(meals || []);
   } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
 
-// @route   DELETE /api/v1/users/todos/:id
-// @desc    할 일 삭제
+// @route   POST /api/v1/users/meals
+// @desc    식단 플랜 추가 (추천 확정)
 // @access  Private
-exports.deleteTodo = async (req, res) => {
+exports.addMeal = async (req, res) => {
   try {
-    const todoId = parseInt(req.params.id);
-    await prisma.todo.delete({ where: { id: todoId } });
+    const { food_name, meal_type, calories, target_date } = req.body;
+
+    if (!food_name || !meal_type || calories == null) {
+      return res.status(400).json({ error: '음식 이름, 식사 타입, 칼로리를 입력해주세요.' });
+    }
+
+    const { data: meal, error } = await supabase
+      .from('user_meal_plans')
+      .insert({
+        user_id: req.user.id,
+        food_name,
+        meal_type,
+        calories,
+        target_date: target_date || new Date().toISOString().split('T')[0]
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(201).json(meal);
+  } catch (err) {
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
+
+// @route   DELETE /api/v1/users/meals/:id
+// @desc    식단 플랜 삭제
+// @access  Private
+exports.deleteMeal = async (req, res) => {
+  try {
+    const mealId = parseInt(req.params.id);
+
+    const { error } = await supabase
+      .from('user_meal_plans')
+      .delete()
+      .eq('meal_id', mealId)
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
     res.json({ message: '삭제 완료' });
   } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
