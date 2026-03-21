@@ -20,7 +20,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",")]
 
     # Gemini 모델 설정
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-flash-lite-latest"
     gemini_temperature: float = 0.3  # 헬스케어: 낮은 temperature로 일관된 응답 유도
 
     class Config:

@@ -8,7 +8,8 @@
 
 **HealthMate** 헬스케어 앱의 AI Core 마이크로서비스.
 FastAPI + LangChain + Google Gemini Flash 기반으로, **Router AI → Worker AI** 두 트랙 파이프라인을 구현합니다.
-WAS(Node.js)에서 사용자 프로필과 메시지를 받아 모드별 구조화된 JSON 응답을 생성합니다.
+WAS(Node.js)에서 사용자 메시지를 받아 모드별 구조화된 JSON 응답을 생성합니다.
+Router AI는 사용자 메시지만 인풋으로 받으며, 사용자 프로필·지시사항은 Worker AI 단계에서 사용합니다.
 
 ---
 
@@ -150,7 +151,8 @@ class ChatUserProfile(BaseUserProfile)          # POST /ai-chat용
 class MealUserProfile(BaseUserProfile)          # + medical_history, allergies
 class RecommendUserProfile(BaseUserProfile)     # + activity_level
 
-class AIChatRequest:    user_id, user_profile: ChatUserProfile, user_instruction, user_message
+# user_message 필수 / 나머지는 Optional (Worker AI 구현 시 활용)
+class AIChatRequest:    user_message, user_id?, user_profile?: ChatUserProfile, user_instruction?
 class MealRequest:      user_id, user_profile: MealUserProfile, user_instruction, user_message
 class RecommendRequest: user_id, user_profile: RecommendUserProfile, user_instruction
 ```
@@ -162,10 +164,7 @@ class RecommendRequest: user_id, user_profile: RecommendUserProfile, user_instru
 class RouterResult:         selected_mode (1~6), reason
 
 # POST /ai-chat
-class PlanItem:             type, detail, value          # 운동·식단 공용
-class Plan:                 date, items: list[PlanItem]
-class DBUpdate:             field, new_value
-class ChatData:             message, plan: Plan|None, db_update: DBUpdate|None
+class ChatData:             message
 class AIChatResponse:       status, mode, data: ChatData
 
 # POST /process-meal
@@ -185,67 +184,38 @@ class RecommendResponse:    status, data: RecommendData
 
 ### `POST /ai-chat` — 채팅 (모드 1~6)
 
-**Request:**
+**Request (최소):**
 ```json
 {
-  "user_id": "user-001",
-  "user_profile": { "gender": "female", "age": 28, "bmi": 22.5, "goal": "체중 감량" },
-  "user_instruction": "짧게 답변해줘",
   "user_message": "1주일 운동 루틴 짜줘"
 }
 ```
 
-**Response (현재 — Router AI stub 상태):**
+**Response (현재 — Worker AI stub 상태):**
 ```json
 {
   "status": "success",
   "mode": 2,
   "data": {
-    "message": "[Worker AI 미구현] Router AI가 '운동 플랜 작성' 모드로 분류했습니다. (근거: ...)",
-    "plan": null,
-    "db_update": null
+    "message": "[Worker AI 미구현] Router AI가 '운동 플랜 작성' 모드로 분류했습니다. (근거: ...)"
   }
 }
 ```
 
-**Response (Worker AI 완성 후 — Mode 2 예시):**
+**Response (Worker AI 완성 후):**
 ```json
 {
   "status": "success",
   "mode": 2,
   "data": {
-    "message": "운동 계획이 생성되었습니다.",
-    "plan": {
-      "date": "2026-03-21 ~ 2026-03-27",
-      "items": [
-        { "type": "유산소", "detail": "러닝 - 월/수/금", "value": "30분" }
-      ]
-    },
-    "db_update": null
+    "message": "운동 계획이 생성되었습니다."
   }
 }
 ```
 
 ### `POST /process-meal` — 식단 기록 (모드 7, Router AI 바이패스)
 
-**Request:**
-```json
-{
-  "user_id": "user-001",
-  "user_profile": { "gender": "female", "age": 28, "bmi": 22.5, "goal": "체중 감량", "medical_history": [], "allergies": ["견과류"] },
-  "user_message": "점심에 닭가슴살 샐러드 먹었어"
-}
-```
-
 ### `POST /recommend` — 운동·식단 추천 (모드 8, AI 바이패스)
-
-**Request:**
-```json
-{
-  "user_id": "user-001",
-  "user_profile": { "gender": "male", "age": 30, "bmi": 25.1, "goal": "체중 감량", "activity_level": "보통" }
-}
-```
 
 ### `GET /health`
 서버 상태 확인. `{ "status": "ok", "service": "ai-core" }` 반환.
@@ -281,12 +251,14 @@ uvicorn main:app --port 8000
 | 키 | 설명 | 기본값 |
 |---|---|---|
 | `GOOGLE_API_KEY` | Google Gemini API 키 (필수) | - |
-| `GEMINI_MODEL` | 사용할 Gemini 모델 | `gemini-2.0-flash` |
+| `GEMINI_MODEL` | 사용할 Gemini 모델 | `gemini-flash-lite-latest` |
 | `APP_ENV` | 실행 환경 | `development` |
 | `APP_PORT` | 서버 포트 | `8000` |
 | `CORS_ORIGINS` | CORS 허용 오리진 (쉼표 구분) | `http://localhost:3000` |
 
 > `.env` 파일은 `.gitignore`에 포함되어 있어 API 키가 Git에 노출되지 않습니다.
+
+> **⚠️ API 키 모델 제한**: 신규 Google AI Studio API 키는 `gemini-2.0-flash` 이하 버전을 지원하지 않습니다. `gemini-flash-lite-latest`, `gemini-flash-latest`, `gemini-2.5-flash` 계열만 사용 가능합니다.
 
 ---
 
@@ -295,7 +267,7 @@ uvicorn main:app --port 8000
 | 카테고리 | 기술 |
 |---|---|
 | 웹 프레임워크 | FastAPI |
-| AI/LLM | LangChain + Google Gemini (`gemini-2.0-flash`) |
+| AI/LLM | LangChain + Google Gemini (`gemini-flash-lite-latest`) |
 | Structured Output | `llm.with_structured_output(RouterResult)` — Router AI 전용 |
 | 데이터 검증 | Pydantic v2 |
 | 설정 관리 | pydantic-settings + python-dotenv |

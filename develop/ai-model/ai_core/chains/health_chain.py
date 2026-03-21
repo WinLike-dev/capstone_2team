@@ -14,7 +14,7 @@ health_chain.py — AI Core 파이프라인 오케스트레이터
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -35,8 +35,6 @@ CHAT_FALLBACK: dict[str, Any] = {
     "mode": 1,
     "data": {
         "message": "죄송합니다. 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
-        "plan": None,
-        "db_update": None,
     },
 }
 
@@ -87,7 +85,7 @@ def _build_user_vars(profile: Any) -> dict[str, str]:
 # [Router AI 담당] 백엔드 데이터 페치 (Mode 3, 5)
 # ──────────────────────────────────────────────────────────────────────────────
 
-async def _fetch_current_exercise_list(user_id: str) -> list[dict]:
+async def _fetch_current_exercise_list(user_id: Any) -> list[dict]:
     """[더미] 백엔드에서 현재 운동 계획 목록을 가져옵니다.
     실제 구현 시: GET /api/users/{user_id}/exercise-plans
     """
@@ -96,7 +94,7 @@ async def _fetch_current_exercise_list(user_id: str) -> list[dict]:
     return []
 
 
-async def _fetch_current_diet_list(user_id: str) -> list[dict]:
+async def _fetch_current_diet_list(user_id: Any) -> list[dict]:
     """[더미] 백엔드에서 현재 식단 목록을 가져옵니다.
     실제 구현 시: GET /api/users/{user_id}/diet-plans
     """
@@ -174,11 +172,7 @@ async def _call_worker_ai(
             {
                 "status": "success",
                 "mode": int,
-                "data": {
-                    "message": str,
-                    "plan": { "date": str, "items": [...] } | None,
-                    "db_update": { "field": str, "new_value": any } | None
-                }
+                "data": { "message": str }
             }
     """
     # ── TODO: 아래 stub을 Worker AI 호출 로직으로 교체하세요 ──────────────
@@ -202,8 +196,6 @@ async def _call_worker_ai(
                 f"Router AI가 '{MODE_NAMES.get(mode, mode)}' 모드로 분류했습니다. "
                 f"(근거: {router_result.reason})"
             ),
-            "plan": None,
-            "db_update": None,
         },
     }
 
@@ -279,7 +271,7 @@ async def run_chat_chain(request: AIChatRequest) -> dict[str, Any]:
     """
     try:
         llm = _build_llm()
-        user_vars = _build_user_vars(request.user_profile)
+        user_vars = _build_user_vars(request.user_profile) if request.user_profile else {}
 
         # ── Step 1: Router AI 실행 ────────────────────────────────────────
         logger.info("Router AI 호출. user_id=%s, message=%r",

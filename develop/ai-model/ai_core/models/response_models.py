@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Any
+from typing import Optional
 
 
 # ── Router AI 출력 스키마 (LangChain Structured Output 내부 전용) ─────────────
@@ -12,45 +12,9 @@ class RouterResult(BaseModel):
 
 # ── POST /ai-chat 응답 ────────────────────────────────────────────────────────
 
-class PlanItem(BaseModel):
-    """계획 항목 하나 (운동 또는 식단 공용)."""
-    type: str = Field(
-        ...,
-        description="운동 종류 또는 식품 종류 (예: '유산소', '닭가슴살 샐러드')",
-    )
-    detail: str = Field(
-        ...,
-        description="세부 항목 또는 식사 시간 (예: '러닝 30분', '아침', '월요일')",
-    )
-    value: str = Field(
-        ...,
-        description="횟수·세트 또는 수량 (예: '3세트 x 12회', '1인분')",
-    )
-
-
-class Plan(BaseModel):
-    """계획 전체 (운동 플랜 또는 식단 플랜)."""
-    date: str = Field(
-        ...,
-        description="날짜 또는 기간 (예: '2026-03-21', '2026-03-21 ~ 2026-03-27')",
-    )
-    items: list[PlanItem] = Field(..., description="계획 항목 목록")
-
-
-class DBUpdate(BaseModel):
-    """사용자 DB 업데이트 정보 (Mode 6 전용, 프론트 비노출)."""
-    field: str = Field(..., description="업데이트할 DB 필드명")
-    new_value: Any = Field(..., description="새로운 값")
-
-
 class ChatData(BaseModel):
     """POST /ai-chat 응답 data 필드."""
     message: str = Field(..., description="사용자에게 보여줄 피드백 메시지")
-    plan: Optional[Plan] = Field(None, description="생성/수정된 계획 (Mode 2~5 전용)")
-    db_update: Optional[DBUpdate] = Field(
-        None,
-        description="DB 업데이트 정보 (Mode 6 전용 — 프론트에서 사용자에게 비노출)",
-    )
 
 
 class AIChatResponse(BaseModel):

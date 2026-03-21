@@ -41,13 +41,13 @@ class RecommendUserProfile(BaseUserProfile):
 
 class AIChatRequest(BaseModel):
     """POST /ai-chat 요청 바디 (모드 1~6 채팅)."""
-    user_id: str = Field(..., description="사용자 고유 ID")
-    user_profile: ChatUserProfile = Field(..., description="사용자 건강 프로필")
+    user_message: str = Field(..., description="사용자 채팅 메시지")
+    user_id: Optional[str] = Field(None, description="사용자 고유 ID")
+    user_profile: Optional[ChatUserProfile] = Field(None, description="사용자 건강 프로필")
     user_instruction: Optional[str] = Field(
         None,
         description="사용자 개인 지시사항 (DB의 user_instruction 필드)",
     )
-    user_message: str = Field(..., description="사용자 채팅 메시지")
 
 
 class MealRequest(BaseModel):

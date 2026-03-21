@@ -21,15 +21,27 @@ router = APIRouter(tags=["AI Core"])
     summary="AI 채팅 (모드 1~6)",
     description=(
         "사용자 채팅 메시지를 Router AI가 모드 1~6으로 분류한 후 Worker AI가 응답을 생성합니다.\n\n"
-        "| 모드 | 설명 | 응답 필드 |\n"
-        "|------|------|-----------|\n"
-        "| 1 | 단순 대화/질문 | `data.message` |\n"
-        "| 2 | 운동 플랜 작성 | `data.message` + `data.plan` |\n"
-        "| 3 | 운동 플랜 수정 | `data.message` + `data.plan` |\n"
-        "| 4 | 식단 플랜 작성 | `data.message` + `data.plan` |\n"
-        "| 5 | 식단 플랜 수정 | `data.message` + `data.plan` |\n"
-        "| 6 | 사용자 정보 수정 | `data.message` + `data.db_update` (프론트 비노출) |"
+        "**필수 필드**: `user_message`만 전송하면 됩니다.\n\n"
+        "| 모드 | 설명 |\n"
+        "|------|------|\n"
+        "| 1 | 단순 대화/질문 |\n"
+        "| 2 | 운동 플랜 작성 |\n"
+        "| 3 | 운동 플랜 수정 |\n"
+        "| 4 | 식단 플랜 작성 |\n"
+        "| 5 | 식단 플랜 수정 |\n"
+        "| 6 | 사용자 정보 수정 |"
     ),
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "user_message": "1주일 운동 루틴 짜줘"
+                    }
+                }
+            }
+        }
+    },
 )
 async def ai_chat(request: AIChatRequest) -> AIChatResponse:
     logger.info(
