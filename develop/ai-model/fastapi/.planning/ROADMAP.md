@@ -12,7 +12,7 @@ FastAPI AI 오케스트레이션 허브를 세 단계로 구축한다. Phase 1�
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - FastAPI 서버 구조, 환경변수, Pydantic 스키마 전체 정의
+- [x] **Phase 1: Foundation** - FastAPI 서버 구조, 환경변수, Pydantic 스키마 전체 정의
 - [ ] **Phase 2: Core Integrations** - Pinecone, Embedding, Gemini Flash, Router AI 클라이언트 구현
 - [ ] **Phase 3: Endpoints and Memory** - /process-meal, /recommend 엔드포인트 + Background Summary 파이프라인
 
@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 2 plans
 Plans:
 - [x] 01-01-PLAN.md — 프로젝트 4계층 구조 + Settings + lifespan + /health
-- [ ] 01-02-PLAN.md — Pydantic 스키마 + 스텁 엔드포인트 (/process-meal, /recommend)
+- [x] 01-02-PLAN.md — Pydantic 스키마 + 스텁 엔드포인트 (/process-meal, /recommend)
 
 ### Phase 2: Core Integrations
 **Goal**: 모든 외부 시스템 클라이언트가 독립적으로 동작하고 테스트 가능하다
@@ -63,6 +63,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/2 | In progress | - |
+| 1. Foundation | 2/2 | Complete | 2026-03-21 |
 | 2. Core Integrations | 0/TBD | Not started | - |
 | 3. Endpoints and Memory | 0/TBD | Not started | - |

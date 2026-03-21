@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-03-21T17:03:13Z"
-last_activity: 2026-03-21 — Plan 01-01 complete (FastAPI scaffold + /health + tests)
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-03-21T17:12:00Z"
+last_activity: 2026-03-21 — Plan 01-02 complete (Pydantic schemas + stub endpoints)
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 6
-  completed_plans: 1
-  percent: 17
+  completed_plans: 2
+  percent: 33
 ---
 
 # Project State
@@ -26,27 +26,27 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 1 of 3 (Foundation)
-Plan: 1 of 6 total plans
+Plan: 2 of 6 total plans
 Status: In progress
-Last activity: 2026-03-21 — Plan 01-01 complete (FastAPI scaffold + /health + tests)
+Last activity: 2026-03-21 — Plan 01-02 complete (Pydantic schemas + stub endpoints)
 
-Progress: [█░░░░░░░░░] 17%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 2 min
-- Total execution time: 0.03 hours
+- Total plans completed: 2
+- Average duration: 3.5 min
+- Total execution time: 0.12 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 1/? | 2 min | 2 min |
+| 01-foundation | 2/? | 7 min | 3.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min)
+- Last 5 plans: 01-01 (2 min), 01-02 (5 min)
 - Trend: -
 
 *Updated after each plan completion*
@@ -66,6 +66,9 @@ Recent decisions affecting current work:
 - 01-01: pydantic-settings with no defaults on required vars — ValidationError at startup on missing env
 - 01-01: lru_cache on get_settings() for process-level singleton
 - 01-01: lifespan in separate core/lifespan.py — clean separation from main.py
+- 01-02: UserProfile unified model with all-optional fields shared across /process-meal and /recommend
+- 01-02: Stubs return hardcoded data; Phase 3 replaces only stub body, interface stays stable
+- 01-02: Routers registered without API prefix (routes are /process-meal, /recommend as-is)
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T17:03:13Z
-Stopped at: Completed 01-01-PLAN.md
-Resume file: .planning/phases/01-foundation/01-01-SUMMARY.md
+Last session: 2026-03-21T17:12:00Z
+Stopped at: Completed 01-02-PLAN.md
+Resume file: .planning/phases/01-foundation/01-02-SUMMARY.md

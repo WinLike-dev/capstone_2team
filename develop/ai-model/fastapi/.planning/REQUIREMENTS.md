@@ -10,7 +10,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Foundation
 
 - [x] **FOUND-01**: FastAPI 프로젝트 4계층 구조 설정 (routers/services/clients/core)
-- [ ] **FOUND-02**: Pydantic 요청/응답 스키마 정의 (8모드 전체 JSON 규격 포함)
+- [x] **FOUND-02**: Pydantic 요청/응답 스키마 정의 (8모드 전체 JSON 규격 포함)
 - [x] **FOUND-03**: pydantic-settings 기반 환경변수 관리 (API 키, Pinecone URL, WAS URL 등)
 - [x] **FOUND-04**: FastAPI lifespan 이벤트로 클라이언트 초기화 (Pinecone, httpx, 임베딩 모델)
 
@@ -99,7 +99,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
+| FOUND-02 | Phase 1 | Complete |
 | FOUND-03 | Phase 1 | Pending |
 | FOUND-04 | Phase 1 | Pending |
 | PINE-01 | Phase 2 | Pending |
