@@ -38,11 +38,17 @@ Plans:
 **Requirements**: PINE-01, PINE-02, PINE-03, PINE-04, EMBD-01, EMBD-02, EMBD-03, GEMI-01, GEMI-02, GEMI-03, GEMI-04, GEMI-05, ROUT-01, ROUT-02, ROUT-03
 **Success Criteria** (what must be TRUE):
   1. PineconeAsyncio 클라이언트가 user_id namespace로 벡터를 저장하고 검색한다. 두 개의 다른 user_id로 저장한 벡터가 서로 검색되지 않는다
-  2. 한국어 텍스트를 입력하면 768차원 임베딩 벡터가 반환된다. 임베딩 생성이 async 함수 내에서 event loop를 블록하지 않는다
+  2. 한국어 텍스트를 입력하면 384차원 임베딩 벡터가 반환된다. 임베딩 생성이 async 함수 내에서 event loop를 블록하지 않는다
   3. Gemini Flash 클라이언트가 Mode 7(식단 분석)과 Mode 8(추천) 프롬프트로 호출 시 지정된 JSON 스키마 형식의 응답을 반환한다
-  4. Router AI가 테스트 입력 문장에 대해 6가지 모드 중 하나와 confidence score를 JSON으로 반환한다
+  4. Router AI가 테스트 입력 문장에 대해 6가지 모드 중 하나와 reason을 JSON으로 반환한다
   5. Gemini API가 429 에러를 반환할 때 exponential backoff로 재시도한다
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 02-01-PLAN.md — Settings 환경변수 + 의존성 + EmbeddingClient
+- [ ] 02-02-PLAN.md — PineconeClient (async 검색/저장, namespace 격리)
+- [ ] 02-03-PLAN.md — GeminiClient + Mode 7/8 프롬프트
+- [ ] 02-04-PLAN.md — RouterClient + 시스템 프롬프트
+- [ ] 02-05-PLAN.md — Lifespan 초기화/종료 완성
 
 ### Phase 3: Endpoints and Memory
 **Goal**: WAS가 /process-meal과 /recommend를 호출하면 AI 분석 결과를 받고, 응답 후 대화 맥락이 Pinecone에 비동기로 저장된다
@@ -64,5 +70,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-03-21 |
-| 2. Core Integrations | 0/TBD | Not started | - |
+| 2. Core Integrations | 0/5 | Planning complete | - |
 | 3. Endpoints and Memory | 0/TBD | Not started | - |
