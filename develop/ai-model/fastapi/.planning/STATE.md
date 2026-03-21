@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-core-integrations/02-01-PLAN.md
-last_updated: "2026-03-21T18:37:12.171Z"
+stopped_at: Completed 02-core-integrations-02-PLAN.md
+last_updated: "2026-03-21T18:39:30.215Z"
 last_activity: 2026-03-21 — Plan 01-02 complete (Pydantic schemas + stub endpoints)
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 6
   percent: 33
 ---
 
@@ -52,6 +52,8 @@ Progress: [███░░░░░░░] 33%
 *Updated after each plan completion*
 | Phase 02-core-integrations P04 | 5 | 2 tasks | 4 files |
 | Phase 02-core-integrations P01 | 5 | 2 tasks | 5 files |
+| Phase 02-core-integrations P03 | 10 | 2 tasks | 4 files |
+| Phase 02-core-integrations P02 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -76,6 +78,10 @@ Recent decisions affecting current work:
 - [Phase 02-core-integrations]: EMBEDDING_DIM=384: paraphrase-multilingual-MiniLM-L12-v2 outputs 384-dim (CONTEXT.md 768 was incorrect)
 - [Phase 02-core-integrations]: EmbeddingClient takes model via constructor for DI and easy test mocking
 - [Phase 02-core-integrations]: run_in_threadpool used for encode() to keep asyncio event loop unblocked
+- [Phase 02-core-integrations]: google.api_core not available in env; use genai_errors.ClientError code==429 predicate for tenacity retry
+- [Phase 02-core-integrations]: response_mime_type=application/json + response_schema enforces SDK-level JSON output from GeminiClient
+- [Phase 02-core-integrations]: IndexAsyncio accessed as pc.IndexAsyncio(host=...) instance method — not top-level importable; PineconeClient uses Any type hint
+- [Phase 02-core-integrations]: namespace=user_id is the sole user isolation mechanism on every Pinecone upsert/search call
 
 ### Pending Todos
 
@@ -88,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T18:37:12.168Z
-Stopped at: Completed 02-core-integrations/02-01-PLAN.md
+Last session: 2026-03-21T18:39:30.213Z
+Stopped at: Completed 02-core-integrations-02-PLAN.md
 Resume file: None

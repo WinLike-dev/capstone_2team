@@ -29,11 +29,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Gemini Flash
 
-- [ ] **GEMI-01**: google-genai SDK 기반 Gemini Flash 클라이언트 구현
-- [ ] **GEMI-02**: 재시도 로직 (429 에러 대응, exponential backoff + jitter)
-- [ ] **GEMI-03**: 모드별 시스템 지시사항 프롬프트 관리 (JSON 출력 형식 지정)
-- [ ] **GEMI-04**: Mode 7 (식단 기록) 프롬프트: 칼로리 분석 + 간결한 피드백 메시지
-- [ ] **GEMI-05**: Mode 8 (추천 기능) 프롬프트: 운동/식단 추천 + 소모/섭취 칼로리
+- [x] **GEMI-01**: google-genai SDK 기반 Gemini Flash 클라이언트 구현
+- [x] **GEMI-02**: 재시도 로직 (429 에러 대응, exponential backoff + jitter)
+- [x] **GEMI-03**: 모드별 시스템 지시사항 프롬프트 관리 (JSON 출력 형식 지정)
+- [x] **GEMI-04**: Mode 7 (식단 기록) 프롬프트: 칼로리 분석 + 간결한 피드백 메시지
+- [x] **GEMI-05**: Mode 8 (추천 기능) 프롬프트: 운동/식단 추천 + 소모/섭취 칼로리
 
 ### Router AI
 
@@ -109,11 +109,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | EMBD-01 | Phase 2 | Complete |
 | EMBD-02 | Phase 2 | Complete |
 | EMBD-03 | Phase 2 | Complete |
-| GEMI-01 | Phase 2 | Pending |
-| GEMI-02 | Phase 2 | Pending |
-| GEMI-03 | Phase 2 | Pending |
-| GEMI-04 | Phase 2 | Pending |
-| GEMI-05 | Phase 2 | Pending |
+| GEMI-01 | Phase 2 | Complete |
+| GEMI-02 | Phase 2 | Complete |
+| GEMI-03 | Phase 2 | Complete |
+| GEMI-04 | Phase 2 | Complete |
+| GEMI-05 | Phase 2 | Complete |
 | ROUT-01 | Phase 2 | Complete |
 | ROUT-02 | Phase 2 | Complete |
 | ROUT-03 | Phase 2 | Complete |
