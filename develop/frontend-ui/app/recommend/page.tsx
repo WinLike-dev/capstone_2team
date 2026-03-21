@@ -110,8 +110,8 @@ export default function RecommendPage() {
 
   const [userData, setUserData] = useState<{name: string, goal: string, allergies?: string[], conditions?: string[]} | null>(null);
 
-  const allergies = userData?.allergies || [];
-  const conditions = userData?.conditions || [];
+  // const allergies = userData?.allergies || [];
+  // const conditions = userData?.conditions || [];
 
   useEffect(() => {
     const now = new Date();
