@@ -1,33 +1,28 @@
 {
-  "name": "ai-healthcare-backend",
+  "name": "backend",
   "version": "1.0.0",
-  "description": "AI 헬스케어 캡스톤 프로젝트 백엔드 API 서버",
+  "description": "AI Healthcare Backend Server",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "logs": "mkdir -p logs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "logs": "mkdir -p logs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@prisma/adapter-pg": "^7.5.0",
-    "@prisma/client": "^7.5.0",
-    "axios": "^1.13.6",
-    "cors": "^2.8.6",
-    "dotenv": "^17.3.1",
-    "express": "^5.2.1",
-    "express-validator": "^7.3.1",
-    "helmet": "^8.1.0",
-    "morgan": "^1.10.1",
-    "pg": "^8.20.0",
-    "prisma": "^7.5.0",
-    "winston": "^3.19.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "axios": "^1.6.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "winston": "^3.10.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "eslint": "^8.49.0",
+    "nodemon": "^3.0.1"
   }
 }

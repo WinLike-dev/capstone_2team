@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+require('dotenv').config();
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 
@@ -35,7 +36,7 @@ app.use(
 );
 
 // ─── 헬스 체크 엔드포인트 ─────────────────────────────────────────────
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: '서버가 정상 동작 중입니다.',
@@ -45,11 +46,10 @@ app.get('/health', (req, res) => {
 });
 
 // ─── API 라우터 ───────────────────────────────────────────────────────
-// TODO: 각 라우터 구현 후 아래에 추가
-// app.use('/api/v1/auth', require('./routes/auth.routes'));
-// app.use('/api/v1/users', require('./routes/user.routes'));
-// app.use('/api/v1/chat', require('./routes/chat.routes'));
-// app.use('/api/v1/admin', require('./routes/admin.routes'));
+app.use('/api/v1/users', require('./routes/users'));
+app.use('/api/v1/ai', require('./routes/ai'));
+app.use('/api/v1/admin', require('./routes/admin'));
+// auth, chat 라우트는 프로토타입 이후 추가 예정
 
 // ─── 에러 핸들러 (라우터 이후에 위치해야 함) ─────────────────────────
 app.use(notFoundHandler);

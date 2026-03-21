@@ -9,7 +9,7 @@ const server = app.listen(PORT, () => {
   logger.info(`  AI 헬스케어 백엔드 서버 시작`);
   logger.info(`  환경:  ${process.env.NODE_ENV || 'development'}`);
   logger.info(`  포트:  http://localhost:${PORT}`);
-  logger.info(`  헬스체크: http://localhost:${PORT}/health`);
+  logger.info(`  헬스체크: http://localhost:${PORT}/api/health`);
   logger.info(`========================================`);
 });
 
