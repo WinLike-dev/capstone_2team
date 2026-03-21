@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from pinecone import PineconeAsyncio, ServerlessSpec
+from sentence_transformers import SentenceTransformer
 from starlette.concurrency import run_in_threadpool
 
 from app.clients import EMBEDDING_DIM, EmbeddingClient, GeminiClient, PineconeClient, RouterClient
@@ -35,8 +36,6 @@ async def lifespan(app: FastAPI):
     # ------------------------------------------------------------------ #
 
     # 1. Embedding model (CPU-bound — offload to thread pool)
-    from sentence_transformers import SentenceTransformer  # noqa: PLC0415
-
     model = await run_in_threadpool(
         SentenceTransformer, "paraphrase-multilingual-MiniLM-L12-v2"
     )
