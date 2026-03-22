@@ -212,3 +212,75 @@ exports.deleteMeal = async (req, res) => {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
+
+// @route   POST /api/v1/users/confirm-recommendation
+// @desc    추천 항목 확정 (좋아요) → 캘린더에 등록 (DataFormat_2)
+// @access  Public (프로토타입)
+exports.confirmRecommendation = async (req, res) => {
+  try {
+    const { user_id, item_type, item_details } = req.body;
+
+    if (!user_id || !item_type || !item_details) {
+      return res.status(400).json({ error: 'user_id, item_type, item_details가 필요합니다.' });
+    }
+
+    const { name, calories, date, time_slot } = item_details;
+
+    if (!name || calories == null || !date) {
+      return res.status(400).json({ error: 'item_details에 name, calories, date가 필요합니다.' });
+    }
+
+    let entry = null;
+
+    if (item_type === 'exercise') {
+      // 운동 추천 확정 → user_exercise_plans에 저장
+      const { data, error } = await supabase
+        .from('user_exercise_plans')
+        .insert({
+          user_id,
+          exercise_name: name,
+          burn_calories: calories,
+          target_date: date
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      entry = data;
+
+    } else if (item_type === 'meal') {
+      // 식단 추천 확정 → user_meal_plans에 저장
+      const { data, error } = await supabase
+        .from('user_meal_plans')
+        .insert({
+          user_id,
+          food_name: name,
+          meal_type: time_slot || '기타',
+          calories,
+          target_date: date
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      entry = data;
+
+    } else {
+      return res.status(400).json({ error: 'item_type은 "exercise" 또는 "meal"이어야 합니다.' });
+    }
+
+    // DataFormat_2 응답 규격
+    res.status(201).json({
+      status: 'success',
+      message: '성공적으로 저장되었습니다.',
+      data: {
+        entry_id: String(entry.exercise_id || entry.meal_id)
+      }
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
+

@@ -1,3 +1,22 @@
+# General
+.DS_Store
+docs/
+*.log
 api_key.txt
+logs/
+coverage/
+
+# Node / Next.js
 node_modules/
+.next/
+dist/
+build/
 .env
+.env.*
+.vercel/
+
+# Python / AI Model
+__pycache__/
+*.pyc
+.venv/
+venv/
