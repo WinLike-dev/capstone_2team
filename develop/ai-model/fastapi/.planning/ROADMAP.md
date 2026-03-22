@@ -22,7 +22,7 @@
 
 - [ ] **Phase 4: Infrastructure** - 글로벌 에러 핸들러 + 구조화 로깅 + WAS HTTP 클라이언트
 - [x] **Phase 5: Chat Pipeline Core** - Router AI + Vector DB 병렬처리 + db_modified_flag + Background Summary 연동 (completed 2026-03-22)
-- [ ] **Phase 6: 8-Mode Gemini Handlers** - 모드별 Gemini 호출 및 JSON 출력 (모드 1~8 전체 구현)
+- [x] **Phase 6: 8-Mode Gemini Handlers** - 모드별 Gemini 호출 및 JSON 출력 (모드 1~8 전체 구현) (completed 2026-03-22)
 
 ## Phase Details
 
@@ -68,7 +68,7 @@ Plans:
   5. 모드 7(식단 기록), 8(추천) 요청에 Gemini가 칼로리/영양소 및 운동3+식단2 추천 JSON을 반환한다
 **Plans:** 1 plan
 Plans:
-- [ ] 06-01-PLAN.md — 8모드 Gemini 응답 스키마 + 모드별 분기/파싱 로직
+- [x] 06-01-PLAN.md — 8모드 Gemini 응답 스키마 + 모드별 분기/파싱 로직
 
 ## Progress
 
@@ -82,4 +82,4 @@ Phases execute in numeric order: 4 → 5 → 6
 | 3. Endpoints and Memory | v1.0 | 3/3 | Complete | 2026-03-22 |
 | 4. Infrastructure | v1.1 | 0/2 | In progress | - |
 | 5. Chat Pipeline Core | v1.1 | 2/2 | Complete | 2026-03-22 |
-| 6. 8-Mode Gemini Handlers | v1.1 | 0/1 | Not started | - |
+| 6. 8-Mode Gemini Handlers | v1.1 | 1/1 | Complete | 2026-03-22 |

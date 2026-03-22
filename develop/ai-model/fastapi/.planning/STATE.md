@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI Chat Pipeline
 status: executing
-stopped_at: Completed 05-chat-pipeline-core/05-02-PLAN.md
-last_updated: "2026-03-22T08:37:30.674Z"
-last_activity: 2026-03-22 — Phase 5 Plan 1 complete — Chat Pipeline Core
+stopped_at: Completed 06-8-mode-gemini-handlers/06-01-PLAN.md
+last_updated: "2026-03-22T08:50:27Z"
+last_activity: 2026-03-22 — Phase 6 Plan 1 complete — 8-mode Gemini Handlers
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** 사용자의 운동/식단 데이터 기반 개인화 AI 응답 + 벡터 메모리 축적으로 맥락 품질 지속 향상
-**Current focus:** Phase 5 — Chat Pipeline Core (Worker AI + 오케스트레이터)
+**Current focus:** Phase 6 — 8-mode Gemini Handlers (모드별 스키마 + 파싱)
 
 ## Current Position
 
-Phase: 5 of 6 (Chat Pipeline Core)
-Plan: 1 of TBD in current phase
+Phase: 6 of 6 (8-mode Gemini Handlers)
+Plan: 1 of 1 in current phase
 Status: In progress
-Last activity: 2026-03-22 — Phase 5 Plan 1 complete — Chat Pipeline Core
+Last activity: 2026-03-22 — Phase 6 Plan 1 complete — 8-mode Gemini Handlers
 
-Progress (v1.1): [████░░░░░░] 40%
+Progress (v1.1): [█████░░░░░] 50%
 
 ## Accumulated Context
 
@@ -42,6 +42,9 @@ Progress (v1.1): [████░░░░░░] 40%
 - Phase 5에서는 SimpleAnswerOutput 단일 스키마 사용, Phase 6에서 모드별 스키마로 교체 예정
 - build_worker_system_prompt() 섹션 헤더 패턴 "사용자 지시사항: " (콜론+공백)으로 user_instruction 존재 여부 구분
 - [Phase 05-chat-pipeline-core]: Patch target is app.routers.chat.handle_ai_chat (local import ref), not service module — Python patch must target where name is used after import
+- [Phase 06-8-mode-gemini-handlers]: Gemini top-level list 미지원으로 ExercisePlanOutput/MealPlanOutput에 items wrapper 패턴 사용
+- [Phase 06-8-mode-gemini-handlers]: _MODE_SCHEMA_MAP dict로 모드별 스키마 O(1) 조회, 알 수 없는 모드는 SimpleAnswerOutput fallback
+- [Phase 06-8-mode-gemini-handlers]: AiChatData.detail: Optional[Any]로 모드별 구조화 데이터 전달, 기존 plan/db_update 필드 유지
 
 ### Pending Todos
 
@@ -51,8 +54,14 @@ None.
 
 - WAS 운동/식단 리스트 API 스펙이 Node.js 팀과 조율 필요 — Phase 4 WAS 클라이언트 구현 전 확인
 
+## Performance Metrics
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 06    | 01   | 4 min    | 2     | 5     |
+
 ## Session Continuity
 
-Last session: 2026-03-22T08:31:47.860Z
-Stopped at: Completed 05-chat-pipeline-core/05-02-PLAN.md
+Last session: 2026-03-22T08:50:27Z
+Stopped at: Completed 06-8-mode-gemini-handlers/06-01-PLAN.md
 Resume file: None
