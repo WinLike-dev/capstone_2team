@@ -36,7 +36,10 @@
   3. WAS HTTP 클라이언트가 모드 3 요청 시 운동 리스트를 조회하여 반환한다
   4. WAS HTTP 클라이언트가 모드 5 요청 시 식단 리스트를 조회하여 반환한다
   5. FastAPI가 db_modified_flag와 Gemini 결과를 조합한 최종 응답을 WAS에 반환한다
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 04-01-PLAN.md — Custom exceptions + structured error handlers + request logging middleware
+- [ ] 04-02-PLAN.md — WAS HTTP client + AI chat request/response schemas
 
 ### Phase 5: Chat Pipeline Core
 **Goal**: POST /ai-chat가 Router AI 의도분류와 Vector DB 맥락검색을 병렬 실행하여 8모드 처리를 오케스트레이션한다
@@ -72,6 +75,6 @@ Phases execute in numeric order: 4 → 5 → 6
 | 1. Foundation | v1.0 | 2/2 | Complete | 2026-03-21 |
 | 2. Core Integrations | v1.0 | 5/5 | Complete | 2026-03-22 |
 | 3. Endpoints and Memory | v1.0 | 3/3 | Complete | 2026-03-22 |
-| 4. Infrastructure | v1.1 | 0/TBD | Not started | - |
+| 4. Infrastructure | v1.1 | 0/2 | In progress | - |
 | 5. Chat Pipeline Core | v1.1 | 0/TBD | Not started | - |
 | 6. 8-Mode Gemini Handlers | v1.1 | 0/TBD | Not started | - |
