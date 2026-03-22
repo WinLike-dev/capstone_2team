@@ -38,6 +38,12 @@ async def lifespan(app: FastAPI):
     # Startup                                                              #
     # ------------------------------------------------------------------ #
 
+    # Configure logging (done here to avoid module-level get_settings() call)
+    logging.basicConfig(
+        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+
     # 1. Embedding model (CPU-bound — offload to thread pool)
     model = await run_in_threadpool(
         SentenceTransformer, "paraphrase-multilingual-MiniLM-L12-v2"
