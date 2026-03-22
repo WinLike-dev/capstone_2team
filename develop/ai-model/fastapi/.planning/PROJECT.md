@@ -2,11 +2,20 @@
 
 ## What This Is
 
-헬스/운동 추천 서비스의 AI 오케스트레이션 허브. Next.js(Front) + Node.js(Backend) 구조의 WAS로부터 REST API 요청을 받아, Vector DB(Pinecone) 검색, Router AI(LLM 기반 의도 분류), Gemini Flash(생성/분석)를 조합하여 식단 기록 분석, 운동/식단 추천 기능을 제공한다. 모든 응답은 비동기 Background Summary 파이프라인을 통해 벡터 메모리로 축적된다.
+헬스/운동 추천 서비스의 AI 오케스트레이션 허브. Next.js(Front) + Node.js(Backend) 구조의 WAS로부터 REST API 요청을 받아, Vector DB(Pinecone) 검색, Router AI(LLM 기반 의도 분류), Gemini Flash(생성/분석)를 조합하여 식단 기록 분석, 운동/식단 추천, AI 채팅(8모드) 기능을 제공한다. 모든 응답은 비동기 Background Summary 파이프라인을 통해 벡터 메모리로 축적된다.
 
 ## Core Value
 
 사용자의 운동/식단 데이터를 기반으로 개인화된 AI 응답을 정확하고 빠르게 제공하는 것. 모든 상호작용은 벡터 메모리로 축적되어 맥락 기반 응답 품질이 지속적으로 향상된다.
+
+## Current Milestone: v1.1 AI Chat Pipeline
+
+**Goal:** POST /ai-chat 엔드포인트를 통해 8모드 전체 AI 채팅 파이프라인을 구현하고, WAS 통신 및 에러 핸들링을 고도화한다.
+
+**Target features:**
+- POST /ai-chat: 8모드 AI 채팅 파이프라인 (Router AI + Vector DB + Gemini Flash)
+- WAS REST 통신 인터페이스 (모드 3/5 조건부 리스트 요청)
+- 글로벌 에러 핸들러 고도화 (구조화 로깅)
 
 ## Requirements
 
@@ -44,6 +53,8 @@
 - v1.0 shipped: 3,000 LOC Python (1,014 app + 1,970 tests), 30 requirements complete
 - Tech stack: FastAPI, Pinecone, Gemini Flash, sentence-transformers (384-dim)
 - 임베딩 모델: paraphrase-multilingual-MiniLM-L12-v2 (384차원, 초기 768 예상에서 변경)
+- 워커 AI 인풋 우선순위: 사용자 메시지(1순위) > 사용자 지시사항(2순위) > 시스템 지시사항(3순위)
+- db_modified_flag: FastAPI가 모드별 결정 (none/exercise/meal/profile)
 
 ## Constraints
 
@@ -64,7 +75,7 @@
 | 비동기 Background Summary | 응답 속도와 메모리 저장을 분리 | ✓ Good — 에러 격리 (무음 실패) |
 | 384-dim 임베딩 (MiniLM-L12-v2) | 초기 768-dim 가정 수정, 실제 모델 출력 기반 | ✓ Good — Pinecone 인덱스와 일치 |
 | _fetch_context 인라인 (서비스별 별도) | meal/recommend 서비스 간 낮은 결합도 | ✓ Good — 독립적 변경 가능 |
-| AI Chat v2로 연기 | v1은 /process-meal, /recommend만 구현 | — Pending (v2에서 구현) |
+| db_modified_flag FastAPI 결정 | Gemini에 맡기면 불안정, 모드별 매핑이 직관적 | — Pending |
 
 ---
-*Last updated: 2026-03-22 after v1.0 milestone*
+*Last updated: 2026-03-22 after v1.1 milestone start*
