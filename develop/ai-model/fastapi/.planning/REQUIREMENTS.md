@@ -51,11 +51,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Recommendation (Mode 8)
 
-- [ ] **RECOM-01**: POST /recommend 엔드포인트 구현
-- [ ] **RECOM-02**: 요청 처리: user_id, user_profile, user_instruction 수신
-- [ ] **RECOM-03**: Pinecone 벡터 검색 (사용자 맥락 조회)
-- [ ] **RECOM-04**: Gemini Flash 호출 (운동/식단 추천 생성)
-- [ ] **RECOM-05**: 응답 형식: {status, data: {recommended_exercise: {name, burn_calories}, recommended_meal: {name, calories}}}
+- [x] **RECOM-01**: POST /recommend 엔드포인트 구현
+- [x] **RECOM-02**: 요청 처리: user_id, user_profile, user_instruction 수신
+- [x] **RECOM-03**: Pinecone 벡터 검색 (사용자 맥락 조회)
+- [x] **RECOM-04**: Gemini Flash 호출 (운동/식단 추천 생성)
+- [x] **RECOM-05**: 응답 형식: {status, data: {recommended_exercise: {name, burn_calories}, recommended_meal: {name, calories}}}
 
 ### Background Summary
 
@@ -122,11 +122,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | MEAL-03 | Phase 3 | Complete |
 | MEAL-04 | Phase 3 | Complete |
 | MEAL-05 | Phase 3 | Complete |
-| RECOM-01 | Phase 3 | Pending |
-| RECOM-02 | Phase 3 | Pending |
-| RECOM-03 | Phase 3 | Pending |
-| RECOM-04 | Phase 3 | Pending |
-| RECOM-05 | Phase 3 | Pending |
+| RECOM-01 | Phase 3 | Complete |
+| RECOM-02 | Phase 3 | Complete |
+| RECOM-03 | Phase 3 | Complete |
+| RECOM-04 | Phase 3 | Complete |
+| RECOM-05 | Phase 3 | Complete |
 | BGSM-01 | Phase 3 | Complete |
 | BGSM-02 | Phase 3 | Complete |
 | BGSM-03 | Phase 3 | Complete |
