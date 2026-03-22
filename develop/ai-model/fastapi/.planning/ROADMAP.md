@@ -51,7 +51,7 @@ Plans:
   3. 각 모드에 대해 FastAPI가 db_modified_flag를 결정하여 응답에 포함한다 (none/exercise/meal/profile)
   4. 워커 AI 프롬프트가 사용자 메시지 > 사용자 지시사항 > 시스템 지시사항 순서로 구성된다
   5. 응답 후 Background Summary 파이프라인이 비동기로 벡터 메모리에 저장한다
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 05-01-PLAN.md — Worker AI prompt builder + Chat pipeline orchestrator service
 - [ ] 05-02-PLAN.md — POST /ai-chat router endpoint + main.py registration
@@ -79,5 +79,5 @@ Phases execute in numeric order: 4 → 5 → 6
 | 2. Core Integrations | v1.0 | 5/5 | Complete | 2026-03-22 |
 | 3. Endpoints and Memory | v1.0 | 3/3 | Complete | 2026-03-22 |
 | 4. Infrastructure | v1.1 | 0/2 | In progress | - |
-| 5. Chat Pipeline Core | v1.1 | 0/2 | Not started | - |
+| 5. Chat Pipeline Core | 1/2 | In Progress|  | - |
 | 6. 8-Mode Gemini Handlers | v1.1 | 0/TBD | Not started | - |
