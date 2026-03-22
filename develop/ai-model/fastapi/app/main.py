@@ -12,12 +12,16 @@ from app.core.exceptions import (
     ValidationError,
 )
 from app.core.lifespan import lifespan
+from app.core.middleware import RequestLoggingMiddleware
 from app.routers.meal import router as meal_router
 from app.routers.recommend import router as recommend_router
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Hub", lifespan=lifespan)
+
+# Middleware must be added BEFORE routers are included
+app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(meal_router)
 app.include_router(recommend_router)
@@ -139,3 +143,9 @@ async def test_http_exception():
 @app.get("/test/unhandled-exception")
 async def test_unhandled_exception():
     raise RuntimeError("테스트 처리되지 않은 예외")
+
+
+@app.get("/test/request-id")
+async def test_request_id(request: FastAPIRequest):
+    """Returns the request_id from request.state for testing middleware."""
+    return {"request_id": request.state.request_id}
