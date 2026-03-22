@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI Chat Pipeline
-status: in-progress
-stopped_at: Completed 05-chat-pipeline-core/05-01-PLAN.md
-last_updated: "2026-03-22T08:24:07Z"
+status: executing
+stopped_at: Completed 05-chat-pipeline-core/05-02-PLAN.md
+last_updated: "2026-03-22T08:31:47.862Z"
 last_activity: 2026-03-22 — Phase 5 Plan 1 complete — Chat Pipeline Core
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # Project State
@@ -41,6 +41,7 @@ Progress (v1.1): [████░░░░░░] 40%
 - WAS HTTP 클라이언트는 모드 3/5 에서만 조건부 호출 (나머지 모드는 WAS 리스트 요청 없음)
 - Phase 5에서는 SimpleAnswerOutput 단일 스키마 사용, Phase 6에서 모드별 스키마로 교체 예정
 - build_worker_system_prompt() 섹션 헤더 패턴 "사용자 지시사항: " (콜론+공백)으로 user_instruction 존재 여부 구분
+- [Phase 05-chat-pipeline-core]: Patch target is app.routers.chat.handle_ai_chat (local import ref), not service module — Python patch must target where name is used after import
 
 ### Pending Todos
 
@@ -52,6 +53,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22
-Stopped at: Completed 05-chat-pipeline-core/05-01-PLAN.md
+Last session: 2026-03-22T08:31:47.860Z
+Stopped at: Completed 05-chat-pipeline-core/05-02-PLAN.md
 Resume file: None
