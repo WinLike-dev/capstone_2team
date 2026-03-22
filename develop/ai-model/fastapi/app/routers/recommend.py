@@ -1,21 +1,17 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks, Request
 
 from app.schemas.common import SuccessResponse
-from app.schemas.recommend import (
-    RecommendationData,
-    RecommendedExercise,
-    RecommendedMeal,
-    RecommendRequest,
-)
+from app.schemas.recommend import RecommendRequest
+from app.services.recommend_service import recommend as handle_recommend
 
 router = APIRouter(tags=["recommend"])
 
 
 @router.post("/recommend", response_model=SuccessResponse)
-async def recommend(request: RecommendRequest) -> SuccessResponse:
-    """스텁: Phase 3에서 실제 Gemini 호출로 교체."""
-    stub_data = RecommendationData(
-        recommended_exercise=RecommendedExercise(name="조깅", burn_calories=300.0),
-        recommended_meal=RecommendedMeal(name="닭가슴살 샐러드", calories=400.0),
-    )
-    return SuccessResponse(data=stub_data.model_dump())
+async def recommend_endpoint(
+    body: RecommendRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> SuccessResponse:
+    """운동/식단 추천 서비스 파이프라인을 호출한다."""
+    return await handle_recommend(body, request, background_tasks)
