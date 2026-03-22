@@ -43,11 +43,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Meal Recording (Mode 7)
 
-- [ ] **MEAL-01**: POST /process-meal 엔드포인트 구현
-- [ ] **MEAL-02**: 요청 처리: user_id, user_profile, user_instruction, user_message 수신
-- [ ] **MEAL-03**: Pinecone 벡터 검색 (사용자 맥락 조회)
-- [ ] **MEAL-04**: Gemini Flash 호출 (식단 분석 → 칼로리 + 메시지 반환)
-- [ ] **MEAL-05**: 응답 형식: {status, data: {calories, message}}
+- [x] **MEAL-01**: POST /process-meal 엔드포인트 구현
+- [x] **MEAL-02**: 요청 처리: user_id, user_profile, user_instruction, user_message 수신
+- [x] **MEAL-03**: Pinecone 벡터 검색 (사용자 맥락 조회)
+- [x] **MEAL-04**: Gemini Flash 호출 (식단 분석 → 칼로리 + 메시지 반환)
+- [x] **MEAL-05**: 응답 형식: {status, data: {calories, message}}
 
 ### Recommendation (Mode 8)
 
@@ -117,11 +117,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | ROUT-01 | Phase 2 | Complete |
 | ROUT-02 | Phase 2 | Complete |
 | ROUT-03 | Phase 2 | Complete |
-| MEAL-01 | Phase 3 | Pending |
-| MEAL-02 | Phase 3 | Pending |
-| MEAL-03 | Phase 3 | Pending |
-| MEAL-04 | Phase 3 | Pending |
-| MEAL-05 | Phase 3 | Pending |
+| MEAL-01 | Phase 3 | Complete |
+| MEAL-02 | Phase 3 | Complete |
+| MEAL-03 | Phase 3 | Complete |
+| MEAL-04 | Phase 3 | Complete |
+| MEAL-05 | Phase 3 | Complete |
 | RECOM-01 | Phase 3 | Pending |
 | RECOM-02 | Phase 3 | Pending |
 | RECOM-03 | Phase 3 | Pending |
