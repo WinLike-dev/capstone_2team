@@ -1,16 +1,17 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks, Request
 
 from app.schemas.common import SuccessResponse
-from app.schemas.meal import MealAnalysisData, ProcessMealRequest
+from app.schemas.meal import ProcessMealRequest
+from app.services.meal_service import process_meal as handle_process_meal
 
 router = APIRouter(tags=["meal"])
 
 
 @router.post("/process-meal", response_model=SuccessResponse)
-async def process_meal(request: ProcessMealRequest) -> SuccessResponse:
-    """스텁: Phase 3에서 실제 Gemini 호출로 교체."""
-    stub_data = MealAnalysisData(
-        calories=350.0,
-        message="식단이 기록되었습니다. 균형 잡힌 식사입니다.",
-    )
-    return SuccessResponse(data=stub_data.model_dump())
+async def process_meal_endpoint(
+    body: ProcessMealRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> SuccessResponse:
+    """식단 분석 서비스 파이프라인을 호출한다."""
+    return await handle_process_meal(body, request, background_tasks)
