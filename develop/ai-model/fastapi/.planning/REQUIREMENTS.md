@@ -58,31 +58,31 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CHAT-01 | — | Pending |
-| CHAT-02 | — | Pending |
-| CHAT-03 | — | Pending |
-| CHAT-04 | — | Pending |
-| CHAT-05 | — | Pending |
-| CHAT-06 | — | Pending |
-| CHAT-07 | — | Pending |
-| CHAT-08 | — | Pending |
-| CHAT-09 | — | Pending |
-| CHAT-10 | — | Pending |
-| CHAT-11 | — | Pending |
-| CHAT-12 | — | Pending |
-| CHAT-13 | — | Pending |
-| WAS-01 | — | Pending |
-| WAS-02 | — | Pending |
-| WAS-03 | — | Pending |
-| WAS-04 | — | Pending |
-| ERR-01 | — | Pending |
-| ERR-02 | — | Pending |
+| CHAT-01 | Phase 5 | Pending |
+| CHAT-02 | Phase 5 | Pending |
+| CHAT-03 | Phase 6 | Pending |
+| CHAT-04 | Phase 6 | Pending |
+| CHAT-05 | Phase 6 | Pending |
+| CHAT-06 | Phase 6 | Pending |
+| CHAT-07 | Phase 6 | Pending |
+| CHAT-08 | Phase 6 | Pending |
+| CHAT-09 | Phase 6 | Pending |
+| CHAT-10 | Phase 6 | Pending |
+| CHAT-11 | Phase 5 | Pending |
+| CHAT-12 | Phase 5 | Pending |
+| CHAT-13 | Phase 5 | Pending |
+| WAS-01 | Phase 4 | Pending |
+| WAS-02 | Phase 4 | Pending |
+| WAS-03 | Phase 4 | Pending |
+| WAS-04 | Phase 4 | Pending |
+| ERR-01 | Phase 4 | Pending |
+| ERR-02 | Phase 4 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-22*
-*Last updated: 2026-03-22 after initial definition*
+*Last updated: 2026-03-22 after v1.1 roadmap creation*
