@@ -20,4 +20,7 @@ router.get('/meals', userController.getMeals);
 router.post('/meals', userController.addMeal);
 router.delete('/meals/:id', userController.deleteMeal);
 
+// 4. 추천 항목 확정 (DataFormat_2)
+router.post('/confirm-recommendation', userController.confirmRecommendation);
+
 module.exports = router;
