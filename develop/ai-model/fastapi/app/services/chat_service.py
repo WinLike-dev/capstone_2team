@@ -17,7 +17,6 @@ import logging
 
 from fastapi import BackgroundTasks, HTTPException, Request
 from google.genai import errors as genai_errors
-from pydantic import BaseModel
 
 from app.prompts.worker import build_worker_system_prompt
 from app.schemas.chat import (
@@ -26,20 +25,33 @@ from app.schemas.chat import (
     AiChatResponse,
     get_db_modified_flag,
 )
+from app.schemas.gemini_outputs import (
+    ExercisePlanOutput,
+    MealLogOutput,
+    MealPlanOutput,
+    RecommendationOutput,
+    SimpleAnswerOutput,
+    UserDbUpdateOutput,
+)
 from app.services.background_summary import run_background_summary
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Phase 5 임시 응답 스키마 (Phase 6에서 모드별 스키마로 교체)
+# 모드별 Gemini 응답 스키마 맵
 # ---------------------------------------------------------------------------
 
-
-class SimpleAnswerOutput(BaseModel):
-    """모드 1 기본 응답 스키마. Phase 6 placeholder로 다른 모드에도 사용."""
-
-    answer: str
+_MODE_SCHEMA_MAP: dict[int, type] = {
+    1: SimpleAnswerOutput,
+    2: ExercisePlanOutput,
+    3: ExercisePlanOutput,
+    4: MealPlanOutput,
+    5: MealPlanOutput,
+    6: UserDbUpdateOutput,
+    7: MealLogOutput,
+    8: RecommendationOutput,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -86,17 +98,83 @@ async def _fetch_context(
 def _get_worker_response_schema(mode: int) -> type:
     """모드별 Gemini 응답 스키마를 반환한다.
 
-    Phase 5에서는 모든 모드에 SimpleAnswerOutput을 사용한다.
-    Phase 6에서 모드별 스키마로 교체 예정.
-
     Args:
         mode: 라우터 AI가 분류한 모드 번호 (1-8).
 
     Returns:
         Pydantic BaseModel 서브클래스.
     """
-    # TODO(Phase 6): 모드별 스키마로 교체
-    return SimpleAnswerOutput
+    return _MODE_SCHEMA_MAP.get(mode, SimpleAnswerOutput)
+
+
+def _build_ai_chat_data(mode: int, parsed: dict) -> AiChatData:
+    """모드별 Gemini 응답 파싱 결과를 AiChatData로 구성한다.
+
+    Args:
+        mode: 라우터 AI가 분류한 모드 번호 (1-8).
+        parsed: Gemini JSON 응답을 dict로 파싱한 값.
+
+    Returns:
+        AiChatData 인스턴스.
+    """
+    if mode == 1:
+        return AiChatData(
+            message=parsed.get("answer", ""),
+            detail=None,
+        )
+
+    if mode == 2:
+        return AiChatData(
+            message="운동 계획이 생성되었습니다.",
+            detail=parsed.get("items"),
+        )
+
+    if mode == 3:
+        return AiChatData(
+            message="운동 계획이 수정되었습니다.",
+            detail=parsed.get("items"),
+        )
+
+    if mode == 4:
+        return AiChatData(
+            message="식단 계획이 생성되었습니다.",
+            detail=parsed.get("items"),
+        )
+
+    if mode == 5:
+        return AiChatData(
+            message="식단 계획이 수정되었습니다.",
+            detail=parsed.get("items"),
+        )
+
+    if mode == 6:
+        return AiChatData(
+            message="프로필이 업데이트되었습니다.",
+            detail=parsed.get("updated_fields"),
+        )
+
+    if mode == 7:
+        return AiChatData(
+            message=parsed.get("message", ""),
+            detail={
+                "calories": parsed.get("calories"),
+                "carbs": parsed.get("carbs"),
+                "protein": parsed.get("protein"),
+                "fat": parsed.get("fat"),
+            },
+        )
+
+    if mode == 8:
+        return AiChatData(
+            message="추천 운동과 식단입니다.",
+            detail=parsed,
+        )
+
+    # 알 수 없는 모드 — fallback
+    return AiChatData(
+        message=parsed.get("answer", str(parsed)),
+        detail=None,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -203,13 +281,13 @@ async def handle_ai_chat(
             },
         ) from exc
 
-    # 7. 응답 구성
+    # 7. 응답 구성 — 모드별 파싱
     parsed = json.loads(raw_json)
-    ai_message: str = parsed.get("answer", raw_json)  # Phase 6에서 모드별 파싱으로 고도화
+    chat_data = _build_ai_chat_data(mode, parsed)
 
     response = AiChatResponse(
         mode=mode,
-        data=AiChatData(message=ai_message),
+        data=chat_data,
         db_modified_flag=db_flag,
     )
 
@@ -218,7 +296,7 @@ async def handle_ai_chat(
         run_background_summary,
         user_id=body.user_id,
         user_message=body.user_message,
-        ai_response=ai_message,
+        ai_response=chat_data.message,
         gemini_client=gemini,
         embed_client=embed,
         pinecone_client=pinecone,
