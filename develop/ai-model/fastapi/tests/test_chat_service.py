@@ -1,0 +1,286 @@
+"""chat_service.handle_ai_chat 파이프라인 유닛 테스트 (TDD).
+
+검증 항목:
+  1. Router AI classify와 Vector DB context search가 asyncio.gather로 병렬 실행됨
+  2. mode 1 요청 시 db_modified_flag="none"인 AiChatResponse 반환
+  3. mode 2 요청 시 db_modified_flag="exercise"인 AiChatResponse 반환
+  4. mode 6 요청 시 db_modified_flag="profile"인 AiChatResponse 반환
+  5. user_instruction이 비어있으면 프롬프트에 사용자 지시사항 섹션 미포함
+  6. BackgroundTasks.add_task가 run_background_summary로 호출됨
+  7. Router AI 실패 시 mode=1 fallback으로 정상 응답
+"""
+
+import asyncio
+import json
+from unittest.mock import AsyncMock, MagicMock, patch, call
+
+import pytest
+from fastapi import BackgroundTasks
+
+from app.schemas.chat import AiChatRequest, AiChatResponse
+from app.schemas.common import UserProfile
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+SIMPLE_ANSWER_JSON = json.dumps({"answer": "안녕하세요! 무엇을 도와드릴까요?"})
+EMBED_VECTOR = [0.1] * 384
+PINECONE_RESULTS = [
+    {"id": "1", "score": 0.9, "summary": "어제 운동을 했음", "timestamp": "2026-01-01"},
+]
+
+
+def _make_body(**kwargs):
+    """기본값으로 AiChatRequest를 생성한다."""
+    defaults = dict(
+        user_id="user_test",
+        user_profile=UserProfile(gender="male", age=28, bmi=23.5, goal="체중 감량"),
+        user_instruction="",
+        user_message="안녕하세요",
+    )
+    defaults.update(kwargs)
+    return AiChatRequest(**defaults)
+
+
+def _make_request(router_mock, gemini_mock, pinecone_mock, embed_mock, was_mock=None):
+    """app.state에 mock 클라이언트를 가진 FastAPI Request mock을 반환한다."""
+    if was_mock is None:
+        was_mock = AsyncMock()
+    request = MagicMock()
+    request.app.state.router_client = router_mock
+    request.app.state.gemini_client = gemini_mock
+    request.app.state.pinecone_client = pinecone_mock
+    request.app.state.embed_client = embed_mock
+    request.app.state.was_client = was_mock
+    return request
+
+
+@pytest.fixture
+def router_mock():
+    """기본 mode=1 응답을 반환하는 RouterClient mock."""
+    from app.clients.router import RouterOutput
+    m = AsyncMock()
+    m.classify = AsyncMock(return_value=RouterOutput(mode=1, reason="단순대화"))
+    return m
+
+
+@pytest.fixture
+def gemini_mock():
+    m = AsyncMock()
+    m.generate = AsyncMock(return_value=SIMPLE_ANSWER_JSON)
+    return m
+
+
+@pytest.fixture
+def embed_mock():
+    m = AsyncMock()
+    m.embed = AsyncMock(return_value=EMBED_VECTOR)
+    return m
+
+
+@pytest.fixture
+def pinecone_mock():
+    m = AsyncMock()
+    m.search = AsyncMock(return_value=PINECONE_RESULTS)
+    return m
+
+
+@pytest.fixture
+def background_tasks():
+    return MagicMock(spec=BackgroundTasks)
+
+
+# ---------------------------------------------------------------------------
+# Test 1: asyncio.gather로 병렬 실행 검증
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_parallel_router_and_context_fetch(
+    router_mock, gemini_mock, embed_mock, pinecone_mock, background_tasks
+):
+    """Router AI classify와 Vector DB context search가 asyncio.gather로 병렬 실행된다."""
+    from app.services.chat_service import handle_ai_chat
+
+    body = _make_body()
+    request = _make_request(router_mock, gemini_mock, pinecone_mock, embed_mock)
+
+    gather_called_with_coroutines = []
+
+    original_gather = asyncio.gather
+
+    async def mock_gather(*coros, **kwargs):
+        gather_called_with_coroutines.extend(coros)
+        return await original_gather(*coros, **kwargs)
+
+    with patch("app.services.chat_service.asyncio.gather", side_effect=mock_gather):
+        await handle_ai_chat(body, request, background_tasks)
+
+    assert len(gather_called_with_coroutines) == 2, (
+        f"asyncio.gather는 정확히 2개의 코루틴으로 호출되어야 한다. 실제: {len(gather_called_with_coroutines)}"
+    )
+    # router classify가 호출되었는지 확인
+    router_mock.classify.assert_called_once_with(body.user_message)
+    # embed가 호출되었는지 확인 (context fetch 일부)
+    embed_mock.embed.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Test 2: mode 1 → db_modified_flag="none"
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_mode1_db_flag_none(
+    router_mock, gemini_mock, embed_mock, pinecone_mock, background_tasks
+):
+    """mode 1 요청 시 db_modified_flag='none'인 AiChatResponse를 반환한다."""
+    from app.clients.router import RouterOutput
+    from app.services.chat_service import handle_ai_chat
+
+    router_mock.classify = AsyncMock(return_value=RouterOutput(mode=1, reason="단순대화"))
+    body = _make_body(user_message="오늘 날씨 어때?")
+    request = _make_request(router_mock, gemini_mock, pinecone_mock, embed_mock)
+
+    result = await handle_ai_chat(body, request, background_tasks)
+
+    assert isinstance(result, AiChatResponse)
+    assert result.mode == 1
+    assert result.db_modified_flag == "none"
+    assert result.status == "success"
+
+
+# ---------------------------------------------------------------------------
+# Test 3: mode 2 → db_modified_flag="exercise"
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_mode2_db_flag_exercise(
+    gemini_mock, embed_mock, pinecone_mock, background_tasks
+):
+    """mode 2 요청 시 db_modified_flag='exercise'인 AiChatResponse를 반환한다."""
+    from app.clients.router import RouterOutput
+    from app.services.chat_service import handle_ai_chat
+
+    router_mock2 = AsyncMock()
+    router_mock2.classify = AsyncMock(return_value=RouterOutput(mode=2, reason="플랜 작성"))
+    body = _make_body(user_message="운동 계획 만들어줘")
+    request = _make_request(router_mock2, gemini_mock, pinecone_mock, embed_mock)
+
+    result = await handle_ai_chat(body, request, background_tasks)
+
+    assert result.mode == 2
+    assert result.db_modified_flag == "exercise"
+
+
+# ---------------------------------------------------------------------------
+# Test 4: mode 6 → db_modified_flag="profile"
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_mode6_db_flag_profile(
+    gemini_mock, embed_mock, pinecone_mock, background_tasks
+):
+    """mode 6 요청 시 db_modified_flag='profile'인 AiChatResponse를 반환한다."""
+    from app.clients.router import RouterOutput
+    from app.services.chat_service import handle_ai_chat
+
+    router_mock6 = AsyncMock()
+    router_mock6.classify = AsyncMock(return_value=RouterOutput(mode=6, reason="DB 수정"))
+    body = _make_body(user_message="나이 30으로 업데이트해줘")
+    request = _make_request(router_mock6, gemini_mock, pinecone_mock, embed_mock)
+
+    result = await handle_ai_chat(body, request, background_tasks)
+
+    assert result.mode == 6
+    assert result.db_modified_flag == "profile"
+
+
+# ---------------------------------------------------------------------------
+# Test 5: user_instruction 비어있으면 프롬프트에 사용자 지시사항 섹션 미포함
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_no_user_instruction_omits_section(
+    router_mock, gemini_mock, embed_mock, pinecone_mock, background_tasks
+):
+    """user_instruction이 빈 문자열이면 시스템 프롬프트에 '사용자 지시사항' 섹션이 없다."""
+    from app.services.chat_service import handle_ai_chat
+    import app.prompts.worker as worker_module
+
+    body = _make_body(user_instruction="", user_message="운동 팁 알려줘")
+    request = _make_request(router_mock, gemini_mock, pinecone_mock, embed_mock)
+
+    captured: dict = {}
+    original_build = worker_module.build_worker_system_prompt
+
+    def capture_build(mode, user_profile, context_text, user_instruction=""):
+        result = original_build(mode, user_profile, context_text, user_instruction)
+        captured["prompt"] = result
+        return result
+
+    with patch("app.services.chat_service.build_worker_system_prompt", side_effect=capture_build):
+        await handle_ai_chat(body, request, background_tasks)
+
+    assert "사용자 지시사항" not in captured.get("prompt", ""), (
+        "user_instruction이 비어있으면 '사용자 지시사항' 섹션이 포함되지 않아야 한다"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 6: BackgroundTasks.add_task가 run_background_summary로 호출됨
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_background_task_registered(
+    router_mock, gemini_mock, embed_mock, pinecone_mock, background_tasks
+):
+    """background_tasks.add_task(run_background_summary, ...) 호출이 확인된다."""
+    from app.services.chat_service import handle_ai_chat
+    from app.services.background_summary import run_background_summary
+
+    body = _make_body(user_id="bg_user", user_message="건강 팁 알려줘")
+    request = _make_request(router_mock, gemini_mock, pinecone_mock, embed_mock)
+
+    await handle_ai_chat(body, request, background_tasks)
+
+    background_tasks.add_task.assert_called_once()
+    call_args = background_tasks.add_task.call_args
+    assert call_args.args[0] is run_background_summary
+
+
+# ---------------------------------------------------------------------------
+# Test 7: Router AI 실패 시 mode=1 fallback
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_router_failure_fallback_mode1(
+    gemini_mock, embed_mock, pinecone_mock, background_tasks
+):
+    """Router AI classify 실패 시 mode=1 fallback으로 정상 AiChatResponse를 반환한다."""
+    from app.services.chat_service import handle_ai_chat
+
+    router_fail = AsyncMock()
+    router_fail.classify = AsyncMock(side_effect=Exception("Router AI 연결 실패"))
+    body = _make_body(user_message="도와줘")
+    request = _make_request(router_fail, gemini_mock, pinecone_mock, embed_mock)
+
+    result = await handle_ai_chat(body, request, background_tasks)
+
+    assert isinstance(result, AiChatResponse)
+    assert result.mode == 1
+    assert result.db_modified_flag == "none"
+    assert result.status == "success"
