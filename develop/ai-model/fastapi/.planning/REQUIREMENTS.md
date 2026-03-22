@@ -59,11 +59,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Background Summary
 
-- [ ] **BGSM-01**: BackgroundTasks 기반 비동기 메모리 파이프라인 구현
-- [ ] **BGSM-02**: Gemini Flash로 질문+답변 요약 생성
-- [ ] **BGSM-03**: 요약 텍스트 임베딩 생성 (FastAPI 자체)
-- [ ] **BGSM-04**: Pinecone에 벡터 임베딩 + user_id + 요약 + timestamp 저장
-- [ ] **BGSM-05**: 에러 발생 시 로깅 (무음 실패 방지)
+- [x] **BGSM-01**: BackgroundTasks 기반 비동기 메모리 파이프라인 구현
+- [x] **BGSM-02**: Gemini Flash로 질문+답변 요약 생성
+- [x] **BGSM-03**: 요약 텍스트 임베딩 생성 (FastAPI 자체)
+- [x] **BGSM-04**: Pinecone에 벡터 임베딩 + user_id + 요약 + timestamp 저장
+- [x] **BGSM-05**: 에러 발생 시 로깅 (무음 실패 방지)
 
 ## v2 Requirements
 
@@ -127,11 +127,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | RECOM-03 | Phase 3 | Pending |
 | RECOM-04 | Phase 3 | Pending |
 | RECOM-05 | Phase 3 | Pending |
-| BGSM-01 | Phase 3 | Pending |
-| BGSM-02 | Phase 3 | Pending |
-| BGSM-03 | Phase 3 | Pending |
-| BGSM-04 | Phase 3 | Pending |
-| BGSM-05 | Phase 3 | Pending |
+| BGSM-01 | Phase 3 | Complete |
+| BGSM-02 | Phase 3 | Complete |
+| BGSM-03 | Phase 3 | Complete |
+| BGSM-04 | Phase 3 | Complete |
+| BGSM-05 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 30 total
