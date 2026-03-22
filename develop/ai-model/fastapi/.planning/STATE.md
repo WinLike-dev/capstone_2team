@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: AI Chat Pipeline
-status: executing
-stopped_at: Completed 06-8-mode-gemini-handlers/06-01-PLAN.md
-last_updated: "2026-03-22T08:56:28.621Z"
-last_activity: 2026-03-22 — Phase 6 Plan 1 complete — 8-mode Gemini Handlers
+milestone: v1.2
+milestone_name: Deployment + Debug UI
+status: complete
+stopped_at: v1.1 shipped + Docker & Debug UI added
+last_updated: "2026-03-22T09:30:00.000Z"
+last_activity: 2026-03-22 — v1.1 전체 완료 + Docker 배포 + Pipeline Debug UI 구현
 progress:
-  total_phases: 3
-  completed_phases: 3
+  total_phases: 6
+  completed_phases: 6
   total_plans: 5
   completed_plans: 5
 ---
@@ -20,16 +20,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** 사용자의 운동/식단 데이터 기반 개인화 AI 응답 + 벡터 메모리 축적으로 맥락 품질 지속 향상
-**Current focus:** Phase 6 — 8-mode Gemini Handlers (모드별 스키마 + 파싱)
+**Current focus:** v1.2 — Docker 배포 + Pipeline Debug UI (완료)
 
 ## Current Position
 
-Phase: 6 of 6 (8-mode Gemini Handlers)
-Plan: 1 of 1 in current phase
-Status: In progress
-Last activity: 2026-03-22 — Phase 6 Plan 1 complete — 8-mode Gemini Handlers
+Milestone: v1.1 AI Chat Pipeline — COMPLETE
+Extra: v1.2 Docker 배포 + Pipeline Debug UI — COMPLETE
+Status: 모든 계획된 작업 완료
 
-Progress (v1.1): [█████░░░░░] 50%
+Progress (전체): [██████████] 100%
 
 ## Accumulated Context
 
@@ -45,6 +44,9 @@ Progress (v1.1): [█████░░░░░] 50%
 - [Phase 06-8-mode-gemini-handlers]: Gemini top-level list 미지원으로 ExercisePlanOutput/MealPlanOutput에 items wrapper 패턴 사용
 - [Phase 06-8-mode-gemini-handlers]: _MODE_SCHEMA_MAP dict로 모드별 스키마 O(1) 조회, 알 수 없는 모드는 SimpleAnswerOutput fallback
 - [Phase 06-8-mode-gemini-handlers]: AiChatData.detail: Optional[Any]로 모드별 구조화 데이터 전달, 기존 plan/db_update 필드 유지
+- [v1.2-deployment]: Dockerfile은 python:3.11-slim 단일 스테이지, docker-compose는 .env 파일에서 시크릿 로드
+- [v1.2-debug-ui]: POST /ai-chat-debug는 실제 파이프라인 실행 + 7단계 입출력 수집, GET /debug는 정적 HTML 반환 (app/static/debug.html)
+- [v1.2-debug-ui]: debug.py는 chat_service.py 내부 헬퍼(_fetch_context, _build_ai_chat_data)를 직접 재사용하여 중복 없이 구현
 
 ### Pending Todos
 
@@ -52,7 +54,7 @@ None.
 
 ### Blockers/Concerns
 
-- WAS 운동/식단 리스트 API 스펙이 Node.js 팀과 조율 필요 — Phase 4 WAS 클라이언트 구현 전 확인
+- WAS 운동/식단 리스트 API 스펙이 Node.js 팀과 조율 필요 (모드 3/5 실제 연동 시 확인)
 
 ## Performance Metrics
 
@@ -62,6 +64,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T08:50:27Z
-Stopped at: Completed 06-8-mode-gemini-handlers/06-01-PLAN.md
+Last session: 2026-03-22T09:30:00Z
+Stopped at: v1.2 Docker + Debug UI 완료
 Resume file: None

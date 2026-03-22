@@ -3,7 +3,8 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-3 (shipped 2026-03-22)
-- 🚧 **v1.1 AI Chat Pipeline** — Phases 4-6 (in progress)
+- ✅ **v1.1 AI Chat Pipeline** — Phases 4-6 (shipped 2026-03-22)
+- 🚧 **v1.2 Deployment + Debug UI** — (in progress)
 
 ## Phases
 
@@ -16,30 +17,33 @@
 
 </details>
 
-### 🚧 v1.1 AI Chat Pipeline (In Progress)
+<details>
+<summary>✅ v1.1 AI Chat Pipeline (Phases 4-6) — SHIPPED 2026-03-22</summary>
 
-**Milestone Goal:** POST /ai-chat 엔드포인트를 통해 8모드 전체 AI 채팅 파이프라인을 구현하고, WAS 통신 및 에러 핸들링을 고도화한다.
+- [x] Phase 4: Infrastructure (2/2 plans) — completed 2026-03-22
+- [x] Phase 5: Chat Pipeline Core (2/2 plans) — completed 2026-03-22
+- [x] Phase 6: 8-Mode Gemini Handlers (1/1 plans) — completed 2026-03-22
 
-- [ ] **Phase 4: Infrastructure** - 글로벌 에러 핸들러 + 구조화 로깅 + WAS HTTP 클라이언트
-- [x] **Phase 5: Chat Pipeline Core** - Router AI + Vector DB 병렬처리 + db_modified_flag + Background Summary 연동 (completed 2026-03-22)
-- [x] **Phase 6: 8-Mode Gemini Handlers** - 모드별 Gemini 호출 및 JSON 출력 (모드 1~8 전체 구현) (completed 2026-03-22)
+</details>
+
+### 🚧 v1.2 Deployment + Debug UI (In Progress)
+
+**Milestone Goal:** Docker 기반 배포 환경을 구성하고, AI 채팅 파이프라인의 각 단계 데이터 흐름을 시각적으로 확인할 수 있는 디버그 UI를 제공한다.
+
+- [x] **Docker 배포 준비** - Dockerfile + docker-compose.yml + .dockerignore (completed 2026-03-22)
+- [x] **Pipeline Debug UI** - GET /debug HTML UI + POST /ai-chat-debug 단계별 시각화 (completed 2026-03-22)
 
 ## Phase Details
 
-### Phase 4: Infrastructure
+### Phase 4: Infrastructure ✅
 **Goal**: 에러 처리 일관성과 WAS 통신 기반이 완성되어 상위 파이프라인이 안전하게 의존할 수 있다
 **Depends on**: Phase 3 (v1.0 완료)
 **Requirements**: ERR-01, ERR-02, WAS-01, WAS-02, WAS-03, WAS-04
-**Success Criteria** (what must be TRUE):
-  1. 모든 예외가 구조화된 JSON 에러 응답으로 반환된다 (status, error_code, message 필드 포함)
-  2. 모든 요청에 요청 ID, 처리 시간, 모드가 로그에 기록된다
-  3. WAS HTTP 클라이언트가 모드 3 요청 시 운동 리스트를 조회하여 반환한다
-  4. WAS HTTP 클라이언트가 모드 5 요청 시 식단 리스트를 조회하여 반환한다
-  5. FastAPI가 db_modified_flag와 Gemini 결과를 조합한 최종 응답을 WAS에 반환한다
-**Plans:** 2 plans
+**Completed**: 2026-03-22
+**Plans:** 2/2 plans complete
 Plans:
-- [ ] 04-01-PLAN.md — Custom exceptions + structured error handlers + request logging middleware
-- [ ] 04-02-PLAN.md — WAS HTTP client + AI chat request/response schemas
+- [x] 04-01-PLAN.md — Custom exceptions + structured error handlers + request logging middleware
+- [x] 04-02-PLAN.md — WAS HTTP client + AI chat request/response schemas
 
 ### Phase 5: Chat Pipeline Core
 **Goal**: POST /ai-chat가 Router AI 의도분류와 Vector DB 맥락검색을 병렬 실행하여 8모드 처리를 오케스트레이션한다
@@ -80,6 +84,8 @@ Phases execute in numeric order: 4 → 5 → 6
 | 1. Foundation | v1.0 | 2/2 | Complete | 2026-03-21 |
 | 2. Core Integrations | v1.0 | 5/5 | Complete | 2026-03-22 |
 | 3. Endpoints and Memory | v1.0 | 3/3 | Complete | 2026-03-22 |
-| 4. Infrastructure | v1.1 | 0/2 | In progress | - |
+| 4. Infrastructure | v1.1 | 2/2 | Complete | 2026-03-22 |
 | 5. Chat Pipeline Core | v1.1 | 2/2 | Complete | 2026-03-22 |
 | 6. 8-Mode Gemini Handlers | v1.1 | 1/1 | Complete | 2026-03-22 |
+| Docker Deployment | v1.2 | - | Complete | 2026-03-22 |
+| Pipeline Debug UI | v1.2 | - | Complete | 2026-03-22 |
