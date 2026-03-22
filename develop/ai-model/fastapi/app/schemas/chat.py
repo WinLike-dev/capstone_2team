@@ -66,6 +66,7 @@ class AiChatData(BaseModel):
     message: str
     plan: Optional[PlanData] = None
     db_update: Optional[DbUpdate] = None
+    detail: Optional[Any] = None
 
 
 # ---------------------------------------------------------------------------
