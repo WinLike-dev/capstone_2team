@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Chat Pipeline Debug</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #38bdf8;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --red: #f87171;
+    --purple: #c084fc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.6rem;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+  }
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto 32px;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .form-full { grid-column: 1 / -1; }
+  label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  input, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 60px; }
+  .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+  button {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: var(--accent); color: var(--bg); }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pipeline {
+    max-width: 800px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .pipeline::before {
+    content: '';
+    position: absolute;
+    left: 24px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .total-bar {
+    text-align: center;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+  }
+  .step {
+    position: relative;
+    margin-left: 48px;
+    margin-bottom: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    animation: fadeIn 0.3s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .step::before {
+    content: '';
+    position: absolute;
+    left: -28px;
+    top: 20px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: var(--bg);
+    z-index: 1;
+  }
+  .step.done::before { background: var(--green); border-color: var(--green); }
+  .step.error::before { background: var(--red); border-color: var(--red); }
+  .step.skip::before { background: var(--text-dim); border-color: var(--text-dim); }
+  .step-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-header:hover { background: rgba(56, 189, 248, 0.05); }
+  .step-name { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+  .step-badge {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-ok { background: rgba(74, 222, 128, 0.15); color: var(--green); }
+  .badge-err { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+  .badge-skip { background: rgba(148, 163, 184, 0.15); color: var(--text-dim); }
+  .step-time { font-size: 0.8rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .step-desc { padding: 0 16px 8px; font-size: 0.8rem; color: var(--text-dim); }
+  .step-body { display: none; border-top: 1px solid var(--border); }
+  .step.open .step-body { display: block; }
+  .data-section { padding: 12px 16px; }
+  .data-section + .data-section { border-top: 1px solid var(--border); }
+  .data-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .arrow-in { color: var(--orange); }
+  .arrow-out { color: var(--green); }
+  pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    line-height: 1.5;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .final-card {
+    max-width: 800px;
+    margin: 24px auto 0;
+    background: var(--surface);
+    border: 2px solid var(--green);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .final-card h3 { color: var(--green); margin-bottom: 12px; font-size: 1rem; }
+  .loading { text-align: center; padding: 40px; color: var(--text-dim); }
+  .spinner {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none; }
+  .profile-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  @media (max-width: 640px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .profile-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>AI Chat Pipeline Debugger</h1>
+<p class="subtitle">Router AI / Vector DB / Prompt Build / WAS / Gemini Worker — each step visualized</p>
+
+<div class="form-card">
+  <div class="form-grid">
+    <div>
+      <label>User ID</label>
+      <input id="userId" value="test-user-001" />
+    </div>
+    <div>
+      <label>User Instruction</label>
+      <input id="userInstruction" placeholder="ex: prefer low calorie" />
+    </div>
+    <div class="form-full">
+      <label>User Message</label>
+      <textarea id="userMessage" rows="2" placeholder="ex: make me a workout plan for this week"></textarea>
+    </div>
+  </div>
+
+  <details style="margin-bottom: 12px;">
+    <summary style="cursor:pointer; color: var(--text-dim); font-size: 0.8rem;">User Profile (optional)</summary>
+    <div class="profile-grid" style="margin-top: 8px;">
+      <div><label>Gender</label><input id="pGender" value="male" /></div>
+      <div><label>Age</label><input id="pAge" type="number" value="25" /></div>
+      <div><label>BMI</label><input id="pBmi" type="number" step="0.1" value="23.5" /></div>
+      <div><label>Goal</label><input id="pGoal" value="" /></div>
+      <div><label>Activity Level</label><input id="pActivity" value="moderate" /></div>
+      <div><label>Allergies (comma sep)</label><input id="pAllergies" placeholder="" /></div>
+    </div>
+  </details>
+
+  <div class="btn-row">
+    <button class="btn-primary" id="sendBtn">Run Pipeline</button>
+  </div>
+</div>
+
+<div id="loadingArea" class="loading hidden">
+  <div class="spinner"></div>
+  <div>Running pipeline...</div>
+</div>
+
+<div id="resultArea" class="hidden">
+  <div class="pipeline">
+    <div class="total-bar" id="totalBar"></div>
+    <div id="stepsContainer"></div>
+  </div>
+  <div id="finalCard" class="final-card hidden">
+    <h3>Final Response</h3>
+    <pre id="finalJson"></pre>
+  </div>
+</div>
+
+<script>
+document.getElementById('sendBtn').addEventListener('click', sendRequest);
+
+async function sendRequest() {
+  var btn = document.getElementById('sendBtn');
+  var loading = document.getElementById('loadingArea');
+  var result = document.getElementById('resultArea');
+
+  btn.disabled = true;
+  loading.classList.remove('hidden');
+  result.classList.add('hidden');
+
+  var allergiesRaw = document.getElementById('pAllergies').value.trim();
+  var allergies = allergiesRaw ? allergiesRaw.split(',').map(function(s) { return s.trim(); }) : null;
+
+  var payload = {
+    user_id: document.getElementById('userId').value,
+    user_message: document.getElementById('userMessage').value,
+    user_instruction: document.getElementById('userInstruction').value,
+    user_profile: {
+      gender: document.getElementById('pGender').value || null,
+      age: parseInt(document.getElementById('pAge').value) || null,
+      bmi: parseFloat(document.getElementById('pBmi').value) || null,
+      goal: document.getElementById('pGoal').value || null,
+      activity_level: document.getElementById('pActivity').value || null,
+      allergies: allergies
+    }
+  };
+
+  try {
+    var resp = await fetch('/ai-chat-debug', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    var data = await resp.json();
+    renderResult(data);
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    loading.classList.add('hidden');
+  }
+}
+
+function createEl(tag, className, textContent) {
+  var el = document.createElement(tag);
+  if (className) el.className = className;
+  if (textContent) el.textContent = textContent;
+  return el;
+}
+
+function renderResult(data) {
+  var result = document.getElementById('resultArea');
+  result.classList.remove('hidden');
+
+  var totalBar = document.getElementById('totalBar');
+  totalBar.textContent = '';
+  var s1 = document.createElement('strong');
+  s1.textContent = 'Mode ' + data.mode;
+  totalBar.appendChild(s1);
+  totalBar.appendChild(document.createTextNode(' (' + data.mode_name + ') \u2014 Total: '));
+  var s2 = document.createElement('strong');
+  s2.textContent = data.total_elapsed_ms + 'ms';
+  totalBar.appendChild(s2);
+
+  var container = document.getElementById('stepsContainer');
+  container.textContent = '';
+
+  data.steps.forEach(function(step, i) {
+    var hasError = step.output && step.output.error;
+    var isSkipped = step.output && step.output.skipped;
+    var cls = hasError ? 'error' : isSkipped ? 'skip' : 'done';
+    var badgeCls = hasError ? 'badge-err' : isSkipped ? 'badge-skip' : 'badge-ok';
+    var badgeText = hasError ? 'ERROR' : isSkipped ? 'SKIP' : 'OK';
+
+    var el = createEl('div', 'step ' + cls);
+    el.style.animationDelay = (i * 80) + 'ms';
+
+    // header
+    var header = createEl('div', 'step-header');
+    header.addEventListener('click', function() { el.classList.toggle('open'); });
+
+    var nameSpan = createEl('span', 'step-name');
+    nameSpan.appendChild(document.createTextNode(step.name + ' '));
+    var badge = createEl('span', 'step-badge ' + badgeCls, badgeText);
+    nameSpan.appendChild(badge);
+    header.appendChild(nameSpan);
+
+    var timeSpan = createEl('span', 'step-time', step.elapsed_ms > 0 ? step.elapsed_ms + 'ms' : '-');
+    header.appendChild(timeSpan);
+    el.appendChild(header);
+
+    // desc
+    var desc = createEl('div', 'step-desc', step.description);
+    el.appendChild(desc);
+
+    // body
+    var body = createEl('div', 'step-body');
+
+    // input section
+    var inSection = createEl('div', 'data-section');
+    var inLabel = createEl('div', 'data-label');
+    var inArrow = createEl('span', 'arrow-in', '\u25B6 ');
+    inLabel.appendChild(inArrow);
+    inLabel.appendChild(document.createTextNode('INPUT'));
+    inSection.appendChild(inLabel);
+    var inPre = createEl('pre', null, JSON.stringify(step.input, null, 2));
+    inSection.appendChild(inPre);
+    body.appendChild(inSection);
+
+    // output section
+    var outSection = createEl('div', 'data-section');
+    var outLabel = createEl('div', 'data-label');
+    var outArrow = createEl('span', 'arrow-out', '\u25C0 ');
+    outLabel.appendChild(outArrow);
+    outLabel.appendChild(document.createTextNode('OUTPUT'));
+    outSection.appendChild(outLabel);
+    var outPre = createEl('pre', null, JSON.stringify(step.output, null, 2));
+    outSection.appendChild(outPre);
+    body.appendChild(outSection);
+
+    el.appendChild(body);
+    container.appendChild(el);
+  });
+
+  var finalCard = document.getElementById('finalCard');
+  if (data.final_response) {
+    finalCard.classList.remove('hidden');
+    document.getElementById('finalJson').textContent = JSON.stringify(data.final_response, null, 2);
+  } else {
+    finalCard.classList.add('hidden');
+  }
+}
+</script>
+</body>
+</html>

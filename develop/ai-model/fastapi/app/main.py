@@ -14,6 +14,7 @@ from app.core.exceptions import (
 from app.core.lifespan import lifespan
 from app.core.middleware import RequestLoggingMiddleware
 from app.routers.chat import router as chat_router
+from app.routers.debug import router as debug_router
 from app.routers.meal import router as meal_router
 from app.routers.recommend import router as recommend_router
 
@@ -27,6 +28,7 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(meal_router)
 app.include_router(recommend_router)
 app.include_router(chat_router)
+app.include_router(debug_router)
 
 
 # ---------------------------------------------------------------------------
