@@ -152,3 +152,133 @@ def test_error_response_structure():
     resp = ErrorResponse(error=ErrorDetail(code="INVALID_INPUT", message="잘못된 입력입니다."))
     assert resp.status == "error"
     assert resp.error.code == "INVALID_INPUT"
+
+
+# ---------------------------------------------------------------------------
+# AiChatRequest
+# ---------------------------------------------------------------------------
+
+from app.schemas.chat import AiChatData, AiChatRequest, AiChatResponse, get_db_modified_flag
+
+
+def test_ai_chat_request_valid():
+    """AiChatRequest가 유효한 데이터를 파싱한다."""
+    data = {
+        "user_id": "user_001",
+        "user_profile": {
+            "gender": "male",
+            "age": 28,
+            "bmi": 23.5,
+            "goal": "체중 감량",
+        },
+        "user_instruction": "운동 위주로 추천해줘",
+        "user_message": "오늘 운동 계획 짜줘",
+    }
+    req = AiChatRequest(**data)
+    assert req.user_id == "user_001"
+    assert req.user_profile.gender == "male"
+    assert req.user_instruction == "운동 위주로 추천해줘"
+    assert req.user_message == "오늘 운동 계획 짜줘"
+
+
+def test_ai_chat_request_default_instruction():
+    """user_instruction은 기본값이 빈 문자열이다."""
+    req = AiChatRequest(
+        user_id="u1",
+        user_profile={},
+        user_message="안녕",
+    )
+    assert req.user_instruction == ""
+
+
+def test_ai_chat_request_missing_user_id_raises():
+    """user_id 누락 시 ValidationError가 발생한다."""
+    with pytest.raises(ValidationError) as exc_info:
+        AiChatRequest(
+            user_profile={},
+            user_instruction="test",
+            user_message="test",
+        )
+    errors = exc_info.value.errors()
+    assert any(e["loc"] == ("user_id",) for e in errors)
+
+
+def test_ai_chat_request_missing_user_message_raises():
+    """user_message 누락 시 ValidationError가 발생한다."""
+    with pytest.raises(ValidationError) as exc_info:
+        AiChatRequest(
+            user_id="u1",
+            user_profile={},
+        )
+    errors = exc_info.value.errors()
+    assert any(e["loc"] == ("user_message",) for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# get_db_modified_flag
+# ---------------------------------------------------------------------------
+
+def test_get_db_modified_flag_mode_1_returns_none():
+    assert get_db_modified_flag(1) == "none"
+
+
+def test_get_db_modified_flag_mode_2_returns_exercise():
+    assert get_db_modified_flag(2) == "exercise"
+
+
+def test_get_db_modified_flag_mode_3_returns_exercise():
+    assert get_db_modified_flag(3) == "exercise"
+
+
+def test_get_db_modified_flag_mode_4_returns_meal():
+    assert get_db_modified_flag(4) == "meal"
+
+
+def test_get_db_modified_flag_mode_5_returns_meal():
+    assert get_db_modified_flag(5) == "meal"
+
+
+def test_get_db_modified_flag_mode_6_returns_profile():
+    assert get_db_modified_flag(6) == "profile"
+
+
+def test_get_db_modified_flag_mode_7_returns_none():
+    assert get_db_modified_flag(7) == "none"
+
+
+def test_get_db_modified_flag_mode_8_returns_none():
+    assert get_db_modified_flag(8) == "none"
+
+
+def test_get_db_modified_flag_unknown_mode_returns_none():
+    assert get_db_modified_flag(99) == "none"
+
+
+# ---------------------------------------------------------------------------
+# AiChatResponse
+# ---------------------------------------------------------------------------
+
+def test_ai_chat_response_serialization():
+    """AiChatResponse가 모든 필수 필드를 포함하여 직렬화된다."""
+    resp = AiChatResponse(
+        mode=3,
+        data=AiChatData(message="운동 계획을 생성했습니다."),
+        db_modified_flag="exercise",
+    )
+    dumped = resp.model_dump()
+    assert dumped["status"] == "success"
+    assert dumped["mode"] == 3
+    assert dumped["data"]["message"] == "운동 계획을 생성했습니다."
+    assert dumped["data"]["plan"] is None
+    assert dumped["data"]["db_update"] is None
+    assert dumped["db_modified_flag"] == "exercise"
+
+
+def test_ai_chat_response_default_status():
+    """AiChatResponse의 status 기본값은 'success'이다."""
+    resp = AiChatResponse(
+        mode=1,
+        data=AiChatData(message="일반 응답"),
+        db_modified_flag="none",
+    )
+    assert resp.status == "success"
