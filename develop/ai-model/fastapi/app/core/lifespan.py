@@ -5,9 +5,11 @@ Startup order (per CONTEXT.md decision):
   2. PineconeClient  (async index init, creates index if absent)
   3. GeminiClient    (lightweight constructor, no I/O)
   4. RouterClient    (lightweight constructor, no I/O)
+  5. WASClient       (httpx.AsyncClient with 10s timeout)
 
 Shutdown:
   - Close PineconeAsyncio control-plane connection.
+  - Close httpx.AsyncClient used by WASClient.
 
 Initialization failures are NOT caught — exceptions propagate and FastAPI
 aborts server startup, preventing a partially-initialized state.
@@ -15,12 +17,13 @@ aborts server startup, preventing a partially-initialized state.
 import logging
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from pinecone import PineconeAsyncio, ServerlessSpec
 from sentence_transformers import SentenceTransformer
 from starlette.concurrency import run_in_threadpool
 
-from app.clients import EMBEDDING_DIM, EmbeddingClient, GeminiClient, PineconeClient, RouterClient
+from app.clients import EMBEDDING_DIM, EmbeddingClient, GeminiClient, PineconeClient, RouterClient, WASClient
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -73,6 +76,12 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Router client initialized (model=%s)", settings.ROUTER_MODEL_NAME)
 
+    # 5. WAS HTTP client (httpx.AsyncClient with 10s timeout)
+    http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
+    app.state.was_client = WASClient(base_url=settings.WAS_BASE_URL, client=http_client)
+    app.state._was_http_client = http_client  # kept for shutdown cleanup
+    logger.info("WAS client initialized (base_url=%s)", settings.WAS_BASE_URL)
+
     yield
 
     # ------------------------------------------------------------------ #
@@ -80,3 +89,6 @@ async def lifespan(app: FastAPI):
     # ------------------------------------------------------------------ #
     await app.state._pinecone_control.close()
     logger.info("Pinecone connection closed")
+
+    await app.state._was_http_client.aclose()
+    logger.info("WAS HTTP client closed")

@@ -4,6 +4,7 @@ from app.clients.embedding import EMBEDDING_DIM, EmbeddingClient
 from app.clients.gemini import GeminiClient
 from app.clients.pinecone import PineconeClient
 from app.clients.router import RouterClient, RouterOutput
+from app.clients.was import WASClient
 
 __all__ = [
     "EmbeddingClient",
@@ -12,4 +13,5 @@ __all__ = [
     "PineconeClient",
     "RouterClient",
     "RouterOutput",
+    "WASClient",
 ]
