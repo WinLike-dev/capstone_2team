@@ -233,8 +233,10 @@ async def test_no_user_instruction_omits_section(
     with patch("app.services.chat_service.build_worker_system_prompt", side_effect=capture_build):
         await handle_ai_chat(body, request, background_tasks)
 
-    assert "사용자 지시사항" not in captured.get("prompt", ""), (
-        "user_instruction이 비어있으면 '사용자 지시사항' 섹션이 포함되지 않아야 한다"
+    # 사용자 지시사항 섹션 헤더("사용자 지시사항: " — 콜론+공백)가 없어야 한다
+    # (공통 규칙 본문에도 '사용자 지시사항'이라는 단어가 등장하므로 섹션 헤더 패턴으로 확인)
+    assert "사용자 지시사항: " not in captured.get("prompt", ""), (
+        "user_instruction이 비어있으면 '사용자 지시사항: ...' 섹션 헤더가 포함되지 않아야 한다"
     )
 
 
