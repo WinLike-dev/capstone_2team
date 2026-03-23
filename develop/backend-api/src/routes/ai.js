@@ -8,7 +8,7 @@ const aiController = require('../controllers/aiController');
 router.get('/plans', aiController.getPlans);
 
 // 식단 기록 → AI 칼로리 분석 중계 (DataFormat_2_ai_api)
-router.post('/process-meal', aiController.processMeal);
+router.post('/meal-record', aiController.processMeal);
 
 // 운동/식단 추천 요청 (DataFormat_2_ai_api)
 router.post('/recommend', aiController.recommend);
