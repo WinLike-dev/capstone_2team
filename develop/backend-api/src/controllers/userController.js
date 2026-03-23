@@ -76,7 +76,7 @@ exports.getExercises = async (req, res) => {
 // @access  Public (프로토타입)
 exports.addExercise = async (req, res) => {
   try {
-    const { user_id, exercise_name, sets_reps, burn_calories, target_date } = req.body;
+    const { user_id, exercise_name, burn_calories, target_date } = req.body;
     if (!user_id || !exercise_name || burn_calories == null) {
       return res.status(400).json({ error: 'user_id, 운동 이름, 소모 칼로리를 입력해주세요.' });
     }
@@ -86,7 +86,6 @@ exports.addExercise = async (req, res) => {
       .insert({
         user_id,
         exercise_name,
-        sets_reps,
         burn_calories,
         target_date: target_date || new Date().toISOString().split('T')[0]
       })
@@ -224,7 +223,7 @@ exports.confirmRecommendation = async (req, res) => {
       return res.status(400).json({ error: 'user_id, item_type, item_details가 필요합니다.' });
     }
 
-    const { name, calories, date, time_slot, sets_reps } = item_details;
+    const { name, calories, date, time_slot } = item_details;
 
     if (!name || calories == null || !date) {
       return res.status(400).json({ error: 'item_details에 name, calories, date가 필요합니다.' });
@@ -240,7 +239,6 @@ exports.confirmRecommendation = async (req, res) => {
           user_id,
           exercise_name: name,
           burn_calories: calories,
-          sets_reps: sets_reps || '미지정',
           target_date: date
         })
         .select()
