@@ -14,7 +14,10 @@ app.use(helmet()); // HTTP 보안 헤더 자동 설정
 // CORS: 허용할 프론트엔드 Origin을 환경변수로 관리
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    // 로컬과 Vercel 모두 접근 가능하도록 모든 출처 허용 (개발/프로토타입 단계)
+    origin: function (origin, callback) {
+      callback(null, true);
+    },
     credentials: true, // 쿠키/인증 헤더 허용
   })
 );

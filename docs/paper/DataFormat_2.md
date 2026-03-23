@@ -17,7 +17,8 @@
     "name": "string",          // 운동/식단 이름
     "calories": "number",      // (운동 시 소모 / 식단 시 섭취) 칼로리
     "date": "YYYY-MM-DD",      // 등록할 날짜
-    "time_slot": "string"      // (식단 시) 아침, 점심, 저녁 등
+    "time_slot": "string",     // (식단 시) 아침, 점심, 저녁 등 (운동일 경우 null/생략 가능)
+    "sets_reps": "string"      // (운동 시) 3세트 15회 등 (식단일 경우 null/생략 가능)
   }
 }
 ```

@@ -224,7 +224,7 @@ exports.confirmRecommendation = async (req, res) => {
       return res.status(400).json({ error: 'user_id, item_type, item_details가 필요합니다.' });
     }
 
-    const { name, calories, date, time_slot } = item_details;
+    const { name, calories, date, time_slot, sets_reps } = item_details;
 
     if (!name || calories == null || !date) {
       return res.status(400).json({ error: 'item_details에 name, calories, date가 필요합니다.' });
@@ -240,6 +240,7 @@ exports.confirmRecommendation = async (req, res) => {
           user_id,
           exercise_name: name,
           burn_calories: calories,
+          sets_reps: sets_reps || '미지정',
           target_date: date
         })
         .select()
