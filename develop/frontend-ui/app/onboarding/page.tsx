@@ -21,11 +21,12 @@ export default function OnboardingPage() {
   });
 
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const conditionOptions = ['고혈압', '당뇨', '관절염', '천식', '심혈관 질환', '없음'];
   const allergyOptions = ['유제품', '견과류', '갑각류', '밀', '대두', '달걀', '해당 없음'];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -37,8 +38,53 @@ export default function OnboardingPage() {
     if (formData.conditions.length === 0) return setErrorMsg('기저 질환을 하나 이상 선택해주세요 (해당 없으면 "없음" 선택).');
     if (formData.allergies.length === 0 && !formData.otherAllergy.trim() && !formData.allergies.includes('기타(직접 입력)')) return setErrorMsg('알레르기 정보를 선택해주세요 (해당 없으면 "해당 없음" 선택).');
 
-    localStorage.setItem('healthAppUser', JSON.stringify(formData));
-    router.push('/');
+    setIsSubmitting(true);
+    try {
+      const height = parseFloat(formData.height);
+      const weight = parseFloat(formData.weight);
+      let bmi = 0;
+      if (height > 0) {
+        bmi = Math.round((weight / ((height / 100) * (height / 100))) * 10) / 10;
+      }
+
+      const genderStr = formData.gender === '남성' ? 'male' : 'female';
+
+      const payload = {
+        user_id: formData.name, // 로그인 구현 전이라 이름을 id로 임시 사용
+        mbti: formData.mbti,
+        gender: genderStr,
+        age: parseInt(formData.age, 10),
+        height,
+        weight,
+        bmi,
+        goal: formData.goal,
+        activity_level: formData.activityLevel,
+        medical_history: formData.conditions,
+        allergies: formData.allergies,
+        user_instruction: formData.otherAllergy ? `기타 알레르기: ${formData.otherAllergy}` : ''
+      };
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const response = await fetch(`${API_URL}/users/profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('API 연동 실패');
+      }
+
+      localStorage.setItem('healthAppUser', JSON.stringify(formData));
+      router.push('/');
+    } catch (error) {
+      console.error(error);
+      setErrorMsg('프로필 저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -345,9 +391,10 @@ export default function OnboardingPage() {
           <div className="pt-6">
             <button
               type="submit"
-              className="w-full bg-[#2563eb] text-white font-bold text-lg py-4 rounded-xl shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:bg-blue-700 hover:shadow-[0_8px_24px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_2px_8px_rgba(37,99,235,0.3)] transition-all duration-300"
+              disabled={isSubmitting}
+              className="w-full bg-[#2563eb] text-white font-bold text-lg py-4 rounded-xl shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:bg-blue-700 hover:shadow-[0_8px_24px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_2px_8px_rgba(37,99,235,0.3)] transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              시작하기
+              {isSubmitting ? '저장 중...' : '시작하기'}
             </button>
           </div>
         </form>
