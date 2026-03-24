@@ -185,6 +185,7 @@ def _format_user_profile(profile: UserProfile) -> str:
         "age": "나이",
         "bmi": "BMI",
         "goal": "목표",
+        "personality": "성향(MBTI)",
         "medical_history": "의료 이력",
         "allergies": "알레르기",
         "activity_level": "활동 수준",

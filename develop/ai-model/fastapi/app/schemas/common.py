@@ -14,6 +14,7 @@ class UserProfile(BaseModel):
     age: Optional[int] = None
     bmi: Optional[float] = None
     goal: Optional[str] = None
+    personality: Optional[str] = None
     medical_history: Optional[list[str]] = None
     allergies: Optional[list[str]] = None
     activity_level: Optional[str] = None

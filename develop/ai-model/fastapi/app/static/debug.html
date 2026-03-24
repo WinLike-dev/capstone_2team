@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Chat Pipeline Debug</title>
+<title>AI Hub Debug</title>
 <style>
   :root {
     --bg: #0f172a;
@@ -208,17 +208,115 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   .hidden { display: none; }
+  .endpoint-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .endpoint-tab {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .endpoint-tab:hover { border-color: var(--accent); color: var(--accent); }
+  .endpoint-tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .tab-section { display: none; }
+  .tab-section.active { display: block; }
   .profile-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .examples-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto 20px;
+  }
+  .examples-panel h2 {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+  }
+  .mode-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .mode-tab {
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-tab:hover { border-color: var(--accent); color: var(--accent); }
+  .mode-tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 700; }
+  .example-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .example-item {
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: var(--text);
+    text-align: left;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .example-item:hover { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,0.05); }
+  .example-item .ex-num { color: var(--text-dim); font-size: 0.7rem; margin-right: 4px; }
   @media (max-width: 640px) {
     .form-grid { grid-template-columns: 1fr; }
     .profile-grid { grid-template-columns: 1fr 1fr; }
+    .example-list { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
 
-<h1>AI Chat Pipeline Debugger</h1>
-<p class="subtitle">Router AI / Vector DB / Prompt Build / WAS / Gemini Worker — each step visualized</p>
+<h1>AI Hub Debugger</h1>
+<p class="subtitle">엔드포인트별 파이프라인 단계 시각화</p>
+
+<div class="endpoint-tabs">
+  <button class="endpoint-tab active" onclick="switchTab('aichat')">AI Chat</button>
+  <button class="endpoint-tab" onclick="switchTab('meal')">Process Meal</button>
+  <button class="endpoint-tab" onclick="switchTab('recommend')">Recommend</button>
+  <button class="endpoint-tab" onclick="switchTab('vectordb')">Vector DB</button>
+</div>
+
+<div class="tab-section active" id="tab-aichat">
+<div class="examples-panel">
+  <h2>예시 데이터 — 모드별 10개 × 8모드 = 80개</h2>
+  <div class="mode-tabs" id="modeTabs">
+    <button class="mode-tab active" data-mode="1" onclick="selectMode(1)">Mode 1 단순대화</button>
+    <button class="mode-tab" data-mode="2" onclick="selectMode(2)">Mode 2 플랜 작성</button>
+    <button class="mode-tab" data-mode="3" onclick="selectMode(3)">Mode 3 플랜 수정</button>
+    <button class="mode-tab" data-mode="4" onclick="selectMode(4)">Mode 4 식단 작성</button>
+    <button class="mode-tab" data-mode="5" onclick="selectMode(5)">Mode 5 식단 수정</button>
+    <button class="mode-tab" data-mode="6" onclick="selectMode(6)">Mode 6 DB 수정</button>
+    <button class="mode-tab" data-mode="7" onclick="selectMode(7)">Mode 7 식단 기록</button>
+    <button class="mode-tab" data-mode="8" onclick="selectMode(8)">Mode 8 추천</button>
+  </div>
+  <div class="example-list" id="exampleList"></div>
+</div>
 
 <div class="form-card">
   <div class="form-grid">
@@ -243,6 +341,7 @@
       <div><label>Age</label><input id="pAge" type="number" value="25" /></div>
       <div><label>BMI</label><input id="pBmi" type="number" step="0.1" value="23.5" /></div>
       <div><label>Goal</label><input id="pGoal" value="" /></div>
+      <div><label>Personality (MBTI)</label><input id="pPersonality" placeholder="ex: INTJ, ENFP" /></div>
       <div><label>Activity Level</label><input id="pActivity" value="moderate" /></div>
       <div><label>Allergies (comma sep)</label><input id="pAllergies" placeholder="" /></div>
     </div>
@@ -269,7 +368,253 @@
   </div>
 </div>
 
+</div><!-- /tab-aichat -->
+
+<!-- ── Process Meal 탭 ── -->
+<div class="tab-section" id="tab-meal">
+  <div class="form-card">
+    <div class="form-grid">
+      <div><label>User ID</label><input id="mUserId" value="test-user-001" /></div>
+      <div><label>User Instruction</label><input id="mInstruction" placeholder="ex: 저칼로리로 분석해줘" /></div>
+      <div class="form-full"><label>User Message (먹은 음식)</label>
+        <textarea id="mMessage" rows="2" placeholder="ex: 오늘 점심에 비빔밥 먹었어"></textarea>
+      </div>
+    </div>
+    <details style="margin-bottom:12px;">
+      <summary style="cursor:pointer;color:var(--text-dim);font-size:0.8rem;">User Profile (optional)</summary>
+      <div class="profile-grid" style="margin-top:8px;">
+        <div><label>Gender</label><input id="mpGender" value="female" /></div>
+        <div><label>Age</label><input id="mpAge" type="number" value="27" /></div>
+        <div><label>BMI</label><input id="mpBmi" type="number" step="0.1" value="22.5" /></div>
+        <div><label>Goal</label><input id="mpGoal" value="다이어트" /></div>
+        <div><label>Personality (MBTI)</label><input id="mpPersonality" placeholder="ex: ISFJ" /></div>
+        <div><label>Activity Level</label><input id="mpActivity" value="moderate" /></div>
+        <div><label>Allergies (comma sep)</label><input id="mpAllergies" placeholder="" /></div>
+      </div>
+    </details>
+    <div class="btn-row"><button class="btn-primary" id="mealBtn">Run Process Meal</button></div>
+  </div>
+  <div id="mealLoadingArea" class="loading hidden"><div class="spinner"></div><div>Analyzing meal...</div></div>
+  <div id="mealResultArea" class="hidden">
+    <div class="pipeline"><div class="total-bar" id="mealTotalBar"></div><div id="mealStepsContainer"></div></div>
+    <div id="mealFinalCard" class="final-card hidden"><h3>Final Response</h3><pre id="mealFinalJson"></pre></div>
+  </div>
+</div>
+
+<!-- ── Recommend 탭 ── -->
+<div class="tab-section" id="tab-recommend">
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="form-full"><label>User ID</label><input id="rUserId" value="test-user-001" /></div>
+      <div class="form-full"><label>User Instruction (추천 요청)</label>
+        <textarea id="rInstruction" rows="2" placeholder="ex: 다이어트에 맞는 운동이랑 식단 추천해줘"></textarea>
+      </div>
+    </div>
+    <details style="margin-bottom:12px;">
+      <summary style="cursor:pointer;color:var(--text-dim);font-size:0.8rem;">User Profile (optional)</summary>
+      <div class="profile-grid" style="margin-top:8px;">
+        <div><label>Gender</label><input id="rpGender" value="male" /></div>
+        <div><label>Age</label><input id="rpAge" type="number" value="28" /></div>
+        <div><label>BMI</label><input id="rpBmi" type="number" step="0.1" value="27.0" /></div>
+        <div><label>Goal</label><input id="rpGoal" value="다이어트" /></div>
+        <div><label>Personality (MBTI)</label><input id="rpPersonality" placeholder="ex: ENTP" /></div>
+        <div><label>Activity Level</label><input id="rpActivity" value="low" /></div>
+        <div><label>Allergies (comma sep)</label><input id="rpAllergies" placeholder="" /></div>
+      </div>
+    </details>
+    <div class="btn-row"><button class="btn-primary" id="recommendBtn">Run Recommend</button></div>
+  </div>
+  <div id="recLoadingArea" class="loading hidden"><div class="spinner"></div><div>Generating recommendation...</div></div>
+  <div id="recResultArea" class="hidden">
+    <div class="pipeline"><div class="total-bar" id="recTotalBar"></div><div id="recStepsContainer"></div></div>
+    <div id="recFinalCard" class="final-card hidden"><h3>Final Response</h3><pre id="recFinalJson"></pre></div>
+  </div>
+</div>
+
+<!-- ── Vector DB 탭 ── -->
+<div class="tab-section" id="tab-vectordb">
+  <div style="max-width:800px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+    <!-- Search -->
+    <div class="form-card" style="margin:0;">
+      <h3 style="color:var(--accent);font-size:0.95rem;margin-bottom:12px;">Search (유사 벡터 검색)</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div><label>User ID</label><input id="vsUserId" value="test-user-001" /></div>
+        <div><label>Query</label><textarea id="vsQuery" rows="2" placeholder="ex: 운동 계획 세워줘"></textarea></div>
+        <div><label>Top K</label><input id="vsTopK" type="number" value="3" min="1" max="10" /></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px;"><button class="btn-primary" id="vsBtn">Search</button></div>
+      <pre id="vsResult" style="margin-top:12px;display:none;"></pre>
+    </div>
+
+    <!-- Upsert -->
+    <div class="form-card" style="margin:0;">
+      <h3 style="color:var(--purple);font-size:0.95rem;margin-bottom:12px;">Upsert (벡터 저장)</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div><label>User ID</label><input id="vuUserId" value="test-user-001" /></div>
+        <div><label>Summary (저장할 텍스트)</label><textarea id="vuSummary" rows="4" placeholder="ex: 사용자가 이번 주 운동 계획을 요청했고 헬스장 기준 4일 루틴을 생성함"></textarea></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px;"><button class="btn-primary" id="vuBtn">Upsert</button></div>
+      <pre id="vuResult" style="margin-top:12px;display:none;"></pre>
+    </div>
+
+  </div>
+</div>
+
 <script>
+// ─── 80개 예시 데이터 (모드별 10개) ─────────────────────────────────────
+var EXAMPLES = {
+  1: [
+    { msg: "안녕, 오늘 뭐 해?", instr: "", uid: "user-001", profile: { gender:"female", age:22, bmi:21.0, goal:"", activity_level:"moderate", allergies:[] } },
+    { msg: "운동하면 살이 빠져?", instr: "", uid: "user-002", profile: { gender:"male", age:25, bmi:25.0, goal:"다이어트", activity_level:"low", allergies:[] } },
+    { msg: "단백질이 뭐야? 왜 중요해?", instr: "", uid: "user-003", profile: { gender:"male", age:30, bmi:23.5, goal:"근력 증진", activity_level:"active", allergies:[] } },
+    { msg: "비타민 C 효능 알려줘", instr: "", uid: "user-004", profile: { gender:"female", age:28, bmi:20.5, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "오늘 기분이 별로야, 뭔가 위로해줄 말 없어?", instr: "", uid: "user-005", profile: { gender:"female", age:26, bmi:22.0, goal:"", activity_level:"low", allergies:[] } },
+    { msg: "운동하기 가장 좋은 시간대가 언제야?", instr: "", uid: "user-006", profile: { gender:"male", age:35, bmi:27.0, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "하루에 물 얼마나 마셔야 해?", instr: "", uid: "user-007", profile: { gender:"male", age:40, bmi:24.0, goal:"건강 유지", activity_level:"low", allergies:[] } },
+    { msg: "넌 어떤 AI야? 뭘 도와줄 수 있어?", instr: "", uid: "user-008", profile: { gender:"female", age:19, bmi:18.5, goal:"", activity_level:"moderate", allergies:[] } },
+    { msg: "운동 후 단백질 섭취 타이밍이 어떻게 되는 게 좋아?", instr: "", uid: "user-009", profile: { gender:"male", age:27, bmi:23.0, goal:"근력 증진", activity_level:"very_active", allergies:[] } },
+    { msg: "스트레스 해소에 좋은 활동 뭐가 있어?", instr: "", uid: "user-010", profile: { gender:"female", age:32, bmi:22.5, goal:"건강 유지", activity_level:"moderate", allergies:[] } }
+  ],
+  2: [
+    { msg: "이번 주 운동 계획 세워줘", instr: "헬스장 기준으로 짜줘", uid: "user-011", profile: { gender:"male", age:25, bmi:23.5, goal:"근력 증진", activity_level:"moderate", allergies:[] } },
+    { msg: "초보자를 위한 3일 분할 루틴 추천해줘", instr: "", uid: "user-012", profile: { gender:"male", age:22, bmi:21.0, goal:"근력 증진", activity_level:"low", allergies:[] } },
+    { msg: "다음 달 전신 운동 스케줄 짜줘", instr: "주 4일 운동으로", uid: "user-013", profile: { gender:"female", age:28, bmi:22.0, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "집에서 할 수 있는 홈트 루틴 만들어줘", instr: "기구 없이", uid: "user-014", profile: { gender:"female", age:30, bmi:24.5, goal:"다이어트", activity_level:"low", allergies:[] } },
+    { msg: "러닝과 근력 운동을 병행하는 2주 계획 세워줘", instr: "", uid: "user-015", profile: { gender:"male", age:29, bmi:22.0, goal:"다이어트", activity_level:"active", allergies:[] } },
+    { msg: "복근 집중 2주 운동 계획 짜줘", instr: "매일 10분 이내로", uid: "user-016", profile: { gender:"male", age:24, bmi:23.0, goal:"체형 개선", activity_level:"moderate", allergies:[] } },
+    { msg: "주 5일 헬스장 루틴 만들어줘", instr: "하이볼륨으로 구성해줘", uid: "user-017", profile: { gender:"male", age:26, bmi:24.0, goal:"근육 증가", activity_level:"very_active", allergies:[] } },
+    { msg: "다이어트용 유산소 위주 운동 계획 짜줘", instr: "1달치로", uid: "user-018", profile: { gender:"female", age:35, bmi:27.5, goal:"다이어트", activity_level:"low", allergies:[] } },
+    { msg: "상체 집중 1달 운동 루틴 만들어줘", instr: "무게 점진적으로 올려줘", uid: "user-019", profile: { gender:"male", age:31, bmi:22.5, goal:"근력 증진", activity_level:"active", allergies:[] } },
+    { msg: "마라톤 준비를 위한 12주 훈련 계획 세워줘", instr: "5km 입문자 기준", uid: "user-020", profile: { gender:"male", age:33, bmi:21.5, goal:"마라톤 완주", activity_level:"moderate", allergies:[] } }
+  ],
+  3: [
+    { msg: "수요일 운동 빼줘", instr: "", uid: "user-021", profile: { gender:"male", age:25, bmi:23.5, goal:"근력 증진", activity_level:"moderate", allergies:[] } },
+    { msg: "내일 운동에 스쿼트 10세트 추가해줘", instr: "", uid: "user-022", profile: { gender:"male", age:27, bmi:24.0, goal:"하체 강화", activity_level:"active", allergies:[] } },
+    { msg: "운동 강도 좀 낮춰줘, 너무 힘들어", instr: "", uid: "user-023", profile: { gender:"female", age:23, bmi:20.5, goal:"체형 개선", activity_level:"low", allergies:[] } },
+    { msg: "목요일 운동을 금요일로 옮겨줘", instr: "", uid: "user-024", profile: { gender:"male", age:30, bmi:22.0, goal:"근력 증진", activity_level:"moderate", allergies:[] } },
+    { msg: "레그데이를 화요일에서 수요일로 바꿔줘", instr: "", uid: "user-025", profile: { gender:"male", age:28, bmi:23.0, goal:"하체 발달", activity_level:"active", allergies:[] } },
+    { msg: "오늘 운동 끝에 스트레칭 20분 추가해줘", instr: "", uid: "user-026", profile: { gender:"female", age:32, bmi:21.5, goal:"유연성 향상", activity_level:"moderate", allergies:[] } },
+    { msg: "이번 주 운동 강도를 전반적으로 10% 올려줘", instr: "", uid: "user-027", profile: { gender:"male", age:26, bmi:22.5, goal:"근육 증가", activity_level:"very_active", allergies:[] } },
+    { msg: "풀업이 너무 힘드니까 랫풀다운으로 바꿔줘", instr: "", uid: "user-028", profile: { gender:"female", age:25, bmi:20.0, goal:"상체 근력", activity_level:"moderate", allergies:[] } },
+    { msg: "다음 주에 쉬는 날을 하루 더 추가해줘", instr: "", uid: "user-029", profile: { gender:"male", age:38, bmi:25.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "현재 계획에서 유산소 시간을 30분 더 늘려줘", instr: "", uid: "user-030", profile: { gender:"female", age:29, bmi:26.0, goal:"다이어트", activity_level:"moderate", allergies:[] } }
+  ],
+  4: [
+    { msg: "다이어트 식단 일주일치 짜줘", instr: "하루 1500kcal 이내로", uid: "user-031", profile: { gender:"female", age:28, bmi:26.5, goal:"다이어트", activity_level:"low", allergies:[] } },
+    { msg: "단백질 위주의 식단 1주일치 추천해줘", instr: "하루 150g 단백질 목표", uid: "user-032", profile: { gender:"male", age:25, bmi:23.0, goal:"근육 증가", activity_level:"active", allergies:[] } },
+    { msg: "벌크업을 위한 고칼로리 식단 1달치 만들어줘", instr: "하루 3000kcal 이상", uid: "user-033", profile: { gender:"male", age:22, bmi:20.0, goal:"벌크업", activity_level:"very_active", allergies:[] } },
+    { msg: "채식주의자 식단 2주치 추천해줘", instr: "계란은 가능", uid: "user-034", profile: { gender:"female", age:30, bmi:22.0, goal:"건강 유지", activity_level:"moderate", allergies:["육류"] } },
+    { msg: "당뇨 환자에게 적합한 저당 식단 짜줘", instr: "혈당 지수 낮은 음식 위주로", uid: "user-035", profile: { gender:"male", age:55, bmi:28.0, goal:"혈당 관리", activity_level:"low", allergies:[], medical_history:["당뇨"] } },
+    { msg: "저탄고지 키토제닉 식단 1주일치 짜줘", instr: "탄수화물 50g 이하", uid: "user-036", profile: { gender:"female", age:33, bmi:25.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "운동 후 회복을 위한 식단 만들어줘", instr: "탄단지 균형 맞게", uid: "user-037", profile: { gender:"male", age:27, bmi:22.5, goal:"근력 증진", activity_level:"very_active", allergies:[] } },
+    { msg: "유제품 알레르기가 있어도 먹을 수 있는 식단 짜줘", instr: "", uid: "user-038", profile: { gender:"female", age:24, bmi:21.0, goal:"건강 유지", activity_level:"moderate", allergies:["유제품"] } },
+    { msg: "아침에 바빠서 10분 이내로 준비되는 식단 만들어줘", instr: "간단하고 영양 있게", uid: "user-039", profile: { gender:"male", age:32, bmi:24.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "한 달치 다이어트 식단 짜줘", instr: "야식 없이 하루 세끼로", uid: "user-040", profile: { gender:"female", age:26, bmi:27.0, goal:"다이어트", activity_level:"low", allergies:[] } }
+  ],
+  5: [
+    { msg: "오늘 점심 메뉴를 닭가슴살 샐러드로 바꿔줘", instr: "", uid: "user-041", profile: { gender:"female", age:27, bmi:25.0, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "현재 식단에서 지방 비율 좀 줄여줘", instr: "포화지방 위주로 줄여줘", uid: "user-042", profile: { gender:"male", age:40, bmi:28.0, goal:"다이어트", activity_level:"low", allergies:[] } },
+    { msg: "저녁 식사 칼로리를 500kcal 이하로 줄여줘", instr: "", uid: "user-043", profile: { gender:"female", age:29, bmi:24.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "아침에 제철 과일 한 가지 더 추가해줘", instr: "", uid: "user-044", profile: { gender:"female", age:23, bmi:20.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "탄수화물 비율 좀 높여줘, 운동량이 늘었어", instr: "복합 탄수화물 위주로", uid: "user-045", profile: { gender:"male", age:28, bmi:21.5, goal:"근육 증가", activity_level:"very_active", allergies:[] } },
+    { msg: "점심 메뉴를 편의점에서 살 수 있는 걸로 간단하게 바꿔줘", instr: "", uid: "user-046", profile: { gender:"male", age:24, bmi:22.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "현재 식단에서 유제품 전부 빼줘", instr: "", uid: "user-047", profile: { gender:"female", age:25, bmi:21.0, goal:"건강 유지", activity_level:"moderate", allergies:["유제품"] } },
+    { msg: "저녁 식사에 동물성 단백질 더 넣어줘", instr: "", uid: "user-048", profile: { gender:"male", age:26, bmi:22.5, goal:"근력 증진", activity_level:"active", allergies:[] } },
+    { msg: "아침식사를 탄수화물과 단백질 같이 더 풍성하게 바꿔줘", instr: "", uid: "user-049", profile: { gender:"male", age:31, bmi:23.0, goal:"근육 증가", activity_level:"active", allergies:[] } },
+    { msg: "이번 주 식단의 총 칼로리를 하루 1800으로 맞춰줘", instr: "", uid: "user-050", profile: { gender:"female", age:30, bmi:24.0, goal:"체중 유지", activity_level:"moderate", allergies:[] } }
+  ],
+  6: [
+    { msg: "나 몸무게 2kg 줄었어, 현재 68kg이야", instr: "", uid: "user-051", profile: { gender:"male", age:28, bmi:23.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "현재 키 178cm야, 업데이트해줘", instr: "", uid: "user-052", profile: { gender:"male", age:25, bmi:null, goal:"근력 증진", activity_level:"active", allergies:[] } },
+    { msg: "활동량을 매우 활동적으로 변경해줘", instr: "", uid: "user-053", profile: { gender:"male", age:27, bmi:22.0, goal:"근육 증가", activity_level:"moderate", allergies:[] } },
+    { msg: "목표를 다이어트에서 근력 증진으로 바꿔줘", instr: "", uid: "user-054", profile: { gender:"male", age:30, bmi:23.0, goal:"다이어트", activity_level:"active", allergies:[] } },
+    { msg: "나 이제 26살이야, 나이 업데이트해줘", instr: "", uid: "user-055", profile: { gender:"female", age:25, bmi:21.5, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "알레르기에 견과류랑 갑각류 추가해줘", instr: "", uid: "user-056", profile: { gender:"female", age:29, bmi:20.5, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "목표를 벌크업으로 바꿔줘", instr: "", uid: "user-057", profile: { gender:"male", age:22, bmi:19.5, goal:"다이어트", activity_level:"active", allergies:[] } },
+    { msg: "성별 여성으로 다시 설정해줘", instr: "", uid: "user-058", profile: { gender:"male", age:24, bmi:22.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "지병에 고혈압 추가해줘", instr: "", uid: "user-059", profile: { gender:"male", age:50, bmi:27.5, goal:"건강 관리", activity_level:"low", allergies:[] } },
+    { msg: "활동 수준을 거의 안 움직임으로 낮춰줘, 재택근무 시작했어", instr: "", uid: "user-060", profile: { gender:"female", age:33, bmi:23.0, goal:"건강 유지", activity_level:"active", allergies:[] } }
+  ],
+  7: [
+    { msg: "오늘 점심에 비빔밥 먹었어", instr: "", uid: "user-061", profile: { gender:"female", age:27, bmi:22.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "아까 치킨 한 마리 다 먹었어", instr: "", uid: "user-062", profile: { gender:"male", age:25, bmi:23.0, goal:"근육 증가", activity_level:"active", allergies:[] } },
+    { msg: "아침에 계란 3개랑 통밀 토스트 2장 먹었어", instr: "", uid: "user-063", profile: { gender:"male", age:30, bmi:22.0, goal:"근력 증진", activity_level:"very_active", allergies:[] } },
+    { msg: "점심에 김치찌개랑 밥 한 공기 먹었어", instr: "", uid: "user-064", profile: { gender:"female", age:28, bmi:21.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "저녁에 샐러드랑 닭가슴살 200g 먹었어", instr: "", uid: "user-065", profile: { gender:"female", age:26, bmi:24.0, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "오늘 라면 한 봉지 끓여 먹었어, 계란도 넣었어", instr: "", uid: "user-066", profile: { gender:"male", age:23, bmi:21.5, goal:"건강 유지", activity_level:"low", allergies:[] } },
+    { msg: "아까 피자 2조각 먹었어", instr: "", uid: "user-067", profile: { gender:"male", age:29, bmi:25.0, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "아침에 오트밀 한 그릇에 바나나 하나 먹었어", instr: "", uid: "user-068", profile: { gender:"female", age:24, bmi:20.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "점심에 햄버거 세트 먹었어, 콜라도 포함", instr: "", uid: "user-069", profile: { gender:"male", age:31, bmi:26.0, goal:"다이어트", activity_level:"low", allergies:[] } },
+    { msg: "저녁에 삼겹살 200g 먹고 소주 한 잔 했어", instr: "", uid: "user-070", profile: { gender:"male", age:35, bmi:25.5, goal:"건강 유지", activity_level:"moderate", allergies:[] } }
+  ],
+  8: [
+    { msg: "오늘 뭐 먹고 어떤 운동 하면 좋아?", instr: "가볍게", uid: "user-071", profile: { gender:"female", age:26, bmi:22.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "내 현재 상태에 맞는 운동이랑 식단 추천해줘", instr: "", uid: "user-072", profile: { gender:"male", age:28, bmi:27.0, goal:"다이어트", activity_level:"low", allergies:[] } },
+    { msg: "다이어트에 가장 효과적인 운동이랑 식단 추천해줘", instr: "", uid: "user-073", profile: { gender:"female", age:30, bmi:28.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
+    { msg: "허리 디스크 있는 사람한테 맞는 운동이랑 식단 추천해줘", instr: "저충격 위주로", uid: "user-074", profile: { gender:"male", age:42, bmi:26.0, goal:"건강 유지", activity_level:"low", allergies:[] } },
+    { msg: "운동 초보자한테 맞는 운동이랑 식단 뭐야?", instr: "", uid: "user-075", profile: { gender:"male", age:20, bmi:22.5, goal:"근력 증진", activity_level:"low", allergies:[] } },
+    { msg: "기분 전환 겸 오늘 할 운동이랑 먹거리 추천해줘", instr: "스트레스 해소에 좋은 것", uid: "user-076", profile: { gender:"female", age:27, bmi:21.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
+    { msg: "고단백 식단이랑 근력 운동 추천해줘", instr: "벌크업 목적", uid: "user-077", profile: { gender:"male", age:24, bmi:20.5, goal:"벌크업", activity_level:"very_active", allergies:[] } },
+    { msg: "피로 회복에 좋은 음식이랑 운동 추천해줘", instr: "", uid: "user-078", profile: { gender:"male", age:38, bmi:24.0, goal:"건강 유지", activity_level:"low", allergies:[] } },
+    { msg: "체중 감량 목적으로 최적의 운동이랑 식단 추천해줘", instr: "주 3회 이내로", uid: "user-079", profile: { gender:"female", age:33, bmi:29.0, goal:"다이어트", activity_level:"low", allergies:[] } },
+    { msg: "운동 후 회복식이랑 마무리 스트레칭 추천해줘", instr: "", uid: "user-080", profile: { gender:"male", age:29, bmi:22.0, goal:"근력 증진", activity_level:"active", allergies:[] } }
+  ]
+};
+
+var currentMode = 1;
+
+function selectMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(function(t) {
+    t.classList.toggle('active', parseInt(t.dataset.mode) === mode);
+  });
+  renderExamples(mode);
+}
+
+function renderExamples(mode) {
+  var list = document.getElementById('exampleList');
+  while (list.firstChild) { list.removeChild(list.firstChild); }
+  EXAMPLES[mode].forEach(function(ex, i) {
+    var btn = document.createElement('button');
+    btn.className = 'example-item';
+    var numSpan = document.createElement('span');
+    numSpan.className = 'ex-num';
+    numSpan.textContent = (i + 1) + '. ';
+    btn.appendChild(numSpan);
+    btn.appendChild(document.createTextNode(ex.msg));
+    btn.addEventListener('click', function() { loadExample(ex); });
+    list.appendChild(btn);
+  });
+}
+
+function loadExample(ex) {
+  document.getElementById('userId').value = ex.uid;
+  document.getElementById('userMessage').value = ex.msg;
+  document.getElementById('userInstruction').value = ex.instr;
+  document.getElementById('pGender').value = ex.profile.gender || '';
+  document.getElementById('pAge').value = ex.profile.age || '';
+  document.getElementById('pBmi').value = ex.profile.bmi || '';
+  document.getElementById('pGoal').value = ex.profile.goal || '';
+  document.getElementById('pPersonality').value = ex.profile.personality || '';
+  document.getElementById('pActivity').value = ex.profile.activity_level || '';
+  document.getElementById('pAllergies').value = (ex.profile.allergies || []).join(', ');
+  document.querySelector('details').open = true;
+}
+
+renderExamples(1);
+
+// ─── 탭 전환 ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-section').forEach(function(s) { s.classList.remove('active'); });
+  document.querySelectorAll('.endpoint-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.getElementById('tab-' + name).classList.add('active');
+  var tabs = document.querySelectorAll('.endpoint-tab');
+  var map = { aichat: 0, meal: 1, recommend: 2, vectordb: 3 };
+  tabs[map[name]].classList.add('active');
+}
+
+// ─── AI Chat 파이프라인 로직 ─────────────────────────────────────────────
 document.getElementById('sendBtn').addEventListener('click', sendRequest);
 
 async function sendRequest() {
@@ -293,6 +638,7 @@ async function sendRequest() {
       age: parseInt(document.getElementById('pAge').value) || null,
       bmi: parseFloat(document.getElementById('pBmi').value) || null,
       goal: document.getElementById('pGoal').value || null,
+      personality: document.getElementById('pPersonality').value || null,
       activity_level: document.getElementById('pActivity').value || null,
       allergies: allergies
     }
@@ -403,6 +749,188 @@ function renderResult(data) {
     finalCard.classList.add('hidden');
   }
 }
+
+// ─── 공통: 단계 시각화 렌더러 (ID prefix로 재사용) ─────────────────────
+function renderPipelineResult(data, prefix) {
+  var resultArea = document.getElementById(prefix + 'ResultArea');
+  resultArea.classList.remove('hidden');
+
+  var totalBar = document.getElementById(prefix + 'TotalBar');
+  totalBar.textContent = '';
+  var s = document.createElement('strong');
+  s.textContent = 'Total: ' + data.total_elapsed_ms + 'ms';
+  totalBar.appendChild(s);
+
+  var container = document.getElementById(prefix + 'StepsContainer');
+  while (container.firstChild) { container.removeChild(container.firstChild); }
+
+  data.steps.forEach(function(step, i) {
+    var hasError = step.output && step.output.error;
+    var isSkipped = step.output && step.output.skipped;
+    var cls = hasError ? 'error' : isSkipped ? 'skip' : 'done';
+    var badgeCls = hasError ? 'badge-err' : isSkipped ? 'badge-skip' : 'badge-ok';
+    var badgeText = hasError ? 'ERROR' : isSkipped ? 'SKIP' : 'OK';
+
+    var el = createEl('div', 'step ' + cls);
+    el.style.animationDelay = (i * 80) + 'ms';
+
+    var header = createEl('div', 'step-header');
+    header.addEventListener('click', function() { el.classList.toggle('open'); });
+    var nameSpan = createEl('span', 'step-name');
+    nameSpan.appendChild(document.createTextNode(step.name + ' '));
+    nameSpan.appendChild(createEl('span', 'step-badge ' + badgeCls, badgeText));
+    header.appendChild(nameSpan);
+    header.appendChild(createEl('span', 'step-time', step.elapsed_ms > 0 ? step.elapsed_ms + 'ms' : '-'));
+    el.appendChild(header);
+    el.appendChild(createEl('div', 'step-desc', step.description));
+
+    var body = createEl('div', 'step-body');
+    var inSection = createEl('div', 'data-section');
+    var inLabel = createEl('div', 'data-label');
+    inLabel.appendChild(createEl('span', 'arrow-in', '\u25B6 '));
+    inLabel.appendChild(document.createTextNode('INPUT'));
+    inSection.appendChild(inLabel);
+    inSection.appendChild(createEl('pre', null, JSON.stringify(step.input, null, 2)));
+    body.appendChild(inSection);
+
+    var outSection = createEl('div', 'data-section');
+    var outLabel = createEl('div', 'data-label');
+    outLabel.appendChild(createEl('span', 'arrow-out', '\u25C0 '));
+    outLabel.appendChild(document.createTextNode('OUTPUT'));
+    outSection.appendChild(outLabel);
+    outSection.appendChild(createEl('pre', null, JSON.stringify(step.output, null, 2)));
+    body.appendChild(outSection);
+
+    el.appendChild(body);
+    container.appendChild(el);
+  });
+
+  var finalCard = document.getElementById(prefix + 'FinalCard');
+  if (data.final_response) {
+    finalCard.classList.remove('hidden');
+    document.getElementById(prefix + 'FinalJson').textContent = JSON.stringify(data.final_response, null, 2);
+  } else {
+    finalCard.classList.add('hidden');
+  }
+}
+
+// ─── Process Meal ─────────────────────────────────────────────────────────
+document.getElementById('mealBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  document.getElementById('mealLoadingArea').classList.remove('hidden');
+  document.getElementById('mealResultArea').classList.add('hidden');
+
+  var allergiesRaw = document.getElementById('mpAllergies').value.trim();
+  var allergies = allergiesRaw ? allergiesRaw.split(',').map(function(s) { return s.trim(); }) : null;
+
+  var payload = {
+    user_id: document.getElementById('mUserId').value,
+    user_message: document.getElementById('mMessage').value,
+    user_instruction: document.getElementById('mInstruction').value,
+    user_profile: {
+      gender: document.getElementById('mpGender').value || null,
+      age: parseInt(document.getElementById('mpAge').value) || null,
+      bmi: parseFloat(document.getElementById('mpBmi').value) || null,
+      goal: document.getElementById('mpGoal').value || null,
+      personality: document.getElementById('mpPersonality').value || null,
+      activity_level: document.getElementById('mpActivity').value || null,
+      allergies: allergies
+    }
+  };
+
+  try {
+    var resp = await fetch('/debug/process-meal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var data = await resp.json();
+    renderPipelineResult(data, 'meal');
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    document.getElementById('mealLoadingArea').classList.add('hidden');
+  }
+});
+
+// ─── Recommend ────────────────────────────────────────────────────────────
+document.getElementById('recommendBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  document.getElementById('recLoadingArea').classList.remove('hidden');
+  document.getElementById('recResultArea').classList.add('hidden');
+
+  var allergiesRaw = document.getElementById('rpAllergies').value.trim();
+  var allergies = allergiesRaw ? allergiesRaw.split(',').map(function(s) { return s.trim(); }) : null;
+
+  var payload = {
+    user_id: document.getElementById('rUserId').value,
+    user_instruction: document.getElementById('rInstruction').value,
+    user_profile: {
+      gender: document.getElementById('rpGender').value || null,
+      age: parseInt(document.getElementById('rpAge').value) || null,
+      bmi: parseFloat(document.getElementById('rpBmi').value) || null,
+      goal: document.getElementById('rpGoal').value || null,
+      personality: document.getElementById('rpPersonality').value || null,
+      activity_level: document.getElementById('rpActivity').value || null,
+      allergies: allergies
+    }
+  };
+
+  try {
+    var resp = await fetch('/debug/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var data = await resp.json();
+    renderPipelineResult(data, 'rec');
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    document.getElementById('recLoadingArea').classList.add('hidden');
+  }
+});
+
+// ─── Vector DB Search ────────────────────────────────────────────────────
+document.getElementById('vsBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  var resultEl = document.getElementById('vsResult');
+  resultEl.style.display = 'none';
+  try {
+    var payload = {
+      user_id: document.getElementById('vsUserId').value,
+      query: document.getElementById('vsQuery').value,
+      top_k: parseInt(document.getElementById('vsTopK').value) || 3
+    };
+    var resp = await fetch('/debug/vector-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var data = await resp.json();
+    resultEl.textContent = JSON.stringify(data, null, 2);
+    resultEl.style.display = 'block';
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ─── Vector DB Upsert ────────────────────────────────────────────────────
+document.getElementById('vuBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  var resultEl = document.getElementById('vuResult');
+  resultEl.style.display = 'none';
+  try {
+    var payload = {
+      user_id: document.getElementById('vuUserId').value,
+      summary: document.getElementById('vuSummary').value
+    };
+    var resp = await fetch('/debug/vector-upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var data = await resp.json();
+    resultEl.textContent = JSON.stringify(data, null, 2);
+    resultEl.style.display = 'block';
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
 </script>
 </body>
 </html>

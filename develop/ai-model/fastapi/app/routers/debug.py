@@ -14,6 +14,10 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from pydantic import BaseModel
+
+from app.prompts.meal import build_meal_system_prompt
+from app.prompts.recommend import build_recommend_system_prompt
 from app.prompts.worker import build_worker_system_prompt
 from app.schemas.chat import AiChatRequest, get_db_modified_flag
 from app.schemas.gemini_outputs import (
@@ -24,7 +28,20 @@ from app.schemas.gemini_outputs import (
     SimpleAnswerOutput,
     UserDbUpdateOutput,
 )
+from app.schemas.meal import MealAnalysisData, ProcessMealRequest
+from app.schemas.recommend import RecommendationData, RecommendRequest
 from app.services.chat_service import _build_ai_chat_data, _fetch_context
+
+
+class VectorSearchRequest(BaseModel):
+    user_id: str
+    query: str
+    top_k: int = 3
+
+
+class VectorUpsertRequest(BaseModel):
+    user_id: str
+    summary: str
 
 logger = logging.getLogger(__name__)
 
@@ -243,4 +260,193 @@ async def ai_chat_debug(body: AiChatRequest, request: Request) -> dict:
         "mode_name": _MODE_NAMES.get(mode, "알 수 없음"),
         "steps": steps,
         "final_response": final_response,
+    }
+
+
+@router.post("/debug/process-meal")
+async def debug_process_meal(body: ProcessMealRequest, request: Request) -> dict:
+    """Process Meal 파이프라인을 단계별로 실행하여 각 단계 입출력을 반환한다."""
+    steps: list[dict] = []
+    total_start = time.perf_counter()
+
+    gemini = request.app.state.gemini_client
+    pinecone = request.app.state.pinecone_client
+    embed = request.app.state.embed_client
+
+    # ── Step 1: Vector DB 맥락 검색 ──
+    t0 = time.perf_counter()
+    context_text = await _fetch_context(pinecone, embed, body.user_id, body.user_message)
+    t1 = time.perf_counter()
+    steps.append(_step(
+        "Vector DB",
+        "Pinecone에서 사용자 이전 대화 맥락 검색",
+        {"user_id": body.user_id, "query": body.user_message},
+        {"context_text": context_text},
+        (t1 - t0) * 1000,
+    ))
+
+    # ── Step 2: 시스템 프롬프트 빌드 ──
+    t0 = time.perf_counter()
+    system_prompt = build_meal_system_prompt(body.user_profile, context_text)
+    t1 = time.perf_counter()
+    steps.append(_step(
+        "Prompt Builder",
+        "식단 분석 시스템 프롬프트 생성",
+        {
+            "user_profile": body.user_profile.model_dump(exclude_none=True),
+            "context_text": context_text[:200] + "..." if len(context_text) > 200 else context_text,
+        },
+        {"system_prompt_preview": system_prompt[:500] + "..." if len(system_prompt) > 500 else system_prompt},
+        (t1 - t0) * 1000,
+    ))
+
+    # ── Step 3: Gemini 호출 ──
+    t0 = time.perf_counter()
+    raw_json = None
+    parsed = None
+    gemini_error = None
+    try:
+        raw_json = await gemini.generate(
+            system_prompt=system_prompt,
+            user_content=body.user_message,
+            response_schema=MealAnalysisData,
+        )
+        parsed = json.loads(raw_json)
+    except Exception as exc:
+        gemini_error = str(exc)
+    t1 = time.perf_counter()
+    steps.append(_step(
+        "Gemini Worker",
+        "Gemini Flash로 식단 분석 (calories, message)",
+        {"user_message": body.user_message, "response_schema": "MealAnalysisData"},
+        {"raw_json": parsed, "error": gemini_error},
+        (t1 - t0) * 1000,
+    ))
+
+    final_response = None
+    if parsed is not None:
+        final_response = {"status": "success", "data": parsed}
+
+    return {
+        "total_elapsed_ms": round((time.perf_counter() - total_start) * 1000, 1),
+        "steps": steps,
+        "final_response": final_response,
+    }
+
+
+@router.post("/debug/recommend")
+async def debug_recommend(body: RecommendRequest, request: Request) -> dict:
+    """Recommend 파이프라인을 단계별로 실행하여 각 단계 입출력을 반환한다."""
+    steps: list[dict] = []
+    total_start = time.perf_counter()
+
+    gemini = request.app.state.gemini_client
+    pinecone = request.app.state.pinecone_client
+    embed = request.app.state.embed_client
+
+    # ── Step 1: Vector DB 맥락 검색 ──
+    t0 = time.perf_counter()
+    context_text = await _fetch_context(pinecone, embed, body.user_id, body.user_instruction)
+    t1 = time.perf_counter()
+    steps.append(_step(
+        "Vector DB",
+        "Pinecone에서 사용자 이전 대화 맥락 검색",
+        {"user_id": body.user_id, "query": body.user_instruction},
+        {"context_text": context_text},
+        (t1 - t0) * 1000,
+    ))
+
+    # ── Step 2: 시스템 프롬프트 빌드 ──
+    t0 = time.perf_counter()
+    system_prompt = build_recommend_system_prompt(body.user_profile, context_text)
+    t1 = time.perf_counter()
+    steps.append(_step(
+        "Prompt Builder",
+        "추천 시스템 프롬프트 생성",
+        {
+            "user_profile": body.user_profile.model_dump(exclude_none=True),
+            "context_text": context_text[:200] + "..." if len(context_text) > 200 else context_text,
+        },
+        {"system_prompt_preview": system_prompt[:500] + "..." if len(system_prompt) > 500 else system_prompt},
+        (t1 - t0) * 1000,
+    ))
+
+    # ── Step 3: Gemini 호출 ──
+    t0 = time.perf_counter()
+    raw_json = None
+    parsed = None
+    gemini_error = None
+    try:
+        raw_json = await gemini.generate(
+            system_prompt=system_prompt,
+            user_content=body.user_instruction,
+            response_schema=RecommendationData,
+        )
+        parsed = json.loads(raw_json)
+    except Exception as exc:
+        gemini_error = str(exc)
+    t1 = time.perf_counter()
+    steps.append(_step(
+        "Gemini Worker",
+        "Gemini Flash로 운동/식단 추천 생성",
+        {"user_instruction": body.user_instruction, "response_schema": "RecommendationData"},
+        {"raw_json": parsed, "error": gemini_error},
+        (t1 - t0) * 1000,
+    ))
+
+    final_response = None
+    if parsed is not None:
+        final_response = {"status": "success", "data": parsed}
+
+    return {
+        "total_elapsed_ms": round((time.perf_counter() - total_start) * 1000, 1),
+        "steps": steps,
+        "final_response": final_response,
+    }
+
+
+@router.post("/debug/vector-search")
+async def debug_vector_search(body: VectorSearchRequest, request: Request) -> dict:
+    """쿼리 텍스트를 임베딩하여 Pinecone에서 유사 벡터를 검색하고 결과를 반환한다."""
+    embed = request.app.state.embed_client
+    pinecone = request.app.state.pinecone_client
+
+    t0 = time.perf_counter()
+    vector: list[float] = await embed.embed(body.query)
+    embed_elapsed = (time.perf_counter() - t0) * 1000
+
+    t0 = time.perf_counter()
+    results = await pinecone.search(body.user_id, vector, top_k=body.top_k)
+    search_elapsed = (time.perf_counter() - t0) * 1000
+
+    return {
+        "user_id": body.user_id,
+        "query": body.query,
+        "embed_elapsed_ms": round(embed_elapsed, 1),
+        "search_elapsed_ms": round(search_elapsed, 1),
+        "result_count": len(results),
+        "results": results,
+    }
+
+
+@router.post("/debug/vector-upsert")
+async def debug_vector_upsert(body: VectorUpsertRequest, request: Request) -> dict:
+    """요약 텍스트를 임베딩하여 Pinecone에 저장하고 생성된 ID를 반환한다."""
+    embed = request.app.state.embed_client
+    pinecone = request.app.state.pinecone_client
+
+    t0 = time.perf_counter()
+    vector: list[float] = await embed.embed(body.summary)
+    embed_elapsed = (time.perf_counter() - t0) * 1000
+
+    t0 = time.perf_counter()
+    vector_id = await pinecone.upsert(body.user_id, vector, body.summary)
+    upsert_elapsed = (time.perf_counter() - t0) * 1000
+
+    return {
+        "user_id": body.user_id,
+        "summary": body.summary,
+        "vector_id": vector_id,
+        "embed_elapsed_ms": round(embed_elapsed, 1),
+        "upsert_elapsed_ms": round(upsert_elapsed, 1),
     }
