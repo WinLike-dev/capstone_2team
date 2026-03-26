@@ -300,11 +300,13 @@
   <button class="endpoint-tab" onclick="switchTab('meal')">Process Meal</button>
   <button class="endpoint-tab" onclick="switchTab('recommend')">Recommend</button>
   <button class="endpoint-tab" onclick="switchTab('vectordb')">Vector DB</button>
+  <button class="endpoint-tab" onclick="switchTab('instructions')">System Instructions</button>
+  <button class="endpoint-tab" onclick="switchTab('was')">WAS Test</button>
 </div>
 
 <div class="tab-section active" id="tab-aichat">
 <div class="examples-panel">
-  <h2>예시 데이터 — 모드별 10개 × 8모드 = 80개</h2>
+  <h2>예시 데이터 — 모드별 10개 × 6모드 = 60개</h2>
   <div class="mode-tabs" id="modeTabs">
     <button class="mode-tab active" data-mode="1" onclick="selectMode(1)">Mode 1 단순대화</button>
     <button class="mode-tab" data-mode="2" onclick="selectMode(2)">Mode 2 플랜 작성</button>
@@ -312,8 +314,6 @@
     <button class="mode-tab" data-mode="4" onclick="selectMode(4)">Mode 4 식단 작성</button>
     <button class="mode-tab" data-mode="5" onclick="selectMode(5)">Mode 5 식단 수정</button>
     <button class="mode-tab" data-mode="6" onclick="selectMode(6)">Mode 6 DB 수정</button>
-    <button class="mode-tab" data-mode="7" onclick="selectMode(7)">Mode 7 식단 기록</button>
-    <button class="mode-tab" data-mode="8" onclick="selectMode(8)">Mode 8 추천</button>
   </div>
   <div class="example-list" id="exampleList"></div>
 </div>
@@ -461,6 +461,50 @@
   </div>
 </div>
 
+<!-- ── System Instructions 탭 ── -->
+<div class="tab-section" id="tab-instructions">
+  <div style="max-width:800px;margin:0 auto;">
+
+    <!-- Router AI -->
+    <div class="form-card" style="margin-bottom:16px;">
+      <h3 style="color:var(--accent);font-size:1rem;margin-bottom:16px;">Router AI — 시스템 지침서</h3>
+      <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px;">사용자 메시지를 6가지 모드로 분류하는 지침</p>
+      <pre id="routerInstruction" style="max-height:400px;overflow-y:auto;">불러오는 중...</pre>
+    </div>
+
+    <!-- Worker AI 공통 규칙 -->
+    <div class="form-card" style="margin-bottom:16px;">
+      <h3 style="color:var(--orange);font-size:1rem;margin-bottom:16px;">Worker AI — 공통 규칙 &amp; 주의사항</h3>
+      <pre id="workerCommon" style="max-height:300px;overflow-y:auto;">불러오는 중...</pre>
+    </div>
+
+    <!-- Worker AI 모드별 지침 -->
+    <div class="form-card">
+      <h3 style="color:var(--purple);font-size:1rem;margin-bottom:12px;">Worker AI — 모드별 지침</h3>
+      <div class="mode-tabs" id="instrModeTabs" style="margin-bottom:14px;"></div>
+      <pre id="workerModeInstruction" style="max-height:400px;overflow-y:auto;">모드를 선택하세요</pre>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── WAS Test 탭 ── -->
+<div class="tab-section" id="tab-was">
+  <div style="max-width:800px;margin:0 auto;">
+    <div class="form-card">
+      <h3 style="color:var(--orange);font-size:0.95rem;margin-bottom:12px;">WAS REST 통신 테스트</h3>
+      <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:14px;">
+        WAS의 <code style="color:var(--accent);">exercise-list</code> / <code style="color:var(--accent);">meal-list</code> 엔드포인트에 직접 요청을 보내 통신 상태를 확인합니다.
+      </p>
+      <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;">
+        <div style="flex:1;"><label>User ID</label><input id="wasUserId" value="test-user-001" /></div>
+        <button class="btn-primary" id="wasTestBtn" style="white-space:nowrap;">Run WAS Test</button>
+      </div>
+      <pre id="wasResult" style="display:none;"></pre>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─── 80개 예시 데이터 (모드별 10개) ─────────────────────────────────────
 var EXAMPLES = {
@@ -535,30 +579,6 @@ var EXAMPLES = {
     { msg: "성별 여성으로 다시 설정해줘", instr: "", uid: "user-058", profile: { gender:"male", age:24, bmi:22.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
     { msg: "지병에 고혈압 추가해줘", instr: "", uid: "user-059", profile: { gender:"male", age:50, bmi:27.5, goal:"건강 관리", activity_level:"low", allergies:[] } },
     { msg: "활동 수준을 거의 안 움직임으로 낮춰줘, 재택근무 시작했어", instr: "", uid: "user-060", profile: { gender:"female", age:33, bmi:23.0, goal:"건강 유지", activity_level:"active", allergies:[] } }
-  ],
-  7: [
-    { msg: "오늘 점심에 비빔밥 먹었어", instr: "", uid: "user-061", profile: { gender:"female", age:27, bmi:22.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
-    { msg: "아까 치킨 한 마리 다 먹었어", instr: "", uid: "user-062", profile: { gender:"male", age:25, bmi:23.0, goal:"근육 증가", activity_level:"active", allergies:[] } },
-    { msg: "아침에 계란 3개랑 통밀 토스트 2장 먹었어", instr: "", uid: "user-063", profile: { gender:"male", age:30, bmi:22.0, goal:"근력 증진", activity_level:"very_active", allergies:[] } },
-    { msg: "점심에 김치찌개랑 밥 한 공기 먹었어", instr: "", uid: "user-064", profile: { gender:"female", age:28, bmi:21.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
-    { msg: "저녁에 샐러드랑 닭가슴살 200g 먹었어", instr: "", uid: "user-065", profile: { gender:"female", age:26, bmi:24.0, goal:"다이어트", activity_level:"moderate", allergies:[] } },
-    { msg: "오늘 라면 한 봉지 끓여 먹었어, 계란도 넣었어", instr: "", uid: "user-066", profile: { gender:"male", age:23, bmi:21.5, goal:"건강 유지", activity_level:"low", allergies:[] } },
-    { msg: "아까 피자 2조각 먹었어", instr: "", uid: "user-067", profile: { gender:"male", age:29, bmi:25.0, goal:"다이어트", activity_level:"moderate", allergies:[] } },
-    { msg: "아침에 오트밀 한 그릇에 바나나 하나 먹었어", instr: "", uid: "user-068", profile: { gender:"female", age:24, bmi:20.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
-    { msg: "점심에 햄버거 세트 먹었어, 콜라도 포함", instr: "", uid: "user-069", profile: { gender:"male", age:31, bmi:26.0, goal:"다이어트", activity_level:"low", allergies:[] } },
-    { msg: "저녁에 삼겹살 200g 먹고 소주 한 잔 했어", instr: "", uid: "user-070", profile: { gender:"male", age:35, bmi:25.5, goal:"건강 유지", activity_level:"moderate", allergies:[] } }
-  ],
-  8: [
-    { msg: "오늘 뭐 먹고 어떤 운동 하면 좋아?", instr: "가볍게", uid: "user-071", profile: { gender:"female", age:26, bmi:22.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
-    { msg: "내 현재 상태에 맞는 운동이랑 식단 추천해줘", instr: "", uid: "user-072", profile: { gender:"male", age:28, bmi:27.0, goal:"다이어트", activity_level:"low", allergies:[] } },
-    { msg: "다이어트에 가장 효과적인 운동이랑 식단 추천해줘", instr: "", uid: "user-073", profile: { gender:"female", age:30, bmi:28.5, goal:"다이어트", activity_level:"moderate", allergies:[] } },
-    { msg: "허리 디스크 있는 사람한테 맞는 운동이랑 식단 추천해줘", instr: "저충격 위주로", uid: "user-074", profile: { gender:"male", age:42, bmi:26.0, goal:"건강 유지", activity_level:"low", allergies:[] } },
-    { msg: "운동 초보자한테 맞는 운동이랑 식단 뭐야?", instr: "", uid: "user-075", profile: { gender:"male", age:20, bmi:22.5, goal:"근력 증진", activity_level:"low", allergies:[] } },
-    { msg: "기분 전환 겸 오늘 할 운동이랑 먹거리 추천해줘", instr: "스트레스 해소에 좋은 것", uid: "user-076", profile: { gender:"female", age:27, bmi:21.0, goal:"건강 유지", activity_level:"moderate", allergies:[] } },
-    { msg: "고단백 식단이랑 근력 운동 추천해줘", instr: "벌크업 목적", uid: "user-077", profile: { gender:"male", age:24, bmi:20.5, goal:"벌크업", activity_level:"very_active", allergies:[] } },
-    { msg: "피로 회복에 좋은 음식이랑 운동 추천해줘", instr: "", uid: "user-078", profile: { gender:"male", age:38, bmi:24.0, goal:"건강 유지", activity_level:"low", allergies:[] } },
-    { msg: "체중 감량 목적으로 최적의 운동이랑 식단 추천해줘", instr: "주 3회 이내로", uid: "user-079", profile: { gender:"female", age:33, bmi:29.0, goal:"다이어트", activity_level:"low", allergies:[] } },
-    { msg: "운동 후 회복식이랑 마무리 스트레칭 추천해줘", instr: "", uid: "user-080", profile: { gender:"male", age:29, bmi:22.0, goal:"근력 증진", activity_level:"active", allergies:[] } }
   ]
 };
 
@@ -610,8 +630,51 @@ function switchTab(name) {
   document.querySelectorAll('.endpoint-tab').forEach(function(t) { t.classList.remove('active'); });
   document.getElementById('tab-' + name).classList.add('active');
   var tabs = document.querySelectorAll('.endpoint-tab');
-  var map = { aichat: 0, meal: 1, recommend: 2, vectordb: 3 };
+  var map = { aichat: 0, meal: 1, recommend: 2, vectordb: 3, instructions: 4, was: 5 };
   tabs[map[name]].classList.add('active');
+  if (name === 'instructions') loadSystemPrompts();
+}
+
+// ─── System Instructions 로직 ────────────────────────────────────────────
+var _instrLoaded = false;
+var _workerModes = {};
+var _modeNames = {};
+
+async function loadSystemPrompts() {
+  if (_instrLoaded) return;
+  try {
+    var res = await fetch('/debug/system-prompts');
+    var data = await res.json();
+
+    document.getElementById('routerInstruction').textContent = data.router;
+    document.getElementById('workerCommon').textContent = data.worker_common;
+
+    _workerModes = data.worker_modes;
+    _modeNames = data.mode_names;
+
+    var tabsEl = document.getElementById('instrModeTabs');
+    while (tabsEl.firstChild) tabsEl.removeChild(tabsEl.firstChild);
+
+    var sortedModes = Object.keys(_workerModes).sort(function(a, b) { return a - b; });
+    sortedModes.forEach(function(modeNum, idx) {
+      var btn = document.createElement('button');
+      btn.className = 'mode-tab' + (idx === 0 ? ' active' : '');
+      btn.textContent = 'Mode ' + modeNum + ' ' + (_modeNames[modeNum] || '');
+      btn.onclick = function() {
+        document.querySelectorAll('#instrModeTabs .mode-tab').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        document.getElementById('workerModeInstruction').textContent = _workerModes[modeNum];
+      };
+      tabsEl.appendChild(btn);
+    });
+
+    if (sortedModes.length > 0) {
+      document.getElementById('workerModeInstruction').textContent = _workerModes[sortedModes[0]];
+    }
+    _instrLoaded = true;
+  } catch(e) {
+    document.getElementById('routerInstruction').textContent = '불러오기 실패: ' + e.message;
+  }
 }
 
 // ─── AI Chat 파이프라인 로직 ─────────────────────────────────────────────
@@ -923,6 +986,27 @@ document.getElementById('vuBtn').addEventListener('click', async function() {
     };
     var resp = await fetch('/debug/vector-upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     var data = await resp.json();
+    resultEl.textContent = JSON.stringify(data, null, 2);
+    resultEl.style.display = 'block';
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ─── WAS Test ────────────────────────────────────────────────────────────
+document.getElementById('wasTestBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  var resultEl = document.getElementById('wasResult');
+  resultEl.style.display = 'none';
+  try {
+    var payload = { user_id: document.getElementById('wasUserId').value };
+    var resp = await fetch('/debug/was-test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var data = await resp.json();
+    var overallColor = data.overall === 'ok' ? '#4ade80' : '#f87171';
+    resultEl.style.borderColor = overallColor;
     resultEl.textContent = JSON.stringify(data, null, 2);
     resultEl.style.display = 'block';
   } catch (err) {

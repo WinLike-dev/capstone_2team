@@ -1,3 +1,5 @@
+*.tar.gz
+*.tar
 __pycache__
 *.pyc
 *.pyo

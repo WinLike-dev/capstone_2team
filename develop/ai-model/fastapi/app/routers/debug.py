@@ -1,7 +1,8 @@
 """Debug UI router — 파이프라인 각 단계의 입출력을 시각화.
 
-GET  /debug          → HTML 디버그 UI 페이지
-POST /ai-chat-debug  → 파이프라인 실행 + 각 단계 데이터 수집
+GET  /debug                  → HTML 디버그 UI 페이지
+POST /ai-chat-debug          → 파이프라인 실행 + 각 단계 데이터 수집
+GET  /debug/system-prompts   → Router/Worker 시스템 지침서 전문 반환
 """
 
 import asyncio
@@ -18,7 +19,8 @@ from pydantic import BaseModel
 
 from app.prompts.meal import build_meal_system_prompt
 from app.prompts.recommend import build_recommend_system_prompt
-from app.prompts.worker import build_worker_system_prompt
+from app.prompts.router import ROUTER_SYSTEM_PROMPT
+from app.prompts.worker import _COMMON_RULES, _MODE_INSTRUCTIONS, _CAUTION, build_worker_system_prompt
 from app.schemas.chat import AiChatRequest, get_db_modified_flag
 from app.schemas.gemini_outputs import (
     ExercisePlanOutput,
@@ -43,6 +45,10 @@ class VectorUpsertRequest(BaseModel):
     user_id: str
     summary: str
 
+
+class WASTestRequest(BaseModel):
+    user_id: str
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["debug"])
@@ -54,8 +60,6 @@ _MODE_SCHEMA_MAP: dict[int, type] = {
     4: MealPlanOutput,
     5: MealPlanOutput,
     6: UserDbUpdateOutput,
-    7: MealLogOutput,
-    8: RecommendationOutput,
 }
 
 _MODE_NAMES: dict[int, str] = {
@@ -65,8 +69,6 @@ _MODE_NAMES: dict[int, str] = {
     4: "식단 작성",
     5: "식단 수정",
     6: "사용자 DB 수정",
-    7: "식단 기록",
-    8: "추천",
 }
 
 
@@ -411,19 +413,47 @@ async def debug_vector_search(body: VectorSearchRequest, request: Request) -> di
     embed = request.app.state.embed_client
     pinecone = request.app.state.pinecone_client
 
+    # Step 1: embedding
+    embed_error = None
+    vector: list[float] = []
     t0 = time.perf_counter()
-    vector: list[float] = await embed.embed(body.query)
+    try:
+        vector = await embed.embed(body.query)
+    except Exception as exc:
+        embed_error = f"{type(exc).__name__}: {exc}"
+        logger.error("debug/vector-search embed 실패: %s", embed_error)
     embed_elapsed = (time.perf_counter() - t0) * 1000
 
+    if embed_error:
+        return {
+            "user_id": body.user_id,
+            "query": body.query,
+            "embed_elapsed_ms": round(embed_elapsed, 1),
+            "embed_error": embed_error,
+            "search_elapsed_ms": 0.0,
+            "search_error": None,
+            "result_count": 0,
+            "results": [],
+        }
+
+    # Step 2: vector search
+    search_error = None
+    results: list[dict] = []
     t0 = time.perf_counter()
-    results = await pinecone.search(body.user_id, vector, top_k=body.top_k)
+    try:
+        results = await pinecone.search(body.user_id, vector, top_k=body.top_k)
+    except Exception as exc:
+        search_error = f"{type(exc).__name__}: {exc}"
+        logger.error("debug/vector-search pinecone 실패: %s", search_error)
     search_elapsed = (time.perf_counter() - t0) * 1000
 
     return {
         "user_id": body.user_id,
         "query": body.query,
         "embed_elapsed_ms": round(embed_elapsed, 1),
+        "embed_error": None,
         "search_elapsed_ms": round(search_elapsed, 1),
+        "search_error": search_error,
         "result_count": len(results),
         "results": results,
     }
@@ -435,18 +465,98 @@ async def debug_vector_upsert(body: VectorUpsertRequest, request: Request) -> di
     embed = request.app.state.embed_client
     pinecone = request.app.state.pinecone_client
 
+    # Step 1: embedding
+    embed_error = None
+    vector: list[float] = []
     t0 = time.perf_counter()
-    vector: list[float] = await embed.embed(body.summary)
+    try:
+        vector = await embed.embed(body.summary)
+    except Exception as exc:
+        embed_error = f"{type(exc).__name__}: {exc}"
+        logger.error("debug/vector-upsert embed 실패: %s", embed_error)
     embed_elapsed = (time.perf_counter() - t0) * 1000
 
+    if embed_error:
+        return {
+            "user_id": body.user_id,
+            "summary": body.summary,
+            "embed_elapsed_ms": round(embed_elapsed, 1),
+            "embed_error": embed_error,
+            "upsert_elapsed_ms": 0.0,
+            "upsert_error": None,
+            "vector_id": None,
+        }
+
+    # Step 2: upsert
+    upsert_error = None
+    vector_id = None
     t0 = time.perf_counter()
-    vector_id = await pinecone.upsert(body.user_id, vector, body.summary)
+    try:
+        vector_id = await pinecone.upsert(body.user_id, vector, body.summary)
+    except Exception as exc:
+        upsert_error = f"{type(exc).__name__}: {exc}"
+        logger.error("debug/vector-upsert pinecone 실패: %s", upsert_error)
     upsert_elapsed = (time.perf_counter() - t0) * 1000
 
     return {
         "user_id": body.user_id,
         "summary": body.summary,
-        "vector_id": vector_id,
         "embed_elapsed_ms": round(embed_elapsed, 1),
+        "embed_error": None,
         "upsert_elapsed_ms": round(upsert_elapsed, 1),
+        "upsert_error": upsert_error,
+        "vector_id": vector_id,
+    }
+
+
+@router.post("/debug/was-test")
+async def debug_was_test(body: WASTestRequest, request: Request) -> dict:
+    """WAS REST 통신 상태를 직접 테스트한다.
+
+    exercise-list, meal-list 두 엔드포인트를 각각 호출하여
+    응답 상태, 데이터, 소요시간, 오류를 반환한다.
+    """
+    was = request.app.state.was_client
+    results: dict = {}
+
+    for endpoint_key, fetch_fn in (
+        ("exercise_list", lambda: was.fetch_exercise_list(body.user_id)),
+        ("meal_list", lambda: was.fetch_meal_list(body.user_id)),
+    ):
+        t0 = time.perf_counter()
+        try:
+            data = await fetch_fn()
+            results[endpoint_key] = {
+                "status": "ok",
+                "data": data,
+                "elapsed_ms": round((time.perf_counter() - t0) * 1000, 1),
+                "error": None,
+            }
+        except Exception as exc:
+            results[endpoint_key] = {
+                "status": "error",
+                "data": None,
+                "elapsed_ms": round((time.perf_counter() - t0) * 1000, 1),
+                "error": str(exc),
+            }
+
+    overall_ok = all(r["status"] == "ok" for r in results.values())
+    return {
+        "user_id": body.user_id,
+        "overall": "ok" if overall_ok else "error",
+        "endpoints": results,
+    }
+
+
+@router.get("/debug/system-prompts")
+async def debug_system_prompts() -> dict:
+    """Router AI / Worker AI 시스템 지침서 전문을 반환한다."""
+    return {
+        "router": ROUTER_SYSTEM_PROMPT,
+        "worker_common": _COMMON_RULES + "\n" + _CAUTION,
+        "worker_modes": {
+            str(mode): instruction
+            for mode, instruction in _MODE_INSTRUCTIONS.items()
+        },
+        "mode_names": _MODE_NAMES,
     }

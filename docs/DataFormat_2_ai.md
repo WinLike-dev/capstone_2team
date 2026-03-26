@@ -4,7 +4,7 @@
 
 ## 1. 식단 기록 (Meal Recording)
 
-### 1.1 WAS → AI 요청 (POST /process-meal)
+### 1.1 [Production] WAS → FastAPI 요청 (POST /process-meal)
 사용자의 건강 정보, 지시사항, 그리고 기록할 메시지를 전송합니다.
 
 ```json
@@ -40,7 +40,7 @@ Gemini Flash 분석 결과인 칼로리와 메시지를 반환합니다.
 
 ## 2. 추천 기능 (Recommendation)
 
-### 2.1 WAS → AI 요청 (POST /recommend)
+### 2.1 [Production] WAS → FastAPI 요청 (POST /recommend)
 배경 실행 또는 새로고침 시 사용자 정보를 기반으로 추천을 요청합니다.
 
 ```json

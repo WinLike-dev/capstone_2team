@@ -20,8 +20,6 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 from pinecone import PineconeAsyncio, ServerlessSpec
-from sentence_transformers import SentenceTransformer
-from starlette.concurrency import run_in_threadpool
 
 from app.clients import EMBEDDING_DIM, EmbeddingClient, GeminiClient, PineconeClient, RouterClient, WASClient
 from app.core.config import get_settings
@@ -44,12 +42,9 @@ async def lifespan(app: FastAPI):
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
 
-    # 1. Embedding model (CPU-bound — offload to thread pool)
-    model = await run_in_threadpool(
-        SentenceTransformer, "paraphrase-multilingual-MiniLM-L12-v2"
-    )
-    app.state.embed_client = EmbeddingClient(model)
-    logger.info("Embedding model loaded (dim=%d)", EMBEDDING_DIM)
+    # 1. Embedding client (Google text-embedding-004)
+    app.state.embed_client = EmbeddingClient(api_key=settings.GEMINI_API_KEY)
+    logger.info("Embedding client initialized (Google text-embedding-004, dim=%d)", EMBEDDING_DIM)
 
     # 2. Pinecone index
     pc = PineconeAsyncio(api_key=settings.PINECONE_API_KEY)

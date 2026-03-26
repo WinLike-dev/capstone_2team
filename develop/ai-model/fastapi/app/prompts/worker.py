@@ -116,42 +116,6 @@ _MODE_INSTRUCTIONS: dict[int, str] = {
         "  ```\n"
         "- **지침**: 변경이 필요한 모든 필드와 그 값을 포함하십시오.\n"
     ),
-    7: (
-        "### 모드 7: 식단 기록 (Meal Logging)\n"
-        "- **목적**: 사용자가 먹은 음식을 분석하여 영양 정보 기록.\n"
-        "- **출력 형식**:\n"
-        "  ```json\n"
-        "  {\n"
-        '    "calories": number,\n'
-        '    "carbs": number,\n'
-        '    "protein": number,\n'
-        '    "fat": number,\n'
-        '    "message": "한 줄 요약 메시지"\n'
-        "  }\n"
-        "  ```\n"
-        "- **지침**:\n"
-        "  - 사용자 지시사항/사용자 메세지에 갯수에 대한 언급이 없으면 **1개(1인분)**를 기준으로 분석합니다.\n"
-        "  - 영양 정보(단탄지) 단위를 숫자로만 기재하십시오.\n"
-    ),
-    8: (
-        "### 모드 8: 추천 기능 (Recommendation)\n"
-        "- **목적**: 사용자 상태에 맞는 운동 및 식단 추천.\n"
-        "- **출력 형식**:\n"
-        "  ```json\n"
-        "  {\n"
-        '    "recommended_exercises": [\n'
-        '      { "name": "운동명1", "calories": number },\n'
-        '      { "name": "운동명2", "calories": number },\n'
-        '      { "name": "운동명3", "calories": number }\n'
-        "    ],\n"
-        '    "recommended_meals": [\n'
-        '      { "name": "식단명1", "calories": number },\n'
-        '      { "name": "식단명2", "calories": number }\n'
-        "    ]\n"
-        "  }\n"
-        "  ```\n"
-        "- **지침**: **운동 3개와 식단 2개**를 추천하십시오.\n"
-    ),
 }
 
 # ---------------------------------------------------------------------------
@@ -225,7 +189,7 @@ def build_worker_system_prompt(
       4. 이전 대화 맥락 (Vector DB 검색 결과)
 
     Args:
-        mode: 라우터 AI가 분류한 모드 번호 (1-8).
+        mode: 라우터 AI가 분류한 모드 번호 (1-6).
         user_profile: 사용자 프로필 정보.
         context_text: Pinecone에서 검색된 이전 대화 맥락 텍스트.
         user_instruction: 사용자 지시사항 (없으면 빈 문자열).
