@@ -89,7 +89,7 @@ export default function OnboardingPage() {
 
       alert('등록이 완료되었습니다.');
       localStorage.setItem('healthAppUser', JSON.stringify(formData));
-      router.push('/home');
+      router.push('/');
     } catch (error) {
       console.error(error);
       setErrorMsg('프로필 저장에 실패했습니다. 다시 시도해주세요.');
