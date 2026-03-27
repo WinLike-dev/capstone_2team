@@ -68,25 +68,31 @@ async def recommend(
     Raises:
         HTTPException(500): Gemini API 호출 실패 시.
     """
+    logger.info("[recommend] 요청 수신 user_id=%s instruction='%s'", body.user_id, body.user_instruction[:80])
+
     gemini_client = request.app.state.gemini_client
     embed_client = request.app.state.embed_client
     pinecone_client = request.app.state.pinecone_client
 
     # 1. Pinecone 맥락 검색 (graceful degradation)
+    logger.info("[recommend] Pinecone 맥락 검색 시작")
     context_text = await _fetch_context(
         pinecone_client=pinecone_client,
         embed_client=embed_client,
         user_id=body.user_id,
         query=body.user_instruction,
     )
+    logger.info("[recommend] Pinecone 맥락 검색 완료 → %s", context_text[:100])
 
     # 2. 시스템 프롬프트 빌드
     system_prompt = build_recommend_system_prompt(
         user_profile=body.user_profile,
         context_text=context_text,
     )
+    logger.info("[recommend] 시스템 프롬프트 빌드 완료 (%d자)", len(system_prompt))
 
     # 3. Gemini로 추천 생성
+    logger.info("[recommend] Gemini 추천 생성 호출 시작")
     try:
         raw_json = await gemini_client.generate(
             system_prompt=system_prompt,
@@ -94,15 +100,17 @@ async def recommend(
             response_schema=RecommendationData,
         )
     except genai_errors.ClientError as exc:
-        logger.error("Gemini 호출 실패 (user_id=%s): %s", body.user_id, exc)
+        logger.error("[recommend] Gemini 호출 실패 (user_id=%s): %s", body.user_id, exc)
         raise HTTPException(
             status_code=500,
             detail={"code": "GEMINI_ERROR", "message": str(exc)},
         ) from exc
+    logger.info("[recommend] Gemini 응답 수신 완료 (%d자)", len(raw_json))
 
     # 4. 응답 파싱
     parsed = json.loads(raw_json)
     data = RecommendationData(**parsed)
+    logger.info("[recommend] 추천 결과 → 운동=%s, 식단=%s", data.recommended_exercise.name, data.recommended_meal.name)
 
     # 5. BackgroundTasks에 Summary 등록
     background_tasks.add_task(
@@ -114,5 +122,7 @@ async def recommend(
         embed_client=embed_client,
         pinecone_client=pinecone_client,
     )
+    logger.info("[recommend] Background Summary 태스크 등록 완료")
 
+    logger.info("[recommend] 응답 반환 status=success")
     return SuccessResponse(data=data.model_dump())

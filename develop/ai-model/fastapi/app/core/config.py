@@ -6,10 +6,10 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Gemini
     GEMINI_API_KEY: str
-    GEMINI_MODEL_NAME: str = "gemini-2.0-flash"
+    GEMINI_MODEL_NAME: str = "gemini-2.5-flash"
     # Router
     ROUTER_API_KEY: str
-    ROUTER_MODEL_NAME: str = "gemini-2.0-flash-lite"
+    ROUTER_MODEL_NAME: str = "gemini-2.5-flash-lite"
     # Pinecone
     PINECONE_API_KEY: str
     PINECONE_INDEX_NAME: str

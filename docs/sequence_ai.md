@@ -4,25 +4,7 @@
 
 ## 1. 전역 AI 통신 구조 (Overall Flow)
 
-![AI 시퀀스 다이어그램](sequence_ai.png)
-
-## 2. 주요 엔드포인트별 호출 방향
-
-### WAS → FastAPI (Production 요청)
-- `POST /ai-chat`: 채팅 및 의도 분류 (6모드 기반)
-- `POST /process-meal`: 식단 기록 데이터 분석
-- `POST /recommend`: 운동 및 식단 추천
-
-### FastAPI → WAS (정보 조회 요청)
-- `GET /api/exercise-list/{user_id}`: **Mode 3 (플랜 수정)** 호출 시 현재 운동 리스트 확보
-- `GET /api/meal-list/{user_id}`: **Mode 5 (식단 수정)** 호출 시 현재 식단 리스트 확보
-
----
-
-## 3. Mermaid 원본 (참고용)
-
-<details>
-<summary>Mermaid 코드 보기</summary>
+전체적인 대화 및 추천 프로세스 흐름은 아래와 같습니다.
 
 ```mermaid
 sequenceDiagram
@@ -58,4 +40,12 @@ sequenceDiagram
         AI->>VDB: 8. 대화 요약 및 컨텍스트 저장 (Upsert)
     end
 ```
-</details>
+
+## 2. 상세 시퀀스 다이어그램 목록
+
+각 시퀀스별 상세 내용은 아래 개별 문서에서 확인할 수 있습니다.
+
+- [Sequence_0: MBTI 설정](sequence_0.md)
+- [Sequence_1: 전역 흐름](sequence_1.md)
+- [Sequence_1_ai: 식단/추천 상세](sequence_1_ai.md)
+- [Sequence_2_ai: 상세 AI 통신](sequence_2_ai.md)

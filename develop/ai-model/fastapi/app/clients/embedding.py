@@ -1,35 +1,38 @@
-"""EmbeddingClient: async wrapper around Google text-embedding-004 API.
+"""EmbeddingClient: async wrapper around Google gemini-embedding-001 API.
 
-Uses google-genai SDK to generate embeddings via the Gemini API.
+Uses google-generativeai SDK for embedContent.
 output_dimensionality=384 keeps Pinecone index compatibility.
 """
 from __future__ import annotations
 
-from google import genai
-from google.genai import types
+import asyncio
+from functools import partial
 
-# text-embedding-004 with output_dimensionality=384 for Pinecone compatibility.
+import google.generativeai as genai
+
 EMBEDDING_DIM: int = 384
 
 
 class EmbeddingClient:
-    """Async wrapper over Google text-embedding-004."""
+    """Async wrapper over Google gemini-embedding-001 via google-generativeai SDK."""
 
     def __init__(self, api_key: str) -> None:
-        self._client = genai.Client(api_key=api_key)
+        genai.configure(api_key=api_key)
 
     async def embed(self, text: str) -> list[float]:
-        """Return a 384-dim float vector for *text* via Google text-embedding-004.
+        """Return a float vector for *text* via Google gemini-embedding-001.
 
         Args:
             text: Input text (may be empty).
 
         Returns:
-            A list of 384 floats representing the embedding.
+            A list of floats representing the embedding.
         """
-        response = await self._client.aio.models.embed_content(
-            model="text-embedding-004",
-            contents=text,
-            config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM),
+        fn = partial(
+            genai.embed_content,
+            model="models/gemini-embedding-001",
+            content=text,
+            output_dimensionality=EMBEDDING_DIM,
         )
-        return response.embeddings[0].values
+        result = await asyncio.get_event_loop().run_in_executor(None, fn)
+        return result["embedding"]

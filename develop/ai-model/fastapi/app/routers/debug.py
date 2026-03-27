@@ -32,6 +32,7 @@ from app.schemas.gemini_outputs import (
 )
 from app.schemas.meal import MealAnalysisData, ProcessMealRequest
 from app.schemas.recommend import RecommendationData, RecommendRequest
+from app.prompts.summary import SummaryOutput, build_summary_prompt
 from app.services.chat_service import _build_ai_chat_data, _fetch_context
 
 
@@ -252,6 +253,42 @@ async def ai_chat_debug(body: AiChatRequest, request: Request) -> dict:
         {"mode": mode, "parsed_json": parsed},
         {"final_response": final_response},
         0.0,
+    ))
+
+    # ── Step 8: Vector DB 저장 (요약 → 임베딩 → Pinecone upsert) ──
+    summary_text = None
+    vector_id = None
+    save_error = None
+    t0 = time.perf_counter()
+    if parsed is not None:
+        try:
+            summary_prompt = build_summary_prompt()
+            ai_response_text = json.dumps(parsed, ensure_ascii=False)
+            user_content = f"질문: {body.user_message}\n답변: {ai_response_text}"
+            raw_summary = await gemini.generate(
+                system_prompt=summary_prompt,
+                user_content=user_content,
+                response_schema=SummaryOutput,
+            )
+            summary_text = json.loads(raw_summary)["summary"]
+            vector = await embed.embed(summary_text)
+            vector_id = await pinecone.upsert(
+                user_id=body.user_id,
+                vector=vector,
+                summary=summary_text,
+            )
+        except Exception as exc:
+            save_error = str(exc)
+            logger.error("ai-chat-debug vector save 실패: %s", save_error)
+    t1 = time.perf_counter()
+
+    steps.append(_step(
+        "Vector DB 저장",
+        "대화 요약(Gemini) → 임베딩 → Pinecone upsert",
+        {"user_id": body.user_id, "user_message": body.user_message},
+        {"summary": summary_text, "vector_id": vector_id, "error": save_error,
+         "skipped": parsed is None},
+        (t1 - t0) * 1000,
     ))
 
     total_elapsed = (time.perf_counter() - total_start) * 1000

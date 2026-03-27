@@ -1,48 +1,39 @@
-# [Specification] 식단 기록 및 추천 AI API 명세 (sequence_2)
+# Sequence_3: AI 채팅 (단순대화, 플랜/식단 추천/수정, DB 수정)
 
-이 문서는 `sequence_2_ai.png`의 비즈니스 로직에 따른 FastAPI(AI) 요청 및 응답 JSON 규격을 정의합니다.
+이 문서는 사용자와 AI 간의 채팅 인터랙션 및 내부 라우팅, 데이터 연동 프로세스를 정의합니다.
 
-## 1. 식단 기록 (Meal Recording)
+## 1. 시퀀스 다이어그램 (Sequence Diagram)
 
-### 1.1 [Production] WAS → FastAPI 요청 (POST /process-meal)
-사용자의 건강 정보, 지시사항, 그리고 기록할 메시지를 전송합니다.
-
-```json
-{
-  "user_id": "string",
-  "user_profile": {
-    "gender": "string",
-    "age": "number",
-    "bmi": "number",
-    "goal": "string",
-    "medical_history": ["string"],
-    "allergies": ["string"]
-  },
-  "user_instruction": "string", // 사용자 상세 지시사항 (DB 내 TEXT 필드)
-  "user_message": "string"     // 사용자가 입력한 식단 메시지 (예: "점심에 닭가슴살 샐러드 먹었어")
-}
-```
-
-### 1.2 AI → WAS 응답 (Analysis Result)
-Gemini Flash 분석 결과인 칼로리와 메시지를 반환합니다.
-
-```json
-{
-  "status": "success",
-  "data": {
-    "calories": "number",    // 분석된 총 칼로리
-    "message": "string"      // 사용자에게 보여줄 피드백 메시지 (한 줄로 간결히)
-  }
-}
-```
+![Sequence_ai 다이어그램](sequence_ai.png)
 
 ---
 
-## 2. 추천 기능 (Recommendation)
+## 2. 주요 프로세스 상세
 
-### 2.1 [Production] WAS → FastAPI 요청 (POST /recommend)
-배경 실행 또는 새로고침 시 사용자 정보를 기반으로 추천을 요청합니다.
+### 2.1 AI 채팅 및 의도 분류 (Router & Vector DB)
+1. **[Production] 사용자 → Front → WAS**: 사용자가 채팅을 입력하면 WAS를 거쳐 AI(FastAPI)로 전달됩니다. (**POST /ai-chat**)
+2. **AI (Parallel Request)**:
+    - **Router AI**: 라우터 시스템 지침서와 사용자 메시지를 대조하여 6가지 모드 중 하나로 의도를 분류합니다.
+    - **Vector DB**: `user_id`와 사용자 메시지를 바탕으로 이전 대화 기록 및 컨텍스트를 검색합니다.
+3. **조건부 정보 조회 (수정 요청 시)**: 라우터 분류 결과가 '플랜 수정(Mode 3)' 또는 '식단 수정(Mode 5)'일 경우, FastAPI는 직접 **WAS에 현재 리스트**를 요청하여 확보합니다.
+    - **Mode 3**: `GET /api/exercise-list/{user_id}` 호출
+    - **Mode 5**: `GET /api/meal-list/{user_id}` 호출
 
+### 2.2 답변 생성 및 비동기 요약 저장
+- **LLM (Gemini Flash) 호출**: 
+    - 입력: `사용자 메시지 + 시스템 지시사항 + 사용자 정보 + 이전 대화 기록 + 라우터 결과값 [+ 현재 리스트(수정 시)]`
+    - 출력: 각 모드별 정형화된 JSON 데이터
+- **결과 반환 (Response Handling)**:
+    - **6번(사용자 DB 수정)**: 분석 결과 중 사용자가 볼 수 있는 **답변 메시지**만 프론트로 전달합니다.
+    - **그 외 모드**: 생성된 모든 데이터(메시지 + 추천/수정 상세 정보)를 프론트로 전달합니다.
+- **Background Sync**: 답변 전송 후 비동기로 Gemini를 통해 문답을 요약하여 다음 대화를 위해 Vector DB에 저장합니다.
+
+---
+
+## 3. AI API 명세 (JSON 규격)
+
+### 3.1 [Production] WAS → FastAPI 요청 (POST /ai-chat)
+요청 시 사용자의 건강 프로필과 지시사항, 메시지를 포함합니다.
 ```json
 {
   "user_id": "string",
@@ -50,41 +41,44 @@ Gemini Flash 분석 결과인 칼로리와 메시지를 반환합니다.
     "gender": "string",
     "age": "number",
     "bmi": "number",
-    "goal": "string",
-    "activity_level": "string"
+    "goal": "string"
   },
-  "user_instruction": "string" // 개인화된 추천을 위한 지시사항
+  "user_message": "string"      // 사용자가 입력한 채팅 메시지
 }
 ```
 
-### 2.2 AI → WAS 응답 (Recommendation Result)
-Gemini Flash가 생성한 운동 및 식단 추천 데이터를 반환합니다.
+### 3.2 AI → WAS 응답 (모드별 상세)
+Gemini Flash가 생성한 데이터가 `mode`에 따라 다르게 반환됩니다.
 
 ```json
 {
   "status": "success",
+  "mode": "number", // 1(단순대화), 2(플랜작성), 3(플랜수정), 4(식단작성), 5(식단수정)
   "data": {
-    "recommended_exercise": {
-      "name": "string",      // 운동 종류
-      "burn_calories": "number" // 예상 소모 칼로리
-    },
-    "recommended_meal": {
-      "name": "string",      // 식단 종류
-      "calories": "number"   // 식단 칼로리
+    "message": "string",       // 사용자에게 보여줄 피드백 메시지
+    "plan": {                  // 모드 2, 3, 4, 5인 경우에만 포함
+      "date": "string",
+      "items": [
+        {
+          "type": "string",    // 운동 종류 또는 식품 종류
+          "detail": "string",  // 세부 항목 또는 시간(아/점/저)
+          "value": "string"    // 횟수 또는 수량
+        }
+      ]
     }
   }
 }
 ```
 
+### 4. FastAPI → WAS 요청 (GET)
+플랜 또는 식단 수정 모드(Mode 3, 5) 시 AI가 최신 리스트를 기반으로 분석하기 위해 WAS에 직접 요청하는 엔드포인트입니다.
+
+| 모드 | 경로 | 설명 |
+| :--- | :--- | :--- |
+| **Mode 3 (플랜 수정)** | `GET /api/exercise-list/{user_id}` | 현재 등록된 운동 플랜 리스트 조회 |
+| **Mode 5 (식단 수정)** | `GET /api/meal-list/{user_id}` | 현재 등록된 식단 리스트 조회 |
+
 ---
 
-## 3. 벡터 DB 저장 (Background Sync)
-AI 내부에서 Gemini를 통해 요약한 후 Vector DB에 저장되는 데이터 형식입니다.
-
-```json
-{
-  "user_id": "string",
-  "summary": "string",       // 대화 내용 요약본
-  "timestamp": "ISO8601"
-}
-```
+> [!NOTE]
+> 6번 모드의 경우 프론트엔드에서는 `data.message`만 사용자에게 노출합니다.

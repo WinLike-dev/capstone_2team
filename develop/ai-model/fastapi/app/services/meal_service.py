@@ -84,17 +84,23 @@ async def process_meal(
     Raises:
         HTTPException(500): Gemini API 호출이 ClientError로 실패한 경우.
     """
+    logger.info("[process-meal] 요청 수신 user_id=%s message='%s'", body.user_id, body.user_message[:80])
+
     gemini = request.app.state.gemini_client
     pinecone = request.app.state.pinecone_client
     embed = request.app.state.embed_client
 
     # 1. Pinecone 맥락 검색 (실패해도 진행)
+    logger.info("[process-meal] Pinecone 맥락 검색 시작")
     context_text = await _fetch_context(pinecone, embed, body.user_id, body.user_message)
+    logger.info("[process-meal] Pinecone 맥락 검색 완료 → %s", context_text[:100])
 
     # 2. 시스템 프롬프트 빌드
     system_prompt = build_meal_system_prompt(body.user_profile, context_text)
+    logger.info("[process-meal] 시스템 프롬프트 빌드 완료 (%d자)", len(system_prompt))
 
     # 3. Gemini 호출
+    logger.info("[process-meal] Gemini 식단 분석 호출 시작")
     try:
         raw_json = await gemini.generate(
             system_prompt=system_prompt,
@@ -102,6 +108,7 @@ async def process_meal(
             response_schema=MealAnalysisData,
         )
     except genai_errors.ClientError as exc:
+        logger.error("[process-meal] Gemini 호출 실패: %s", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -112,10 +119,12 @@ async def process_meal(
                 },
             },
         ) from exc
+    logger.info("[process-meal] Gemini 응답 수신 완료 (%d자)", len(raw_json))
 
     # 4. 응답 파싱
     parsed = json.loads(raw_json)
     data = MealAnalysisData(**parsed)
+    logger.info("[process-meal] 분석 결과 → calories=%.1f", data.calories)
 
     # 5. Background Summary 등록
     background_tasks.add_task(
@@ -127,6 +136,8 @@ async def process_meal(
         embed_client=embed,
         pinecone_client=pinecone,
     )
+    logger.info("[process-meal] Background Summary 태스크 등록 완료")
 
     # 6. 응답 반환
+    logger.info("[process-meal] 응답 반환 status=success")
     return SuccessResponse(data=data.model_dump())

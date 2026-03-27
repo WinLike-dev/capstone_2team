@@ -459,6 +459,32 @@
     </div>
 
   </div>
+
+  <!-- 모드별 Upsert 일괄 테스트 -->
+  <div class="form-card" style="margin-top:16px;max-width:800px;margin-left:auto;margin-right:auto;">
+    <h3 style="color:var(--orange);font-size:0.95rem;margin-bottom:8px;">모드별 Upsert 일괄 테스트 (1~6)</h3>
+    <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px;">모드 1~6에 대한 샘플 요약을 각각 Pinecone에 저장하고 성공 여부를 확인합니다.</p>
+    <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;">
+      <div style="flex:1;"><label>User ID</label><input id="vuBatchUserId" value="test-user-001" /></div>
+      <button class="btn-primary" id="vuBatchBtn" style="white-space:nowrap;">Run All Modes</button>
+    </div>
+    <div id="vuBatchResult" style="display:none;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:6px 8px;color:var(--text-dim);">모드</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-dim);">모드명</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-dim);">상태</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-dim);">Vector ID</th>
+            <th style="text-align:right;padding:6px 8px;color:var(--text-dim);">임베딩(ms)</th>
+            <th style="text-align:right;padding:6px 8px;color:var(--text-dim);">저장(ms)</th>
+          </tr>
+        </thead>
+        <tbody id="vuBatchTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 
 <!-- ── System Instructions 탭 ── -->
@@ -993,6 +1019,69 @@ document.getElementById('vuBtn').addEventListener('click', async function() {
   } finally {
     btn.disabled = false;
   }
+});
+
+// ─── Vector DB Upsert 모드별 일괄 테스트 ─────────────────────────────────
+var VU_BATCH_SAMPLES = {
+  1: "사용자가 오늘 기분과 일상에 대해 간단히 이야기했고 AI가 공감하며 응답함",
+  2: "사용자가 주 4회 헬스장 운동 계획을 요청해서 가슴/등/하체/전신으로 나눈 루틴을 생성함",
+  3: "사용자가 기존 운동 계획에서 월요일 벤치프레스를 덤벨 플라이로 교체 요청해서 수정 완료함",
+  4: "사용자가 다이어트용 일주일 식단을 요청해서 1800kcal 기준 아침/점심/저녁 식단을 구성함",
+  5: "사용자가 기존 식단에서 저녁 닭가슴살 대신 연어로 변경 요청해서 식단 수정 완료함",
+  6: "사용자가 키 175cm, 몸무게 72kg, 목표 체중 68kg으로 건강 정보를 업데이트함"
+};
+var VU_BATCH_NAMES = { 1:'단순대화', 2:'플랜 작성', 3:'플랜 수정', 4:'식단 작성', 5:'식단 수정', 6:'사용자 DB 수정' };
+
+function makeTd(text, style) {
+  var td = document.createElement('td');
+  td.style.cssText = 'padding:6px 8px;' + (style || '');
+  td.textContent = text;
+  return td;
+}
+
+document.getElementById('vuBatchBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  var userId = document.getElementById('vuBatchUserId').value;
+  var tbody = document.getElementById('vuBatchTbody');
+  while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+  document.getElementById('vuBatchResult').style.display = 'block';
+
+  for (var mode = 1; mode <= 6; mode++) {
+    var tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border)';
+    tr.appendChild(makeTd(String(mode)));
+    tr.appendChild(makeTd(VU_BATCH_NAMES[mode], 'color:var(--text-dim);'));
+    var statusTd = document.createElement('td');
+    statusTd.style.padding = '6px 8px';
+    statusTd.textContent = '\u23F3 요청중...';
+    tr.appendChild(statusTd);
+    tr.appendChild(makeTd('-', 'color:var(--text-dim);font-size:0.75rem;word-break:break-all;'));
+    tr.appendChild(makeTd('-', 'text-align:right;color:var(--text-dim);'));
+    tr.appendChild(makeTd('-', 'text-align:right;color:var(--text-dim);'));
+    tbody.appendChild(tr);
+
+    try {
+      var resp = await fetch('/debug/vector-upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId + '-mode' + mode, summary: VU_BATCH_SAMPLES[mode] })
+      });
+      var d = await resp.json();
+      var ok = !d.embed_error && !d.upsert_error && d.vector_id;
+      var cells = tr.querySelectorAll('td');
+      cells[2].textContent = ok ? '\u2705 성공' : ('\u274C ' + (d.embed_error || d.upsert_error || '알 수 없는 오류'));
+      cells[2].style.color = ok ? '#4ade80' : '#f87171';
+      cells[3].textContent = d.vector_id || '-';
+      cells[4].textContent = d.embed_elapsed_ms != null ? d.embed_elapsed_ms + 'ms' : '-';
+      cells[5].textContent = d.upsert_elapsed_ms != null ? d.upsert_elapsed_ms + 'ms' : '-';
+    } catch (err) {
+      var cells = tr.querySelectorAll('td');
+      cells[2].textContent = '\u274C ' + err.message;
+      cells[2].style.color = '#f87171';
+    }
+  }
+  btn.disabled = false;
 });
 
 // ─── WAS Test ────────────────────────────────────────────────────────────

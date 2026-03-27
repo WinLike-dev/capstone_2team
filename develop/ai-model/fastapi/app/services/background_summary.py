@@ -39,6 +39,8 @@ async def run_background_summary(
         Request 객체를 인자로 받지 않음 — 클라이언트를 직접 주입받음.
     """
     try:
+        logger.info("[background] Summary 시작 (user_id=%s)", user_id)
+
         system_prompt = build_summary_prompt()
         user_content = f"질문: {user_message}\n답변: {ai_response}"
 
@@ -47,18 +49,21 @@ async def run_background_summary(
             user_content=user_content,
             response_schema=SummaryOutput,
         )
+        logger.info("[background] Gemini 요약 생성 완료 (user_id=%s)", user_id)
 
         summary_text: str = json.loads(raw_json)["summary"]
 
         vector: list[float] = await embed_client.embed(summary_text)
+        logger.info("[background] 임베딩 생성 완료 (user_id=%s)", user_id)
 
         await pinecone_client.upsert(
             user_id=user_id,
             vector=vector,
             summary=summary_text,
         )
+        logger.info("[background] Pinecone 저장 완료 (user_id=%s) summary='%s'", user_id, summary_text[:80])
 
     except Exception:
         logger.exception(
-            "Background summary 파이프라인 오류 (user_id=%s)", user_id
+            "[background] Summary 파이프라인 오류 (user_id=%s)", user_id
         )
