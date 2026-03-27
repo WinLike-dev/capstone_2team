@@ -12,6 +12,118 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
   
+  // Calorie & Nutrient Modals state
+  const [isCalorieModalOpen, setIsCalorieModalOpen] = useState(false);
+  const [isNutrientModalOpen, setIsNutrientModalOpen] = useState(false);
+  const [goalInput, setGoalInput] = useState({
+    calories: '',
+    carbs: '',
+    protein: '',
+    fat: '',
+  });
+  const [goalErrorMsg, setGoalErrorMsg] = useState('');
+  const [isGoalSaving, setIsGoalSaving] = useState(false);
+
+  // Targets (displayed in UI)
+  const [targets, setTargets] = useState({
+    calories: 2000,
+    carbs: 250,
+    protein: 80,
+    fat: 50
+  });
+
+  // Current Intakes (mock for UI)
+  const [intakes] = useState({
+    calories: 420,
+    carbs: 120,
+    protein: 45,
+    fat: 30
+  });
+
+  // Calculated Fallback
+  const [recommendedCalories, setRecommendedCalories] = useState(2000);
+
+  const handleCalorieSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGoalErrorMsg('');
+    
+    const cal = Number(goalInput.calories);
+    if (isNaN(cal) || cal <= 0 || cal >= 10000) {
+      return setGoalErrorMsg('올바른 범위를 입력해주세요 (1~9999)');
+    }
+
+    setIsGoalSaving(true);
+    try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      const endpoint = baseUrl ? `${baseUrl}/users/profile` : '/api/mock-save';
+      
+      if (baseUrl) {
+        await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+          body: JSON.stringify({
+            target_calories: cal,
+            target_carbs: targets.carbs,
+            target_protein: targets.protein,
+            target_fat: targets.fat
+          }),
+        });
+      }
+
+      setTargets(prev => ({ ...prev, calories: cal }));
+      setIsCalorieModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      setGoalErrorMsg('저장에 실패했습니다.');
+    } finally {
+      setIsGoalSaving(false);
+    }
+  };
+
+  const handleNutrientSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGoalErrorMsg('');
+    
+    const car = Number(goalInput.carbs);
+    const pro = Number(goalInput.protein);
+    const fa = Number(goalInput.fat);
+
+    if (isNaN(car) || car <= 0 || car >= 10000 ||
+        isNaN(pro) || pro <= 0 || pro >= 10000 ||
+        isNaN(fa) || fa <= 0 || fa >= 10000) {
+      return setGoalErrorMsg('올바른 범위를 입력해주세요 (1~9999)');
+    }
+
+    setIsGoalSaving(true);
+    try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      const endpoint = baseUrl ? `${baseUrl}/users/profile` : '/api/mock-save';
+      
+      if (baseUrl) {
+        await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+          body: JSON.stringify({
+            target_calories: targets.calories,
+            target_carbs: car,
+            target_protein: pro,
+            target_fat: fa
+          }),
+        });
+      }
+
+      setTargets(prev => ({ ...prev, carbs: car, protein: pro, fat: fa }));
+      setIsNutrientModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      setGoalErrorMsg('저장에 실패했습니다.');
+    } finally {
+      setIsGoalSaving(false);
+    }
+  };
+
   // Diet Modal state
   const [isDietModalOpen, setIsDietModalOpen] = useState(false);
   const [foodInput, setFoodInput] = useState('');
@@ -88,7 +200,36 @@ export default function Home() {
     if (!stored) {
       router.push('/onboarding');
     } else {
-      setUserData(JSON.parse(stored));
+      const parsedData = JSON.parse(stored);
+      setUserData(parsedData);
+      
+      if (parsedData.weight && parsedData.height && parsedData.age && parsedData.gender) {
+        const w = parseFloat(parsedData.weight);
+        const h = parseFloat(parsedData.height); // in cm
+        const age = parseInt(parsedData.age, 10);
+        const genderDelta = (parsedData.gender === '남성' || parsedData.gender === 'male') ? 5 : -161;
+        
+        // Mifflin-St Jeor Equation
+        const bmr = 10 * w + 6.25 * h - 5 * age + genderDelta;
+        const recCals = Math.round(bmr * 1.375); // Light activity multiplier
+        
+        setRecommendedCalories(recCals);
+        
+        const initialTargets = {
+          calories: recCals,
+          carbs: Math.round((recCals * 0.5) / 4),
+          protein: Math.round((recCals * 0.3) / 4),
+          fat: Math.round((recCals * 0.2) / 9)
+        };
+        
+        setTargets(initialTargets);
+        setGoalInput({
+          calories: String(initialTargets.calories),
+          carbs: String(initialTargets.carbs),
+          protein: String(initialTargets.protein),
+          fat: String(initialTargets.fat)
+        });
+      }
     }
   }, [router]);
 
@@ -136,7 +277,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Intake Calories Card */}
           <div 
-            onClick={() => setIsDietModalOpen(true)}
+            onClick={() => setIsCalorieModalOpen(true)}
             className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 flex flex-col justify-between hover:shadow-[0_12px_40px_rgb(249,115,22,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
           >
             <div className="flex items-center justify-between mb-6">
@@ -149,20 +290,23 @@ export default function Home() {
             </div>
             <div>
               <div className="flex items-baseline space-x-1">
-                <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{dietAnalysis ? '740' : '420'}</p>
-                <span className="text-sm font-semibold text-gray-400">/ 2000 kcal</span>
+                <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{dietAnalysis ? intakes.calories + 320 : intakes.calories}</p>
+                <span className="text-sm font-semibold text-gray-400">/ {targets.calories} kcal</span>
               </div>
               <div className="flex items-center space-x-1 mt-2.5">
                 <div className="w-full bg-gray-100 rounded-full h-1.5 flex-1 max-w-[120px] overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: dietAnalysis ? '37%' : '21%' }} transition={{ duration: 1, ease: 'easeOut' }} className="bg-orange-500 h-1.5 rounded-full"></motion.div>
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((dietAnalysis ? intakes.calories + 320 : intakes.calories) / targets.calories) * 100, 100)}%` }} transition={{ duration: 1, ease: 'easeOut' }} className="bg-orange-500 h-1.5 rounded-full"></motion.div>
                 </div>
-                <p className="text-sm text-gray-500 font-semibold ml-2">{dietAnalysis ? '37%' : '21%'}</p>
+                <p className="text-sm text-gray-500 font-semibold ml-2">{Math.round(Math.min(((dietAnalysis ? intakes.calories + 320 : intakes.calories) / targets.calories) * 100, 100))}%</p>
               </div>
             </div>
           </div>
 
           {/* Nutrients Card */}
-          <div className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 flex flex-col justify-between hover:shadow-[0_12px_40px_rgb(16,185,129,0.08)] hover:-translate-y-1 transition-all duration-300 md:col-span-2 lg:col-span-2">
+          <div 
+            onClick={() => setIsNutrientModalOpen(true)}
+            className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 flex flex-col justify-between hover:shadow-[0_12px_40px_rgb(16,185,129,0.08)] hover:-translate-y-1 transition-all duration-300 md:col-span-2 lg:col-span-2 cursor-pointer"
+          >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <div className="w-11 h-11 rounded-2xl bg-emerald-50/80 flex items-center justify-center text-emerald-500 shadow-inner">
@@ -174,26 +318,26 @@ export default function Home() {
             <div className="flex gap-4 items-end justify-between h-full pt-2">
               <div className="flex-1 space-y-1.5">
                 <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500">
-                  <span>탄수화물</span><span>120/250g</span>
+                  <span>탄수화물</span><span>{intakes.carbs}/{targets.carbs}g</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: '48%' }} transition={{ duration: 1 }} className="bg-amber-400 h-2 rounded-full"></motion.div>
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((intakes.carbs / targets.carbs) * 100, 100)}%` }} transition={{ duration: 1 }} className="bg-amber-400 h-2 rounded-full"></motion.div>
                 </div>
               </div>
               <div className="flex-1 space-y-1.5">
                 <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500">
-                  <span>단백질</span><span>45/80g</span>
+                  <span>단백질</span><span>{intakes.protein}/{targets.protein}g</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: '56%' }} transition={{ duration: 1, delay: 0.1 }} className="bg-blue-400 h-2 rounded-full"></motion.div>
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((intakes.protein / targets.protein) * 100, 100)}%` }} transition={{ duration: 1, delay: 0.1 }} className="bg-blue-400 h-2 rounded-full"></motion.div>
                 </div>
               </div>
               <div className="flex-1 space-y-1.5">
                 <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500">
-                  <span>지방</span><span>30/50g</span>
+                  <span>지방</span><span>{intakes.fat}/{targets.fat}g</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: '60%' }} transition={{ duration: 1, delay: 0.2 }} className="bg-rose-400 h-2 rounded-full"></motion.div>
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((intakes.fat / targets.fat) * 100, 100)}%` }} transition={{ duration: 1, delay: 0.2 }} className="bg-rose-400 h-2 rounded-full"></motion.div>
                 </div>
               </div>
             </div>
@@ -519,6 +663,148 @@ export default function Home() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Calorie Goal Modal */}
+      <AnimatePresence>
+        {isCalorieModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setIsCalorieModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-3xl shadow-[0_20px_60px_-12px_rgba(0,0,0,0.15)] w-full max-w-sm overflow-hidden z-10"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-blue-50/50">
+                <div className="flex items-center space-x-2">
+                  <Utensils className="w-5 h-5 text-[#2563eb]" />
+                  <h3 className="font-bold text-lg text-gray-900">목표 칼로리 설정</h3>
+                </div>
+                <button onClick={() => { setIsCalorieModalOpen(false); setGoalErrorMsg(''); }} className="text-gray-400 hover:text-gray-600 transition-colors p-1 bg-white rounded-full shadow-sm">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6">
+                <form onSubmit={handleCalorieSubmit} className="space-y-4">
+                  <div className="bg-blue-50 text-blue-800 p-3 rounded-xl text-sm mb-4 border border-blue-100 font-medium text-center">
+                    💡 체형 맞춤형 권장 섭취량: <br /> 하루 <span className="font-bold text-blue-600">{recommendedCalories} kcal</span>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1.5">하루 목표 칼로리 (kcal)</label>
+                    <input 
+                      type="number" 
+                      value={goalInput.calories}
+                      onChange={(e) => setGoalInput({...goalInput, calories: e.target.value})}
+                      placeholder="예) 2000" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all"
+                    />
+                  </div>
+                  
+                  {goalErrorMsg && (
+                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-xs font-bold text-center mt-2">
+                       {goalErrorMsg}
+                    </motion.p>
+                  )}
+                  
+                  <button 
+                    type="submit" 
+                    disabled={isGoalSaving}
+                    className="w-full bg-[#2563eb] text-white font-bold py-3.5 rounded-xl shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:bg-blue-700 transition-all disabled:opacity-50 disabled:shadow-none mt-2"
+                  >
+                    {isGoalSaving ? '저장 중...' : '목표 저장'}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Nutrient Goal Modal */}
+      <AnimatePresence>
+        {isNutrientModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setIsNutrientModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-3xl shadow-[0_20px_60px_-12px_rgba(0,0,0,0.15)] w-full max-w-sm overflow-hidden z-10"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-blue-50/50">
+                <div className="flex items-center space-x-2">
+                  <Activity className="w-5 h-5 text-[#2563eb]" />
+                  <h3 className="font-bold text-lg text-gray-900">목표 영양소 설정</h3>
+                </div>
+                <button onClick={() => { setIsNutrientModalOpen(false); setGoalErrorMsg(''); }} className="text-gray-400 hover:text-gray-600 transition-colors p-1 bg-white rounded-full shadow-sm">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6">
+                <form onSubmit={handleNutrientSubmit} className="space-y-4">
+                  <div className="bg-emerald-50 text-emerald-800 p-3 rounded-xl text-sm mb-4 border border-emerald-100 font-medium text-center">
+                    💡 체형 맞춤형 권장 탄단지 (5:3:2) <br /> 
+                    <span className="font-bold">탄 {Math.round((recommendedCalories * 0.5) / 4)}g / 단 {Math.round((recommendedCalories * 0.3) / 4)}g / 지 {Math.round((recommendedCalories * 0.2) / 9)}g</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">탄수화물 (g)</label>
+                      <input 
+                        type="number" 
+                        value={goalInput.carbs}
+                        onChange={(e) => setGoalInput({...goalInput, carbs: e.target.value})}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">단백질 (g)</label>
+                      <input 
+                        type="number" 
+                        value={goalInput.protein}
+                        onChange={(e) => setGoalInput({...goalInput, protein: e.target.value})}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">지방 (g)</label>
+                      <input 
+                        type="number" 
+                        value={goalInput.fat}
+                        onChange={(e) => setGoalInput({...goalInput, fat: e.target.value})}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all text-center"
+                      />
+                    </div>
+                  </div>
+                  
+                  {goalErrorMsg && (
+                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-xs font-bold text-center mt-2">
+                       {goalErrorMsg}
+                    </motion.p>
+                  )}
+                  
+                  <button 
+                    type="submit" 
+                    disabled={isGoalSaving}
+                    className="w-full bg-[#2563eb] text-white font-bold py-3.5 rounded-xl shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:bg-blue-700 transition-all disabled:opacity-50 disabled:shadow-none mt-2"
+                  >
+                    {isGoalSaving ? '저장 중...' : '목표 저장'}
+                  </button>
+                </form>
               </div>
             </motion.div>
           </div>
