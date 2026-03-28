@@ -63,6 +63,58 @@ exports.saveProfile = async (req, res) => {
   }
 };
 
+// @route   PUT /api/v1/users/profile
+// @desc    마이페이지 등에서 건강/목표 부분 수정 시 자동 재계산 업데이트
+// @access  Public (프로토타입)
+exports.updateProfile = async (req, res) => {
+  try {
+    const { user_id, ...updateFields } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+
+    // 1. 기존 정보 조회
+    const { data: existingProfile, error: fetchErr } = await supabase
+      .from('user_health_profiles')
+      .select('*')
+      .eq('user_id', user_id)
+      .single();
+
+    if (fetchErr) throw fetchErr;
+
+    // 2. 수정값과 기존 데이터 병합
+    const mergedProfile = { ...existingProfile, ...updateFields };
+
+    // 3. 재계산 로직 수행
+    let targets = {};
+    if (mergedProfile.gender && mergedProfile.age && mergedProfile.height && mergedProfile.weight) {
+      const calculated = calculator.calculateTargets(
+        mergedProfile.gender,
+        mergedProfile.age,
+        mergedProfile.height,
+        mergedProfile.weight,
+        mergedProfile.activity_level,
+        mergedProfile.goal
+      );
+      if (calculated) targets = calculated;
+    }
+
+    // 4. 목표(target_*) 데이터까지 합쳐서 최종 업데이트
+    const finalData = { ...updateFields, ...targets };
+
+    const { data: updatedProfile, error: updateErr } = await supabase
+      .from('user_health_profiles')
+      .update(finalData)
+      .eq('user_id', user_id)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+    res.json({ message: '프로필 업데이트 및 타겟 수치 조율 성공', profile: updatedProfile });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
+
 // @route   PUT /api/v1/users/targets
 // @desc    목표 섭취 칼로리 / 단탄지 수동 저장 (버튼 클릭 시)
 // @access  Public (프로토타입)
