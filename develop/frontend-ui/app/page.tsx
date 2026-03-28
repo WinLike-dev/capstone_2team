@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Home() {
   const router = useRouter();
-  const [userData, setUserData] = useState<{name: string, goal: string, allergies?: string[], conditions?: string[]} | null>(null);
+  const [userData, setUserData] = useState<{name?: string, goal?: string, allergies?: string[], conditions?: string[], gender?: string, age?: number | string, bmi?: number | string, weight?: string, height?: string, user_instruction?: string} | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
   
@@ -32,8 +32,8 @@ export default function Home() {
     fat: 50
   });
 
-  // Current Intakes (mock for UI)
-  const [intakes] = useState({
+  // Current Intakes (mock for UI initially, gets updated by AI)
+  const [intakes, setIntakes] = useState({
     calories: 420,
     carbs: 120,
     protein: 45,
@@ -127,7 +127,7 @@ export default function Home() {
   // Diet Modal state
   const [isDietModalOpen, setIsDietModalOpen] = useState(false);
   const [foodInput, setFoodInput] = useState('');
-  const [dietAnalysis, setDietAnalysis] = useState<{ calories: string, message: string } | null>(null);
+  const [dietAnalysis, setDietAnalysis] = useState<{ calories: number, carbs: number, protein: number, fat: number, message: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Water tracker state (glasses of water)
@@ -156,25 +156,107 @@ export default function Home() {
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
-  const handleDietSubmit = (e: React.FormEvent) => {
+  const handleDietSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!foodInput.trim()) return;
+    if (!foodInput.trim() || !userData) return;
     
     setIsAnalyzing(true);
-    setTimeout(() => {
-      let mockResult = { calories: '320 kcal', message: '적당한 칼로리네요. 든든한 식사 되세요!' };
+    setDietAnalysis(null);
+
+    try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+      // 슬래시 중복 방지를 위해 맨 끝의 슬래시 제거
+      const baseUrl = rawApiUrl.replace(/\/+$/, '');
       
-      if (foodInput.includes('떡볶이') || foodInput.includes('마카롱') || foodInput.includes('케이크') || foodInput.includes('아이스크림') || foodInput.includes('초콜릿') || foodInput.includes('과자') || foodInput.includes('콜라') || foodInput.includes('당') || foodInput.includes('단')) {
-        mockResult = { calories: '450 kcal', message: '이 음식은 당분이 높으니 오후엔 가벼운 산책을 추천해요.' };
-      } else if (foodInput.includes('샐러드') || foodInput.includes('닭가슴살') || foodInput.includes('야채')) {
-        mockResult = { calories: '180 kcal', message: '건강한 선택이네요! 목표 달성에 큰 도움이 될 거예요.' };
-      } else if (foodInput.includes('치킨') || foodInput.includes('피자') || foodInput.includes('햄버거') || foodInput.includes('튀김') || foodInput.includes('고기')) {
-        mockResult = { calories: '800 kcal', message: '칼로리가 다소 높아요. 저녁은 가볍게 드시는 것을 추천합니다.' };
+      let endpoint = '/api/mock-save';
+      if (baseUrl) {
+        // 환경변수에 이미 /api/v1이 포함되어 있다면 중복되지 않게 처리
+        endpoint = baseUrl.endsWith('/api/v1') 
+          ? `${baseUrl}/ai/meal-record` 
+          : `${baseUrl}/api/v1/ai/meal-record`;
       }
       
-      setDietAnalysis(mockResult);
+      const payload = {
+        user_id: userData.name || "user123", // fallback
+        user_message: foodInput
+      };
+
+      if (baseUrl) {
+        console.log('실제 요청 경로:', endpoint);
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error('API request failed');
+        }
+
+        const resData = await response.json();
+        
+        // 서버 응답이 data 내에 있거나 fallback 객체 안에 있어도 모두 유연하게 처리
+        const hasData = resData.status === 'success' && resData.data;
+        const hasFallback = resData.fallback;
+
+        if (hasData || hasFallback) {
+          const resultObj = hasData ? resData.data : resData.fallback;
+          const calories = Number(resultObj.calories) || 0;
+          const carbs = Number(resultObj.carbs) || 0;
+          const protein = Number(resultObj.protein) || 0;
+          const fat = Number(resultObj.fat) || 0;
+          const message = resultObj.message || "기록이 완료되었습니다.";
+          
+          setIntakes(prev => ({
+            calories: prev.calories + calories,
+            carbs: prev.carbs + carbs,
+            protein: prev.protein + protein,
+            fat: prev.fat + fat
+          }));
+          
+          setDietAnalysis({
+            calories,
+            carbs,
+            protein,
+            fat,
+            message
+          });
+        } else {
+           throw new Error("올바른 응답 데이터를 찾을 수 없습니다.");
+        }
+      } else {
+        // Mock fallback if no backend URL
+        setTimeout(() => {
+          const mockC = 320;
+          const mockMsg = "적당한 칼로리네요. 든든한 식사 되세요!";
+          
+          setIntakes(prev => ({
+            calories: prev.calories + mockC,
+            carbs: prev.carbs + 40,
+            protein: prev.protein + 15,
+            fat: prev.fat + 10
+          }));
+
+          setDietAnalysis({
+             calories: mockC,
+             carbs: 40,
+             protein: 15,
+             fat: 10,
+             message: mockMsg
+          });
+          setIsAnalyzing(false);
+        }, 1500);
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+      alert('AI 분석에 실패했습니다. 다시 시도해주세요.');
+    } finally {
       setIsAnalyzing(false);
-    }, 1500);
+    }
   };
 
   const addWater = (e?: React.MouseEvent) => {
@@ -290,14 +372,14 @@ export default function Home() {
             </div>
             <div>
               <div className="flex items-baseline space-x-1">
-                <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{dietAnalysis ? intakes.calories + 320 : intakes.calories}</p>
+                <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{intakes.calories}</p>
                 <span className="text-sm font-semibold text-gray-400">/ {targets.calories} kcal</span>
               </div>
               <div className="flex items-center space-x-1 mt-2.5">
                 <div className="w-full bg-gray-100 rounded-full h-1.5 flex-1 max-w-[120px] overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((dietAnalysis ? intakes.calories + 320 : intakes.calories) / targets.calories) * 100, 100)}%` }} transition={{ duration: 1, ease: 'easeOut' }} className="bg-orange-500 h-1.5 rounded-full"></motion.div>
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((intakes.calories / targets.calories) * 100, 100)}%` }} transition={{ duration: 1, ease: 'easeOut' }} className="bg-orange-500 h-1.5 rounded-full"></motion.div>
                 </div>
-                <p className="text-sm text-gray-500 font-semibold ml-2">{Math.round(Math.min(((dietAnalysis ? intakes.calories + 320 : intakes.calories) / targets.calories) * 100, 100))}%</p>
+                <p className="text-sm text-gray-500 font-semibold ml-2">{Math.round(Math.min((intakes.calories / targets.calories) * 100, 100))}%</p>
               </div>
             </div>
           </div>
@@ -647,17 +729,23 @@ export default function Home() {
                       <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 space-y-3 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl -mr-10 -mt-10"></div>
                         <div className="flex justify-between items-center relative z-10">
-                          <span className="text-sm font-bold text-gray-600">예상 칼로리</span>
-                          <span className="text-lg font-extrabold text-[#2563eb]">{dietAnalysis.calories}</span>
+                          <span className="text-sm font-bold text-gray-600">추가된 칼로리</span>
+                          <span className="text-lg font-extrabold text-[#2563eb]">{dietAnalysis.calories} kcal</span>
+                        </div>
+                        <div className="flex justify-between items-center relative z-10 text-xs font-medium text-gray-500">
+                          <span>탄 {dietAnalysis.carbs}g • 단 {dietAnalysis.protein}g • 지 {dietAnalysis.fat}g</span>
                         </div>
                         <div className="h-px w-full bg-blue-100/50 relative z-10"></div>
-                        <div className="flex items-start space-x-2.5 relative z-10 pt-1">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-[10px]">🤖</span>
+                        <div className="pt-1">
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-md mb-2 relative z-10">AI의 한 줄 조언</span>
+                          <div className="flex items-start space-x-2.5 relative z-10">
+                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <span className="text-[10px]">🤖</span>
+                            </div>
+                            <p className="text-sm text-gray-700 leading-relaxed font-medium">
+                              {dietAnalysis.message}
+                            </p>
                           </div>
-                          <p className="text-sm text-gray-700 leading-relaxed font-medium">
-                            {dietAnalysis.message}
-                          </p>
                         </div>
                       </div>
                     </motion.div>

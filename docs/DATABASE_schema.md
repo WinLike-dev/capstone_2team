@@ -23,6 +23,10 @@
 | **medical_history** | TEXT | NULLABLE | 기저질환 (JSON/String) |
 | **allergies** | TEXT | NULLABLE | 알러지 목록 (JSON/String) |
 | **user_instruction** | TEXT | NULLABLE | **AI용 개인 지시사항** |
+| **target_calories** | INTEGER | DEFAULT 2000 | 하루 목표 섭취 칼로리 |
+| **target_carbs** | INTEGER | DEFAULT 250 | 목표 탄수화물 (g) |
+| **target_protein** | INTEGER | DEFAULT 80 | 목표 단백질 (g) |
+| **target_fat** | INTEGER | DEFAULT 50 | 목표 지방 (g) |
 | **updated_at** | TIMESTAMP | DEFAULT NOW() | 정보 수정 시각 |
 
 ### 1.2 테이블: `user_exercise_plans` (운동 전용)

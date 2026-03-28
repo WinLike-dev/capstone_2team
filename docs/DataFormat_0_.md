@@ -17,12 +17,7 @@
   "goal": "string",             // 건강/운동 목표 (예: "체중 감량")
   "activity_level": "string",   // 평소 활동량 (예: "활동적")
   "medical_history": ["string"], // 기저질환 목록 (배열 형태)
-  "allergies": ["string"],       // 알러지 목록 (배열 형태)
-  "user_instruction": "string",  // 사용자 지시사항 및 특이사항 (설명글)
-  "target_calories": "number",   // 하루 목표 섭취 칼로리
-  "target_carbs": "number",      // 하루 목표 탄수화물 (g)
-  "target_protein": "number",    // 하루 목표 단백질 (g)
-  "target_fat": "number"         // 하루 목표 지방 (g)
+  "allergies": ["string"]       // 알러지 목록 (배열 형태)
 }
 ```
 
@@ -50,10 +45,6 @@
 | **medical_history** | TEXT | NULLABLE | 기저질환 정보 (목록) |
 | **allergies** | TEXT | NULLABLE | 알러지 정보 (목록) |
 | **user_instruction** | TEXT | NULLABLE | **사용자 지시사항 (문자열)** |
-| **target_calories** | INTEGER | DEFAULT 2000 | 하루 목표 섭취 칼로리 |
-| **target_carbs** | INTEGER | DEFAULT 250 | 목표 탄수화물 (g) |
-| **target_protein** | INTEGER | DEFAULT 80 | 목표 단백질 (g) |
-| **target_fat** | INTEGER | DEFAULT 50 | 목표 지방 (g) |
 | **updated_at** | TIMESTAMP | DEFAULT NOW() | 최신 수정 시각 |
 
 ---
