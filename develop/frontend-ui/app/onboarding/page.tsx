@@ -49,8 +49,10 @@ export default function OnboardingPage() {
 
       const genderStr = formData.gender === '남성' ? 'male' : 'female';
 
+      const storedUserId = localStorage.getItem('user_id');
+
       const payload = {
-        user_id: formData.name, // 로그인 구현 전이라 이름을 id로 임시 사용
+        user_id: storedUserId || formData.name, // 로그인 구현 전이라 이름을 id로 임시 사용
         mbti: formData.mbti,
         gender: genderStr,
         age: parseInt(formData.age, 10),
@@ -61,7 +63,6 @@ export default function OnboardingPage() {
         activity_level: formData.activityLevel,
         medical_history: formData.conditions,
         allergies: formData.allergies,
-        user_instruction: formData.otherAllergy ? `기타 알레르기: ${formData.otherAllergy}` : ''
       };
 
       const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
