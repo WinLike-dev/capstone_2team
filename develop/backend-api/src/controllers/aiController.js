@@ -67,7 +67,6 @@ exports.processMeal = async (req, res) => {
         medical_history: profile.medical_history,
         allergies: profile.allergies
       } : {},
-      user_instruction: profile?.user_instruction || '',
       user_message
     };
 
@@ -114,8 +113,7 @@ exports.recommend = async (req, res) => {
         bmi: profile.bmi,
         goal: profile.goal,
         activity_level: profile.activity_level
-      } : {},
-      user_instruction: profile?.user_instruction || ''
+      } : {}
     };
 
     try {
