@@ -34,7 +34,6 @@ exports.sendMessage = async (req, res) => {
                 bmi: profile.bmi,
                 goal: profile.goal
             } : {},
-            user_instruction: profile?.user_instruction || '',
             user_message: message
         };
 
@@ -52,17 +51,6 @@ exports.sendMessage = async (req, res) => {
                     message: '현재 AI 서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.'
                 }
             };
-        }
-
-        // 3. 모드 6 (DB 수정) 처리 — AI가 user_health_profiles 필드 수정을 요청한 경우
-        if (aiResponseData?.mode === 6 && aiResponseData?.data?.db_update) {
-            const { field, new_value } = aiResponseData.data.db_update;
-            const { error: updateErr } = await supabase
-                .from('user_health_profiles')
-                .update({ [field]: new_value })
-                .eq('user_id', user_id);
-
-            if (updateErr) console.error('DB 수정 실패:', updateErr.message);
         }
 
         // 4. 프론트엔드로 응답 반환

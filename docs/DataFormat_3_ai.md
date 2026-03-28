@@ -44,7 +44,6 @@
     "target_protein": "number",
     "target_fat": "number"
   },
-  "user_instruction": "string", // 사용자 DB 내의 지시사항
   "user_message": "string"      // 사용자가 입력한 채팅 메시지
 }
 ```
