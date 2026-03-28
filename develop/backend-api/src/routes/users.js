@@ -10,10 +10,10 @@ router.get('/profile', userController.getProfile);
 router.post('/profile', userController.saveProfile);
 router.put('/targets', userController.updateTargets);
 
-// 2. 운동 플랜 (user_exercise_plans)
+// 2. 운동 플랜 (user_exercise_plans, exercise_items)
 router.get('/exercises', userController.getExercises);
 router.post('/exercises', userController.addExercise);
-router.put('/exercises/:id', userController.updateExercise);
+router.put('/exercises/items/:item_id', userController.updateExerciseItem);
 router.delete('/exercises/:id', userController.deleteExercise);
 
 // 3. 식단 플랜 (user_meal_plans)

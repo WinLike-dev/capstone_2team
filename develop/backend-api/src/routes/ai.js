@@ -13,4 +13,7 @@ router.post('/meal-record', aiController.processMeal);
 // 운동/식단 추천 요청 (DataFormat_2_ai_api)
 router.post('/recommend', aiController.recommend);
 
+// 사용자 지시사항 AI 서버로 전달 (DataFormat_2_ai_api)
+router.post('/instruction', aiController.saveInstruction);
+
 module.exports = router;

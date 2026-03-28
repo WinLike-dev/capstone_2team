@@ -135,3 +135,38 @@ exports.recommend = async (req, res) => {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
+
+// @route   POST /api/v1/ai/instruction
+// @desc    사용자 지시사항(User Instruction) 데이터 AI 서버로 전달
+// @access  Public (프로토타입)
+exports.saveInstruction = async (req, res) => {
+  try {
+    const { user_id, user_instruction } = req.body;
+    
+    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+    if (!user_instruction) return res.status(400).json({ error: '지시사항(user_instruction)을 입력해주세요.' });
+
+    const payload = {
+      user_id,
+      user_instruction
+    };
+
+    try {
+      // AI 서버의 지정 엔드포인트(예: /user-instruction)로 전송
+      const response = await axios.post(`${FASTAPI_URL}/user-instruction`, payload, { timeout: AI_TIMEOUT });
+      
+      // AI 서버 측 응답을 클라이언트에게 그대로 전달
+      return res.json(response.data);
+    } catch (aiError) {
+      console.error('AI 서버 지시사항(instruction) 전달 실패:', aiError.message);
+      return res.status(502).json({
+        error: 'AI 서버로 지시사항을 전송하는데 실패했습니다.',
+        details: aiError.message
+      });
+    }
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
