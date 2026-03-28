@@ -64,11 +64,21 @@ export default function OnboardingPage() {
         user_instruction: formData.otherAllergy ? `기타 알레르기: ${formData.otherAllergy}` : ''
       };
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
-      const response = await fetch(`${API_URL}/users/profile`, {
+      const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+      if (!rawApiUrl) {
+        console.error('API 주소가 설정되지 않았습니다');
+      }
+
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      const endpoint = baseUrl.endsWith('/api/v1') 
+        ? `${baseUrl}/users/profile` 
+        : `${baseUrl}/api/v1/users/profile`;
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
         body: JSON.stringify(payload),
       });
@@ -77,6 +87,7 @@ export default function OnboardingPage() {
         throw new Error('API 연동 실패');
       }
 
+      alert('등록이 완료되었습니다.');
       localStorage.setItem('healthAppUser', JSON.stringify(formData));
       router.push('/');
     } catch (error) {
