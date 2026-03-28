@@ -8,6 +8,7 @@ const userController = require('../controllers/userController');
 // 1. 건강 프로필 (user_health_profiles)
 router.get('/profile', userController.getProfile);
 router.post('/profile', userController.saveProfile);
+router.put('/targets', userController.updateTargets);
 
 // 2. 운동 플랜 (user_exercise_plans)
 router.get('/exercises', userController.getExercises);

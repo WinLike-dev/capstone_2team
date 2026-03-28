@@ -1,4 +1,5 @@
 const supabase = require('../config/db');
+const calculator = require('../utils/calculator');
 
 // @route   GET /api/v1/users/profile
 // @desc    건강 프로필 조회
@@ -21,16 +22,31 @@ exports.getProfile = async (req, res) => {
 };
 
 // @route   POST /api/v1/users/profile
-// @desc    건강 프로필 생성 및 수정 (Upsert)
+// @desc    건강 프로필 생성 및 수정 (Upsert) - 목표 칼로리/단탄지 자동계산 포함
 // @access  Public (프로토타입)
 exports.saveProfile = async (req, res) => {
   try {
-    const { user_id, mbti, gender, age, height, weight, bmi, goal, activity_level, medical_history, allergies, user_instruction } = req.body;
+    // 문진표 정보만 받음 (target_*는 백엔드에서만 계산함)
+    const { 
+      user_id, mbti, gender, age, height, weight, bmi, 
+      goal, activity_level, medical_history, allergies
+    } = req.body;
+    
     if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+
+    let targets = {};
+
+    // 백엔드에서 전적으로 자동 계산
+    if (gender && age && height && weight) {
+      const calculated = calculator.calculateTargets(gender, age, height, weight, activity_level, goal);
+      if (calculated) {
+        targets = calculated;
+      }
+    }
 
     const profileData = {
       user_id, mbti, gender, age, height, weight, bmi,
-      goal, activity_level, medical_history, allergies, user_instruction
+      goal, activity_level, medical_history, allergies, ...targets
     };
 
     const { data: profile, error } = await supabase
@@ -41,6 +57,29 @@ exports.saveProfile = async (req, res) => {
 
     if (error) throw error;
     res.json({ message: '프로필 저장 성공', profile });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
+
+// @route   PUT /api/v1/users/targets
+// @desc    목표 섭취 칼로리 / 단탄지 수동 저장 (버튼 클릭 시)
+// @access  Public (프로토타입)
+exports.updateTargets = async (req, res) => {
+  try {
+    const { user_id, target_calories, target_carbs, target_protein, target_fat } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+
+    const { data: profile, error } = await supabase
+      .from('user_health_profiles')
+      .update({ target_calories, target_carbs, target_protein, target_fat })
+      .eq('user_id', user_id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ message: '목표 수정 성공', profile });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });

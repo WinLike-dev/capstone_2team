@@ -22,7 +22,10 @@
 | **activity_level** | VARCHAR(50) | NULLABLE | 평소 활동량 |
 | **medical_history** | TEXT | NULLABLE | 기저질환 (JSON/String) |
 | **allergies** | TEXT | NULLABLE | 알러지 목록 (JSON/String) |
-| **user_instruction** | TEXT | NULLABLE | **AI용 개인 지시사항** |
+| **target_calories** | INTEGER | NULLABLE | 목표 섭취 칼로리 (kcal) |
+| **target_carbs** | INTEGER | NULLABLE | 목표 탄수화물 (g) |
+| **target_protein**| INTEGER | NULLABLE | 목표 단백질 (g) |
+| **target_fat** | INTEGER | NULLABLE | 목표 지방 (g) |
 | **updated_at** | TIMESTAMP | DEFAULT NOW() | 정보 수정 시각 |
 
 ### 1.2 테이블: `user_exercise_plans` (운동 전용)
@@ -77,7 +80,10 @@ erDiagram
     
     user_health_profiles {
         string user_id PK
-        string user_instruction
+        integer target_calories
+        integer target_carbs
+        integer target_protein
+        integer target_fat
     }
     
     user_exercise_plans {
