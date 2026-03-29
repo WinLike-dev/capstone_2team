@@ -16,4 +16,7 @@ router.post('/recommend', aiController.recommend);
 // 사용자 지시사항 AI 서버로 전달 (DataFormat_2_ai_api)
 router.post('/instruction', aiController.saveInstruction);
 
+// 메인 홈 하트(추천) 클릭 시 기존 스케줄 연동 AI 재설계
+router.post('/heart-recommend', aiController.heartRecommend);
+
 module.exports = router;

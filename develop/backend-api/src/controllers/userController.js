@@ -27,11 +27,11 @@ exports.getProfile = async (req, res) => {
 exports.saveProfile = async (req, res) => {
   try {
     // 문진표 정보만 받음 (target_*는 백엔드에서만 계산함)
-    const { 
-      user_id, mbti, gender, age, height, weight, bmi, 
+    const {
+      user_id, mbti, gender, age, height, weight, bmi,
       goal, activity_level, medical_history, allergies
     } = req.body;
-    
+
     if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
 
     let targets = {};
@@ -168,7 +168,7 @@ exports.getExercises = async (req, res) => {
 exports.addExercise = async (req, res) => {
   try {
     const { user_id, exercise_type, target_date, total_calories, items } = req.body;
-    
+
     if (!user_id || !exercise_type) {
       return res.status(400).json({ error: 'user_id, exercise_type을 입력해주세요.' });
     }
@@ -256,10 +256,10 @@ exports.updateExerciseItem = async (req, res) => {
 
     if (parentErr) throw parentErr;
 
-    res.json({ 
-      message: '항목 상태 업데이트 성공', 
-      item: updatedItem, 
-      parent_status: newStatus 
+    res.json({
+      message: '항목 상태 업데이트 성공',
+      item: updatedItem,
+      parent_status: newStatus
     });
   } catch (err) {
     console.error(err);
@@ -339,6 +339,29 @@ exports.addMeal = async (req, res) => {
   }
 };
 
+// @route   PUT /api/v1/users/meals/:id
+// @desc    식단 플랜 완료 상태(is_completed) 변경
+// @access  Public (프로토타입)
+exports.updateMealStatus = async (req, res) => {
+  try {
+    const mealId = parseInt(req.params.id);
+    const { is_completed } = req.body;
+
+    const { data: updatedMeal, error } = await supabase
+      .from('user_meal_plans')
+      .update({ is_completed })
+      .eq('meal_id', mealId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ message: '식단 완료 상태 업데이트 성공', meal: updatedMeal });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
+
 // @route   DELETE /api/v1/users/meals/:id
 // @desc    식단 플랜 삭제
 // @access  Public (프로토타입)
@@ -358,71 +381,123 @@ exports.deleteMeal = async (req, res) => {
   }
 };
 
-// @route   POST /api/v1/users/confirm-recommendation
-// @desc    추천 항목 확정 (좋아요) → 캘린더에 등록 (DataFormat_2)
+// @route   PUT /api/v1/users/exercises/sync
+// @desc    수락된 AI 재설계 운동 플랜을 덮어쓰기 (DataFormat_2 & 3 대체)
 // @access  Public (프로토타입)
-exports.confirmRecommendation = async (req, res) => {
+exports.syncExercises = async (req, res) => {
   try {
-    const { user_id, item_type, item_details } = req.body;
-
-    if (!user_id || !item_type || !item_details) {
-      return res.status(400).json({ error: 'user_id, item_type, item_details가 필요합니다.' });
+    const { user_id, target_date, modified_plans } = req.body;
+    if (!user_id || !target_date || !modified_plans) {
+      return res.status(400).json({ error: '필수 파라미터(user_id, target_date, modified_plans)가 누락되었습니다.' });
     }
 
-    const { name, calories, date, time_slot } = item_details;
+    // ----------------------------------------------------
+    // 기존 applyExerciseModifications 로직 활용
+    // ----------------------------------------------------
+    for (const plan of modified_plans) {
+      if (plan.exercise_id) {
+        // 부모 업데이트
+        await supabase
+          .from('user_exercise_plans')
+          .update({
+            exercise_type: plan.exercise_type,
+            total_calories: plan.total_calories
+          })
+          .eq('exercise_id', plan.exercise_id);
 
-    if (!name || calories == null || !date) {
-      return res.status(400).json({ error: 'item_details에 name, calories, date가 필요합니다.' });
-    }
+        // 자식 항목 처리
+        if (plan.items) {
+          for (const item of plan.items) {
+            if (item.is_new) {
+              await supabase
+                .from('exercise_items')
+                .insert({
+                  exercise_id: plan.exercise_id,
+                  exercise_name: item.exercise_name,
+                  calories: item.calories || 0,
+                  is_completed: false
+                });
+            } else if (item.item_id) {
+              await supabase
+                .from('exercise_items')
+                .update({
+                  exercise_name: item.exercise_name,
+                  calories: item.calories
+                })
+                .eq('item_id', item.item_id);
+            }
+          }
+        }
+      } else {
+        // 새 플랜 생성
+        const { data: newPlan } = await supabase
+          .from('user_exercise_plans')
+          .insert({
+            user_id: user_id,
+            exercise_type: plan.exercise_type,
+            total_calories: plan.total_calories || 0,
+            status: 0,
+            target_date: target_date
+          })
+          .select()
+          .single();
 
-    let entry = null;
+        if (newPlan && plan.items) {
+          const itemsToInsert = plan.items.map(item => ({
+            exercise_id: newPlan.exercise_id,
+            exercise_name: item.exercise_name,
+            calories: item.calories || 0,
+            is_completed: false
+          }));
 
-    if (item_type === 'exercise') {
-      // 운동 추천 확정 → user_exercise_plans에 저장
-      const { data, error } = await supabase
-        .from('user_exercise_plans')
-        .insert({
-          user_id,
-          exercise_name: name,
-          burn_calories: calories,
-          target_date: date
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      entry = data;
-
-    } else if (item_type === 'meal') {
-      // 식단 추천 확정 → user_meal_plans에 저장
-      const { data, error } = await supabase
-        .from('user_meal_plans')
-        .insert({
-          user_id,
-          food_name: name,
-          meal_type: time_slot || '기타',
-          calories,
-          target_date: date
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      entry = data;
-
-    } else {
-      return res.status(400).json({ error: 'item_type은 "exercise" 또는 "meal"이어야 합니다.' });
-    }
-
-    // DataFormat_2 응답 규격
-    res.status(201).json({
-      status: 'success',
-      message: '성공적으로 저장되었습니다.',
-      data: {
-        entry_id: String(entry.exercise_id || entry.meal_id)
+          await supabase
+            .from('exercise_items')
+            .insert(itemsToInsert);
+        }
       }
-    });
+    }
 
+    res.json({ message: '운동 플랜 동기화(수락) 성공' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
+
+// @route   PUT /api/v1/users/meals/sync
+// @desc    수락된 AI 재설계 식단 플랜을 덮어쓰기
+// @access  Public (프로토타입)
+exports.syncMeals = async (req, res) => {
+  try {
+    const { user_id, target_date, modified_meals } = req.body;
+    if (!user_id || !target_date || !modified_meals) {
+      return res.status(400).json({ error: '필수 파라미터(user_id, target_date, modified_meals)가 누락되었습니다.' });
+    }
+
+    for (const meal of modified_meals) {
+      if (meal.is_new) {
+        await supabase
+          .from('user_meal_plans')
+          .insert({
+            user_id: user_id,
+            food_name: meal.food_name,
+            meal_type: meal.meal_type || '기타',
+            calories: meal.calories,
+            target_date: target_date
+          });
+      } else if (meal.meal_id) {
+        await supabase
+          .from('user_meal_plans')
+          .update({
+            food_name: meal.food_name,
+            meal_type: meal.meal_type,
+            calories: meal.calories
+          })
+          .eq('meal_id', meal.meal_id);
+      }
+    }
+
+    res.json({ message: '식단 플랜 동기화(수락) 성공' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });

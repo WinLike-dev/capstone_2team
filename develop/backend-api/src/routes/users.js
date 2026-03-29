@@ -20,9 +20,11 @@ router.delete('/exercises/:id', userController.deleteExercise);
 // 3. 식단 플랜 (user_meal_plans)
 router.get('/meals', userController.getMeals);
 router.post('/meals', userController.addMeal);
+router.put('/meals/:id', userController.updateMealStatus);
 router.delete('/meals/:id', userController.deleteMeal);
 
-// 4. 추천 항목 확정 (DataFormat_2)
-router.post('/confirm-recommendation', userController.confirmRecommendation);
+// 4. AI 추천 동기화 (수락 시 DB 덮어쓰기)
+router.put('/exercises/sync', userController.syncExercises);
+router.put('/meals/sync', userController.syncMeals);
 
 module.exports = router;

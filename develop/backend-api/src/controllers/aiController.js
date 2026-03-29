@@ -170,3 +170,74 @@ exports.saveInstruction = async (req, res) => {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
+
+// @route   POST /api/v1/ai/heart-recommend
+// @desc    홈 추천 항목 하트 클릭 시 기존 스케줄과 결합된 AI 재설계 요청 (DataFormat_2_ai_api 확장)
+// @access  Public (프로토타입)
+exports.heartRecommend = async (req, res) => {
+  try {
+    const { user_id, item_type, recommended_item_name } = req.body;
+    
+    if (!user_id || !item_type || !recommended_item_name) {
+      return res.status(400).json({ error: 'user_id, item_type, recommended_item_name이 모두 필요합니다.' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // 1. 기존 유저 정보 및 플랜 조회 (채팅 컨트롤러 로직과 유사)
+    const { data: profile } = await supabase
+      .from('user_health_profiles')
+      .select('*')
+      .eq('user_id', user_id)
+      .single();
+
+    const { data: exercises } = await supabase
+      .from('user_exercise_plans')
+      .select('*, exercise_items(*)')
+      .eq('user_id', user_id)
+      .eq('target_date', today);
+
+    const { data: meals } = await supabase
+      .from('user_meal_plans')
+      .select('*')
+      .eq('user_id', user_id)
+      .eq('target_date', today);
+
+    // 2. AI 서버로 전달할 통합 페이로드
+    const payload = {
+      user_id,
+      user_profile: profile ? {
+        gender: profile.gender,
+        age: profile.age,
+        bmi: profile.bmi,
+        goal: profile.goal,
+        activity_level: profile.activity_level
+      } : {},
+      current_exercises: exercises || [],
+      current_meals: meals || [],
+      request_context: {
+        action: "heart_recommendation_clicked",
+        item_type: item_type,
+        recommended_item_name: recommended_item_name
+      }
+    };
+
+    try {
+      // AI 서버의 지정 엔드포인트(/heart-recommend)로 전송
+      const response = await axios.post(`${FASTAPI_URL}/heart-recommend`, payload, { timeout: AI_TIMEOUT });
+      
+      // AI 서버 측이 재구성한 플랜 배열을 반환 (프론트는 수락 여부를 물어봄)
+      return res.json(response.data);
+    } catch (aiError) {
+      console.error('AI 서버 하트 추천 전달 실패:', aiError.message);
+      return res.status(502).json({
+        error: 'AI 서버로 추천 연동을 요청하는데 실패했습니다.',
+        details: aiError.message
+      });
+    }
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '백엔드 서버 에러가 발생했습니다.' });
+  }
+};
