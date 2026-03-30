@@ -28,13 +28,20 @@ exports.saveProfile = async (req, res) => {
   try {
     // 문진표 정보만 받음 (target_*는 백엔드에서만 계산함)
     const {
-      user_id, mbti, gender, age, height, weight, bmi,
+      user_id, mbti, gender, age, height, weight,
       goal, activity_level, medical_history, allergies
     } = req.body;
 
     if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
 
     let targets = {};
+    let calculatedBmi = null;
+
+    // BMI 자동 계산
+    if (height && weight) {
+      const heightInMeters = height / 100;
+      calculatedBmi = parseFloat((weight / (heightInMeters * heightInMeters)).toFixed(1));
+    }
 
     // 백엔드에서 전적으로 자동 계산
     if (gender && age && height && weight) {
@@ -45,7 +52,7 @@ exports.saveProfile = async (req, res) => {
     }
 
     const profileData = {
-      user_id, mbti, gender, age, height, weight, bmi,
+      user_id, mbti, gender, age, height, weight, bmi: calculatedBmi,
       goal, activity_level, medical_history, allergies, ...targets
     };
 
@@ -83,7 +90,15 @@ exports.updateProfile = async (req, res) => {
     // 2. 수정값과 기존 데이터 병합
     const mergedProfile = { ...existingProfile, ...updateFields };
 
-    // 3. 재계산 로직 수행
+    // 3. 재계산 로직 수행 (BMI 및 목표 칼로리/단탄지)
+    
+    // BMI 재계산
+    let calculatedBmi = mergedProfile.bmi;
+    if (mergedProfile.height && mergedProfile.weight) {
+      const heightInMeters = mergedProfile.height / 100;
+      calculatedBmi = parseFloat((mergedProfile.weight / (heightInMeters * heightInMeters)).toFixed(1));
+    }
+
     let targets = {};
     if (mergedProfile.gender && mergedProfile.age && mergedProfile.height && mergedProfile.weight) {
       const calculated = calculator.calculateTargets(
@@ -97,8 +112,8 @@ exports.updateProfile = async (req, res) => {
       if (calculated) targets = calculated;
     }
 
-    // 4. 목표(target_*) 데이터까지 합쳐서 최종 업데이트
-    const finalData = { ...updateFields, ...targets };
+    // 4. 재계산(BMI, 타겟) 데이터를 합쳐서 최종 업데이트
+    const finalData = { ...updateFields, bmi: calculatedBmi, ...targets };
 
     const { data: updatedProfile, error: updateErr } = await supabase
       .from('user_health_profiles')
