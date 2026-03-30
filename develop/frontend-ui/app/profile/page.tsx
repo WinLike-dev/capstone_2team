@@ -6,14 +6,31 @@ import { useRouter } from 'next/navigation';
 import { User, Edit3, Target, Bell, LogOut, ChevronRight, CheckCircle2, HeadphonesIcon, Info, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+interface UserProfile {
+  user_id?: string;
+  email?: string;
+  name?: string;
+  age?: string | number;
+  gender?: string;
+  height?: string | number;
+  weight?: string | number;
+  goal?: string;
+  activityLevel?: string;
+  mbti?: string;
+  conditions?: string[];
+  allergies?: string[];
+  otherAllergy?: string;
+  user_instruction?: string;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserProfile | null>(null);
   
   // Modals state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState<any>({});
+  const [editForm, setEditForm] = useState<Partial<UserProfile>>({});
   const [editGoal, setEditGoal] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -55,7 +72,7 @@ export default function ProfilePage() {
     return Number((weight / (heightInMeters * heightInMeters)).toFixed(1));
   };
 
-  const saveProfileToAPI = async (data: any) => {
+  const saveProfileToAPI = async (data: Partial<UserProfile>) => {
     setIsSaving(true);
     try {
       const payload = {
@@ -102,14 +119,14 @@ export default function ProfilePage() {
   const allergyOptions = ['유제품', '견과류', '갑각류', '밀', '대두', '달걀', '해당 없음'];
 
   const handleCheckboxChange = (condition: string) => {
-    setEditForm((prev: any) => {
-      let newConditions = [...(prev.conditions || [])];
+    setEditForm((prev: Partial<UserProfile>) => {
+      let newConditions: string[] = [...(prev.conditions || [])];
       if (condition === '없음') {
         newConditions = newConditions.includes('없음') ? [] : ['없음'];
       } else {
-        newConditions = newConditions.filter(c => c !== '없음');
+        newConditions = newConditions.filter((c: string) => c !== '없음');
         if (newConditions.includes(condition)) {
-          newConditions = newConditions.filter(c => c !== condition);
+          newConditions = newConditions.filter((c: string) => c !== condition);
         } else {
           newConditions.push(condition);
         }
@@ -119,15 +136,15 @@ export default function ProfilePage() {
   };
 
   const handleAllergyChange = (allergy: string) => {
-    setEditForm((prev: any) => {
-      let newAllergies = [...(prev.allergies || [])];
+    setEditForm((prev: Partial<UserProfile>) => {
+      let newAllergies: string[] = [...(prev.allergies || [])];
       if (allergy === '해당 없음') {
         newAllergies = newAllergies.includes('해당 없음') ? [] : ['해당 없음'];
         return { ...prev, allergies: newAllergies, otherAllergy: '' };
       } else {
-        newAllergies = newAllergies.filter(a => a !== '해당 없음');
+        newAllergies = newAllergies.filter((a: string) => a !== '해당 없음');
         if (newAllergies.includes(allergy)) {
-          newAllergies = newAllergies.filter(a => a !== allergy);
+          newAllergies = newAllergies.filter((a: string) => a !== allergy);
         } else {
           newAllergies.push(allergy);
         }
@@ -189,11 +206,11 @@ export default function ProfilePage() {
               </div>
               <div className="inline-flex items-center bg-orange-50 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full border border-orange-100 shadow-sm mt-1 md:mt-0">
                 <span className="text-[10px] md:text-[11px] font-bold text-orange-600 tracking-wide whitespace-normal">
-                  알레르기: {userData ? (
+                  알레르기: {userData && userData.allergies ? (
                     userData.allergies.includes('해당 없음') || (userData.allergies.length === 0 && !userData.otherAllergy)
                       ? '없음'
                       : [
-                          ...userData.allergies.filter(a => a !== '기타(직접 입력)' && a !== '해당 없음'),
+                          ...userData.allergies.filter((a: string) => a !== '기타(직접 입력)' && a !== '해당 없음'),
                           ...(userData.allergies.includes('기타(직접 입력)') && userData.otherAllergy ? [userData.otherAllergy] : [])
                         ].join(', ')
                   ) : '없음'}
