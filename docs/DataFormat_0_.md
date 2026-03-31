@@ -14,8 +14,8 @@
   "height": "number",           // 키 (cm) - BMI 계산 참고용
   "weight": "number",           // 몸무게 (kg) - BMI 계산 참고용
   "bmi": "number",              // [중요] 비만수치 (Front에서 직접 계산하여 전달)
-  "goal": "string",             // 건강/운동 목표 (예: "체중 감량")
-  "activity_level": "string",   // 평소 활동량 (예: "활동적")
+  "goal": "string",             // 건강/운동 목표 (예: "다이어트", "근력 향상", "건강 유지")
+  "activity_level": "string",   // 평소 활동량 (예: "거의 없음", "가벼운 활동", "보통", "격렬한 활동")
   "medical_history": ["string"], // 기저질환 목록 (배열 형태)
   "allergies": ["string"]       // 알러지 목록 (배열 형태)
 }
