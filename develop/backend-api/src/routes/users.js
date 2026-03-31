@@ -11,6 +11,9 @@ router.post('/profile', userController.saveProfile);
 router.put('/profile', userController.updateProfile);
 router.put('/targets', userController.updateTargets);
 
+// 1-1. 캘린더 통합 조회 (user_exercise_plans, user_meal_plans)
+router.get('/calendar', userController.getCalendar);
+
 // 2. 운동 플랜 (user_exercise_plans, exercise_items)
 router.get('/exercises', userController.getExercises);
 router.post('/exercises', userController.addExercise);
@@ -23,8 +26,8 @@ router.post('/meals', userController.addMeal);
 router.put('/meals/:id', userController.updateMealStatus);
 router.delete('/meals/:id', userController.deleteMeal);
 
-// 4. AI 추천 동기화 (수락 시 DB 덮어쓰기)
-router.put('/exercises/sync', userController.syncExercises);
-router.put('/meals/sync', userController.syncMeals);
+// 4. 홈 추천 다이렉트 추가 및 교체
+router.post('/exercises/recommend-add', userController.addRecommendedExercise);
+router.put('/meals/recommend-replace', userController.replaceRecommendedMeal);
 
 module.exports = router;
