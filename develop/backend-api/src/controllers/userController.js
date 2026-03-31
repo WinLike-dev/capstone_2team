@@ -153,79 +153,6 @@ exports.updateTargets = async (req, res) => {
   }
 };
 
-// @route   GET /api/v1/users/exercises
-// @desc    특정 날짜의 운동 플랜 조회
-// @access  Public (프로토타입)
-exports.getExercises = async (req, res) => {
-  try {
-    const userId = req.query.user_id;
-    if (!userId) return res.status(400).json({ error: 'user_id가 필요합니다.' });
-
-    const targetDate = req.query.date || new Date().toISOString().split('T')[0];
-
-    const { data: exercises, error } = await supabase
-      .from('user_exercise_plans')
-      .select('*, exercise_items(*)')
-      .eq('user_id', userId)
-      .eq('target_date', targetDate)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-    res.json(exercises || []);
-  } catch (err) {
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
-
-// @route   POST /api/v1/users/exercises
-// @desc    운동 플랜 (세션 생성 및 아이템 생성)
-// @access  Public (프로토타입)
-exports.addExercise = async (req, res) => {
-  try {
-    const { user_id, exercise_type, target_date, total_calories, items } = req.body;
-
-    if (!user_id || !exercise_type) {
-      return res.status(400).json({ error: 'user_id, exercise_type을 입력해주세요.' });
-    }
-
-    // 1. 부모 (user_exercise_plans) 세션 생성
-    const { data: parent, error: parentErr } = await supabase
-      .from('user_exercise_plans')
-      .insert({
-        user_id,
-        exercise_type,
-        total_calories: total_calories || 0,
-        status: 0, // 기본값: 실패/미완
-        target_date: target_date || new Date().toISOString().split('T')[0]
-      })
-      .select()
-      .single();
-
-    if (parentErr) throw parentErr;
-
-    // 2. 자식 (exercise_items) 여러 개 생성
-    if (items && Array.isArray(items) && items.length > 0) {
-      const itemsToInsert = items.map(i => ({
-        exercise_id: parent.exercise_id,
-        exercise_name: i.name,
-        calories: i.calories || 0,
-        is_completed: false
-      }));
-
-      const { error: itemsErr } = await supabase
-        .from('exercise_items')
-        .insert(itemsToInsert);
-
-      if (itemsErr) throw itemsErr;
-    }
-
-    res.status(201).json({ message: '운동 계획 생성 완료', exercise_id: parent.exercise_id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
-
 // @route   PUT /api/v1/users/exercises/items/:item_id
 // @desc    개별 운동 항목 완료(체크) 토글 및 부모 상태(0,1,2) 자동 계산
 // @access  Public (프로토타입)
@@ -282,78 +209,6 @@ exports.updateExerciseItem = async (req, res) => {
   }
 };
 
-// @route   DELETE /api/v1/users/exercises/:id
-// @desc    운동 플랜 삭제
-// @access  Public (프로토타입)
-exports.deleteExercise = async (req, res) => {
-  try {
-    const exerciseId = parseInt(req.params.id);
-
-    const { error } = await supabase
-      .from('user_exercise_plans')
-      .delete()
-      .eq('exercise_id', exerciseId);
-
-    if (error) throw error;
-    res.json({ message: '삭제 완료' });
-  } catch (err) {
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
-
-// @route   GET /api/v1/users/meals
-// @desc    특정 날짜의 식단 플랜 조회
-// @access  Public (프로토타입)
-exports.getMeals = async (req, res) => {
-  try {
-    const userId = req.query.user_id;
-    if (!userId) return res.status(400).json({ error: 'user_id가 필요합니다.' });
-
-    const targetDate = req.query.date || new Date().toISOString().split('T')[0];
-
-    const { data: meals, error } = await supabase
-      .from('user_meal_plans')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('target_date', targetDate)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-    res.json(meals || []);
-  } catch (err) {
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
-
-// @route   POST /api/v1/users/meals
-// @desc    식단 플랜 추가 (추천 확정)
-// @access  Public (프로토타입)
-exports.addMeal = async (req, res) => {
-  try {
-    const { user_id, food_name, meal_type, calories, target_date } = req.body;
-    if (!user_id || !food_name || !meal_type || calories == null) {
-      return res.status(400).json({ error: 'user_id, 음식 이름, 식사 타입, 칼로리를 입력해주세요.' });
-    }
-
-    const { data: meal, error } = await supabase
-      .from('user_meal_plans')
-      .insert({
-        user_id,
-        food_name,
-        meal_type,
-        calories,
-        target_date: target_date || new Date().toISOString().split('T')[0]
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.status(201).json(meal);
-  } catch (err) {
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
-
 // @route   PUT /api/v1/users/meals/:id
 // @desc    식단 플랜 완료 상태(is_completed) 변경
 // @access  Public (프로토타입)
@@ -373,25 +228,6 @@ exports.updateMealStatus = async (req, res) => {
     res.json({ message: '식단 완료 상태 업데이트 성공', meal: updatedMeal });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
-
-// @route   DELETE /api/v1/users/meals/:id
-// @desc    식단 플랜 삭제
-// @access  Public (프로토타입)
-exports.deleteMeal = async (req, res) => {
-  try {
-    const mealId = parseInt(req.params.id);
-
-    const { error } = await supabase
-      .from('user_meal_plans')
-      .delete()
-      .eq('meal_id', mealId);
-
-    if (error) throw error;
-    res.json({ message: '삭제 완료' });
-  } catch (err) {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };

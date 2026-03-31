@@ -15,16 +15,10 @@ router.put('/targets', userController.updateTargets);
 router.get('/calendar', userController.getCalendar);
 
 // 2. 운동 플랜 (user_exercise_plans, exercise_items)
-router.get('/exercises', userController.getExercises);
-router.post('/exercises', userController.addExercise);
 router.put('/exercises/items/:item_id', userController.updateExerciseItem);
-router.delete('/exercises/:id', userController.deleteExercise);
 
 // 3. 식단 플랜 (user_meal_plans)
-router.get('/meals', userController.getMeals);
-router.post('/meals', userController.addMeal);
 router.put('/meals/:id', userController.updateMealStatus);
-router.delete('/meals/:id', userController.deleteMeal);
 
 // 4. 홈 추천 다이렉트 추가 및 교체
 router.post('/exercises/recommend-add', userController.addRecommendedExercise);
