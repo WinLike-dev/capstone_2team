@@ -4,14 +4,15 @@
 import { Info, Clock, Flame, ChevronRight, Apple, Calendar as CalendarIcon, ChevronLeft, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePlan, DailyPlan } from '../context/PlanContext';
 
 const getFoodEmoji = (name: string) => {
   if (name.includes('샐러드') || name.includes('야채')) return '🥗';
   if (name.includes('스테이크') || name.includes('고기') || name.includes('장조림')) return '🍖';
   if (name.includes('쉐이크') || name.includes('우유')) return '🥛';
-  if (name.includes('밥') || name.includes('국') || name.includes('찌개')) return '🍚';
+  if (name.includes('밥') || name.includes('국') || name.includes('찌개') || name.includes('된장')) return '🍚';
   if (name.includes('파스타') || name.includes('면') || name.includes('소바') || name.includes('우동')) return '🍝';
-  if (name.includes('샌드위치') || name.includes('빵')) return '🥪';
+  if (name.includes('샌드위치') || name.includes('빵') || name.includes('오트밀')) return '🥪';
   if (name.includes('계란') || name.includes('에그') || name.includes('낫토')) return '🍳';
   if (name.includes('연어') || name.includes('초밥')) return '🍣';
   if (name.includes('요거트') || name.includes('보울')) return '🥣';
@@ -19,140 +20,56 @@ const getFoodEmoji = (name: string) => {
   return '🥗'; // 기본 음식 아이콘
 };
 
-const generateMockPlans = () => {
-  const plans = [];
-  const start = new Date('2026-03-01');
-  const end = new Date('2026-04-30');
-  
-  const workoutTemplates = [
-    [
-      { title: "모닝 조깅 & 워밍업", time: "20분", level: "초급", calories: "150 kcal", color: "from-sky-400 to-blue-500" },
-      { title: "전신 근력 데드리프트", time: "40분", level: "중급", calories: "350 kcal", color: "from-indigo-500 to-purple-600" },
-      { title: "수면 전 릴렉스 요가", time: "15분", level: "초급", calories: "50 kcal", color: "from-teal-400 to-emerald-500" }
-    ],
-    [
-      { title: "공복 실내 자전거", time: "30분", level: "초급", calories: "200 kcal", color: "from-blue-500 to-indigo-600" },
-      { title: "맨몸 코어 트레이닝", time: "20분", level: "중급", calories: "150 kcal", color: "from-orange-400 to-red-500" },
-      { title: "폼롤러 하체 스트레칭", time: "10분", level: "초급", calories: "40 kcal", color: "from-pink-400 to-rose-500" }
-    ],
-    [
-      { title: "경사로 걷기 (인클라인)", time: "40분", level: "초급", calories: "250 kcal", color: "from-sky-400 to-blue-500" },
-      { title: "상체 덤벨 웨이트", time: "35분", level: "중급", calories: "280 kcal", color: "from-indigo-500 to-purple-600" },
-      { title: "어깨/목 뭉침 해소 스트레칭", time: "15분", level: "초급", calories: "60 kcal", color: "from-green-400 to-emerald-500" }
-    ],
-    [
-      { title: "HIIT 인터벌 트레이닝", time: "20분", level: "상급", calories: "300 kcal", color: "from-red-500 to-orange-600" },
-      { title: "하체 중심 맨몸 스쿼트", time: "25분", level: "중급", calories: "200 kcal", color: "from-purple-500 to-indigo-600" },
-      { title: "정적인 전신 요가", time: "20분", level: "초급", calories: "80 kcal", color: "from-teal-400 to-emerald-500" }
-    ],
-  ];
-
-  const dietTemplates = [
-    {
-      breakfast: { name: "두부 된장국 & 소고기 장조림", desc: "속이 편안한 한식 아침", kcal: "350 kcal" },
-      lunch: { name: "닭가슴살 볶음밥", desc: "단백질 풍부한 든든한 점심", kcal: "450 kcal" },
-      dinner: { name: "소고기 무국", desc: "따뜻하고 담백한 저녁", kcal: "300 kcal" }
-    },
-    {
-      breakfast: { name: "통밀 샌드위치 & 우유", desc: "가벼운 서양식 조식", kcal: "320 kcal" },
-      lunch: { name: "연어 아보카도 포케 보울", desc: "건강한 지방 충전", kcal: "420 kcal" },
-      dinner: { name: "안심 스테이크 & 구운 야채", desc: "풍미 가득한 단백질", kcal: "500 kcal" }
-    },
-    {
-      breakfast: { name: "낫토 & 계란말이 밥", desc: "건강한 발효 한 끼", kcal: "380 kcal" },
-      lunch: { name: "메밀 소바 & 닭가슴살 토핑", desc: "깔끔하고 시원한 점심", kcal: "400 kcal" },
-      dinner: { name: "연어 초밥 & 미니 우동", desc: "부담 없는 저녁", kcal: "450 kcal" }
-    },
-    {
-      breakfast: { name: "그릭 요거트 & 그래놀라", desc: "가볍게 시작하는 하루", kcal: "250 kcal" },
-      lunch: { name: "닭가슴살 샐러드 파스타", desc: "식이섬유 & 단백질 조합", kcal: "350 kcal" },
-      dinner: { name: "단백질 쉐이크 & 고구마", desc: "칼로리 조절 저녁", kcal: "280 kcal" }
-    }
-  ];
-
-  let current = new Date(start);
-  let dayCount = 0;
-  while (current <= end) {
-    const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
-    const wT = workoutTemplates[dayCount % workoutTemplates.length];
-    const dT = dietTemplates[dayCount % dietTemplates.length];
-    
-    plans.push({
-      date: dateStr,
-      task: '맞춤형 복합 밸런스 플랜',
-      workout: { type: '유산소 + 근력 + 스트레칭', sets: '총 3가지 운동 코스 진행' },
-      diet: { breakfast: dT.breakfast.name, lunch: dT.lunch.name, dinner: dT.dinner.name },
-      exercises: wT,
-      diets: [
-        { type: "아침", ...dT.breakfast },
-        { type: "점심", ...dT.lunch },
-        { type: "저녁", ...dT.dinner }
-      ]
-    });
-    
-    current.setDate(current.getDate() + 1);
-    dayCount++;
-  }
-  return plans;
-}
-
-const mockPlans = generateMockPlans();
-
-export const getTodayPlan = (date: Date) => {
-  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  return mockPlans.find(plan => plan.date === dateStr) || null;
+const mapWorkoutType = (typeRaw: string) => {
+  if (!typeRaw) return '상체 운동';
+  if (typeRaw.includes('하체') || typeRaw.includes('스쿼트')) return '하체 운동';
+  if (typeRaw.includes('유산소') || typeRaw.includes('조깅') || typeRaw.includes('고강도') || typeRaw.includes('자전거') || typeRaw.includes('걷는') || typeRaw.includes('걷기')) return '유산소';
+  if (typeRaw.includes('스트레칭') || typeRaw.includes('요가') || typeRaw.includes('이완')) return '스트레칭';
+  return '상체 운동'; // 전신, 코어, 기타 모든 운동을 상체 운동으로 매핑
 };
 
 export default function RecommendPage() {
+  const { plans, completedTasks, completeWorkout, completeDiet, getPlanByDate } = usePlan();
+  
   const [currentDate, setCurrentDate] = useState(new Date('2026-03-01'));
   const [today, setToday] = useState<Date | null>(null);
-  const [todayPlan, setTodayPlan] = useState<typeof mockPlans[0] | null>(null);
+  const [todayPlan, setTodayPlan] = useState<DailyPlan | null>(null);
 
   const [userData, setUserData] = useState<{name: string, goal: string, allergies?: string[], conditions?: string[]} | null>(null);
-  const [completedTasks, setCompletedTasks] = useState<Record<string, { workouts: number[], diets: number[] }>>({});
 
-  const toggleWorkoutComplete = (dateStr: string, index: number) => {
-    setCompletedTasks(prev => {
-      const dayTasks = prev[dateStr] || { workouts: [], diets: [] };
-      const newWorkouts = dayTasks.workouts.includes(index) 
-        ? dayTasks.workouts.filter(i => i !== index)
-        : [...dayTasks.workouts, index];
-      const newState = { ...prev, [dateStr]: { ...dayTasks, workouts: newWorkouts } };
-      localStorage.setItem('healthAppCompletedTasks', JSON.stringify(newState));
-      return newState;
-    });
+  const [confirmPopup, setConfirmPopup] = useState<{isOpen: boolean, target: {type: 'workout'|'diet', dateStr: string, name: string, index: number} | null}>({isOpen: false, target: null});
+
+  const handleWorkoutComplete = (dateStr: string, name: string, index: number) => {
+    setConfirmPopup({isOpen: true, target: {type: 'workout', dateStr, name, index}});
   };
 
-  const toggleDietComplete = (dateStr: string, index: number) => {
-    setCompletedTasks(prev => {
-      const dayTasks = prev[dateStr] || { workouts: [], diets: [] };
-      const newDiets = dayTasks.diets.includes(index) 
-        ? dayTasks.diets.filter(i => i !== index)
-        : [...dayTasks.diets, index];
-      const newState = { ...prev, [dateStr]: { ...dayTasks, diets: newDiets } };
-      localStorage.setItem('healthAppCompletedTasks', JSON.stringify(newState));
-      return newState;
-    });
+  const handleDietComplete = (dateStr: string, name: string, index: number) => {
+    setConfirmPopup({isOpen: true, target: {type: 'diet', dateStr, name, index}});
+  };
+
+  const executeConfirm = () => {
+    if (!confirmPopup.target) return;
+    if (confirmPopup.target.type === 'workout') {
+      completeWorkout(confirmPopup.target.dateStr, confirmPopup.target.index);
+    } else {
+      completeDiet(confirmPopup.target.dateStr, confirmPopup.target.index);
+    }
+    setConfirmPopup({isOpen: false, target: null});
   };
 
   useEffect(() => {
     const now = new Date();
     setToday(now);
     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    setTodayPlan(getTodayPlan(now));
+    setTodayPlan(getPlanByDate(now));
 
     const stored = localStorage.getItem('healthAppUser');
     if (stored) {
       setUserData(JSON.parse(stored));
     }
+  }, [plans]);
 
-    const storedCompleted = localStorage.getItem('healthAppCompletedTasks');
-    if (storedCompleted) {
-      setCompletedTasks(JSON.parse(storedCompleted));
-    }
-  }, []);
-
-  const [selectedPlan, setSelectedPlan] = useState<typeof mockPlans[0] | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<DailyPlan | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -261,7 +178,7 @@ export default function RecommendPage() {
                 if (day === null) return <div key={`empty-${idx}`} className="h-16 md:h-20 lg:h-24 bg-transparent rounded-xl"></div>;
 
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const planForDay = mockPlans.find(p => p.date === dateStr);
+                const planForDay = getPlanByDate(dateStr);
 
                 const isToday = today && day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
                 const isWeekend = idx % 7 === 0 || idx % 7 === 6;
@@ -386,15 +303,18 @@ export default function RecommendPage() {
                 const isCompleted = (completedTasks[todayDateStr]?.workouts || []).includes(idx);
 
                 return (
-                  <div key={idx} className={`bg-white rounded-2xl p-5 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100 flex items-center hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] hover:-translate-y-1 transition-all duration-300 group ${isCompleted ? 'opacity-50 grayscale bg-gray-50/50' : ''}`}>
+                  <div key={idx} className={`bg-white rounded-2xl p-5 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100 flex items-center hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] hover:-translate-y-1 transition-all duration-300 group`}>
                     <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${ex.color} flex items-center justify-center text-white shadow-inner flex-shrink-0`}>
                       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <div className={`ml-4 flex-1 ${isCompleted ? 'line-through decoration-gray-400' : ''}`}>
-                      <h3 className="font-bold text-gray-900 text-[17px] mb-1">{ex.title}</h3>
+                    <div className={`ml-4 flex-1`}>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full shadow-sm">{mapWorkoutType(ex.type || '')}</span>
+                        <h3 className="font-bold text-gray-900 text-[17px]">{ex.title}</h3>
+                      </div>
                       <div className="flex items-center space-x-3 text-xs font-semibold text-gray-500">
                         <span className="flex items-center"><Clock className="w-3.5 h-3.5 mr-1" />{ex.time}</span>
                         <span className="w-1 h-1 rounded-full bg-gray-300"></span>
@@ -404,10 +324,11 @@ export default function RecommendPage() {
                       </div>
                     </div>
                     <button 
-                      onClick={(e) => { e.stopPropagation(); toggleWorkoutComplete(todayDateStr, idx); }}
-                      className={`ml-4 text-sm px-4 py-2 rounded-xl font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-200 text-gray-500 hover:bg-gray-300' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                      onClick={(e) => { e.stopPropagation(); if (!isCompleted) handleWorkoutComplete(todayDateStr, ex.title, idx); }}
+                      disabled={isCompleted}
+                      className={`ml-4 text-sm px-4 py-2 rounded-xl font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                     >
-                      {isCompleted ? '취소' : '완료'}
+                      {isCompleted ? '완료!' : '완료'}
                     </button>
                   </div>
                 );
@@ -448,10 +369,11 @@ export default function RecommendPage() {
                       <span className={`text-xs font-bold ${isCompleted ? 'text-gray-400' : 'text-[#2563eb]'}`}>{diet.kcal}</span>
                     </div>
                     <button 
-                      onClick={(e) => { e.stopPropagation(); toggleDietComplete(todayDateStr, idx); }}
-                      className={`w-full mt-2 text-sm py-2 rounded-xl font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-200 text-gray-500 hover:bg-gray-300' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                      onClick={(e) => { e.stopPropagation(); if(!isCompleted) handleDietComplete(todayDateStr, diet.name, idx); }}
+                      disabled={isCompleted}
+                      className={`w-full mt-2 text-sm py-2 rounded-xl font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600'}`}
                     >
-                      {isCompleted ? '취소' : '완료'}
+                      {isCompleted ? '완료!' : '완료'}
                     </button>
                   </div>
                 );
@@ -504,16 +426,17 @@ export default function RecommendPage() {
                       return (
                         <div key={idx} className="flex justify-between items-center group">
                           <div className="flex items-center flex-1 pr-3">
-                            <span className={`text-xs font-bold ${isCompleted ? 'text-gray-400 bg-gray-100 border-gray-200' : 'text-orange-700 bg-white border-orange-200'} px-2.5 py-1 rounded-md shadow-sm whitespace-nowrap transition-colors`}>
-                              {idx + 1}
+                            <span className={`text-[10px] font-bold ${isCompleted ? 'text-gray-400 bg-gray-100 border-gray-200' : 'text-orange-700 bg-orange-50'} px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap transition-colors`}>
+                              {mapWorkoutType(ex.type || '')}
                             </span>
                             <span className={`text-sm font-bold text-left ml-4 transition-all ${isCompleted ? 'text-gray-400 line-through decoration-gray-400' : 'text-gray-900'}`}>{ex.title}</span>
                           </div>
                           <button 
-                            onClick={(e) => { e.stopPropagation(); toggleWorkoutComplete(selectedPlan.date, idx); }}
-                            className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-200 text-gray-500 hover:bg-gray-300' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                            onClick={(e) => { e.stopPropagation(); if(!isCompleted) handleWorkoutComplete(selectedPlan.date, ex.title, idx); }}
+                            disabled={isCompleted}
+                            className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                           >
-                            {isCompleted ? '취소' : '완료'}
+                            {isCompleted ? '완료!' : '완료'}
                           </button>
                         </div>
                       );
@@ -534,22 +457,46 @@ export default function RecommendPage() {
                       return (
                         <div key={idx} className="flex justify-between items-center group">
                           <div className="flex items-center flex-1 pr-3">
-                            <span className={`text-xs font-bold ${isCompleted ? 'text-gray-400 bg-gray-100 border-gray-200' : 'text-green-700 bg-white border-green-200'} px-2.5 py-1 rounded-md shadow-sm whitespace-nowrap transition-colors`}>
+                            <span className={`text-[10px] font-bold ${isCompleted ? 'text-gray-400 bg-gray-100 border-gray-200' : 'text-green-700 bg-green-50'} px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap transition-colors`}>
                               {diet.type}
                             </span>
                             <span className={`text-sm font-bold text-left ml-4 transition-all ${isCompleted ? 'text-gray-400 line-through decoration-gray-400' : 'text-gray-900'}`}>{diet.name}</span>
                           </div>
                           <button 
-                            onClick={(e) => { e.stopPropagation(); toggleDietComplete(selectedPlan.date, idx); }}
-                            className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-200 text-gray-500 hover:bg-gray-300' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                            onClick={(e) => { e.stopPropagation(); if(!isCompleted) handleDietComplete(selectedPlan.date, diet.name, idx); }}
+                            disabled={isCompleted}
+                            className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600'}`}
                           >
-                            {isCompleted ? '취소' : '완료'}
+                            {isCompleted ? '완료!' : '완료'}
                           </button>
                         </div>
                       );
                     })}
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Popup */}
+      <AnimatePresence>
+        {confirmPopup.isOpen && confirmPopup.target && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setConfirmPopup({isOpen: false, target: null})} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl shadow-xl w-full max-w-sm overflow-hidden z-10 px-6 py-8 text-center">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${confirmPopup.target.type === 'workout' ? 'bg-orange-50 text-orange-500' : 'bg-green-50 text-green-500'}`}>
+                {confirmPopup.target.type === 'workout' ? <Flame className="w-7 h-7" /> : <Apple className="w-7 h-7" />}
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 mb-2">일정 완료</h3>
+              <p className="text-sm text-gray-600 mb-6 font-medium leading-relaxed">
+                오늘의 <strong className={confirmPopup.target.type === 'workout' ? 'text-orange-600' : 'text-green-600'}>{confirmPopup.target.name}</strong> 일정을<br />
+                완료하시나요? 한번 완료하면 다시 취소할 수 없습니다.
+              </p>
+              <div className="flex space-x-3">
+                <button onClick={() => setConfirmPopup({isOpen: false, target: null})} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">취소</button>
+                <button onClick={executeConfirm} className={`flex-1 py-3 text-white font-bold rounded-xl transition-colors shadow-md ${confirmPopup.target.type === 'workout' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-500 hover:bg-green-600'}`}>완료하기</button>
               </div>
             </motion.div>
           </div>
