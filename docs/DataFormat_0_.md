@@ -9,7 +9,7 @@
 {
   "user_id": "string",          // 사용자 식별자 (Unique ID)
   "mbti": "string",             // MBTI 유형 (예: "INTJ")
-  "gender": "string",           // 성별 ("male", "female")
+  "gender": "string",           // 성별 ("male", "female") 
   "age": "number",              // 나이
   "height": "number",           // 키 (cm) - BMI 계산 참고용
   "weight": "number",           // 몸무게 (kg) - BMI 계산 참고용
@@ -20,7 +20,7 @@
   "allergies": ["string"]       // 알러지 목록 (배열 형태)
 }
 ```
-
+ 
 > [!WARNING]
 > **BMI 계산 지침**
 > - 서버는 BMI를 별도로 계산하지 않습니다.

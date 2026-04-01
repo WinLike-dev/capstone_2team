@@ -28,7 +28,6 @@ from app.schemas.gemini_outputs import (
     MealPlanOutput,
     RecommendationOutput,
     SimpleAnswerOutput,
-    UserDbUpdateOutput,
 )
 from app.schemas.meal import MealAnalysisData, ProcessMealRequest
 from app.schemas.recommend import RecommendationData, RecommendRequest
@@ -60,7 +59,6 @@ _MODE_SCHEMA_MAP: dict[int, type] = {
     3: ExercisePlanOutput,
     4: MealPlanOutput,
     5: MealPlanOutput,
-    6: UserDbUpdateOutput,
 }
 
 _MODE_NAMES: dict[int, str] = {
@@ -69,7 +67,6 @@ _MODE_NAMES: dict[int, str] = {
     3: "플랜 수정",
     4: "식단 작성",
     5: "식단 수정",
-    6: "사용자 DB 수정",
 }
 
 

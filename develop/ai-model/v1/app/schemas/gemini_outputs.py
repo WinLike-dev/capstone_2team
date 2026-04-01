@@ -1,4 +1,4 @@
-"""8개 모드별 Gemini structured output Pydantic 스키마.
+"""7개 모드별 Gemini structured output Pydantic 스키마.
 
 Gemini response_schema 파라미터는 Pydantic BaseModel 서브클래스를 받는다.
 top-level list는 지원되지 않으므로 items wrapper 패턴을 사용한다.
@@ -7,12 +7,9 @@ top-level list는 지원되지 않으므로 items wrapper 패턴을 사용한다
   모드 1 — SimpleAnswerOutput(answer: str)
   모드 2, 3 — ExercisePlanOutput(items: list[ExercisePlanItem])
   모드 4, 5 — MealPlanOutput(items: list[MealPlanItem])
-  모드 6 — UserDbUpdateOutput(updated_fields: dict[str, Any])
   모드 7 — MealLogOutput(calories, carbs, protein, fat, message)
   모드 8 — RecommendationOutput(recommended_exercises, recommended_meals)
 """
-
-from typing import Any
 
 from pydantic import BaseModel
 
@@ -82,20 +79,6 @@ class MealPlanOutput(BaseModel):
     """
 
     items: list[MealPlanItem]
-
-
-# ---------------------------------------------------------------------------
-# 모드 6 — 사용자 프로필 DB 업데이트
-# ---------------------------------------------------------------------------
-
-
-class UserDbUpdateOutput(BaseModel):
-    """모드 6 프로필 업데이트 응답 스키마.
-
-    Gemini 응답 형태: {"updated_fields": {"field_name": value, ...}}
-    """
-
-    updated_fields: dict[str, Any]
 
 
 # ---------------------------------------------------------------------------

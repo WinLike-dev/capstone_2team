@@ -4,7 +4,7 @@
   1. SimpleAnswerOutput — 모드 1 기본 응답 스키마
   2. ExercisePlanItem / ExercisePlanOutput — 모드 2, 3 운동 계획
   3. MealPlanItem / MealPlanOutput — 모드 4, 5 식단 계획
-  4. UserDbUpdateOutput — 모드 6 프로필 업데이트
+  4. (삭제됨 — mode 6 제거)
   5. MealLogOutput — 모드 7 식사 기록 분석
   6. RecommendationExercise / RecommendationMeal / RecommendationOutput — 모드 8 추천
   7. 각 스키마의 JSON 직렬화/역직렬화 라운드트립
@@ -24,7 +24,6 @@ from app.schemas.gemini_outputs import (
     RecommendationMeal,
     RecommendationOutput,
     SimpleAnswerOutput,
-    UserDbUpdateOutput,
 )
 
 
@@ -121,26 +120,6 @@ def test_meal_plan_output_roundtrip():
     json_str = original.model_dump_json()
     restored = MealPlanOutput.model_validate_json(json_str)
     assert restored.items[0].food == "현미밥"
-
-
-# ---------------------------------------------------------------------------
-# Test 4: UserDbUpdateOutput (모드 6)
-# ---------------------------------------------------------------------------
-
-
-def test_user_db_update_output_instantiation():
-    """UserDbUpdateOutput은 updated_fields: dict[str, Any]로 인스턴스화된다."""
-    obj = UserDbUpdateOutput(updated_fields={"age": 30, "goal": "근력 강화"})
-    assert obj.updated_fields["age"] == 30
-    assert obj.updated_fields["goal"] == "근력 강화"
-
-
-def test_user_db_update_output_roundtrip():
-    """UserDbUpdateOutput JSON 직렬화/역직렬화 라운드트립."""
-    original = UserDbUpdateOutput(updated_fields={"bmi": 22.5})
-    json_str = original.model_dump_json()
-    restored = UserDbUpdateOutput.model_validate_json(json_str)
-    assert restored.updated_fields["bmi"] == 22.5
 
 
 # ---------------------------------------------------------------------------

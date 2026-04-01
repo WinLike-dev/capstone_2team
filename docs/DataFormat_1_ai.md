@@ -30,6 +30,9 @@ Gemini Flash 분석 결과인 칼로리와 메시지를 반환합니다.
   "status": "success",
   "data": {
     "calories": "number",    // 분석된 총 칼로리
+    "protein": "number",
+    "carbohydrate": "number",
+    "fat": "number",
     "message": "string"      // 사용자에게 보여줄 피드백 메시지 (한 줄로 간결히)
   }
 }

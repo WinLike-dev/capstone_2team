@@ -238,8 +238,8 @@ def test_get_db_modified_flag_mode_5_returns_meal():
     assert get_db_modified_flag(5) == "meal"
 
 
-def test_get_db_modified_flag_mode_6_returns_profile():
-    assert get_db_modified_flag(6) == "profile"
+def test_get_db_modified_flag_mode_6_returns_none():
+    assert get_db_modified_flag(6) == "none"
 
 
 def test_get_db_modified_flag_mode_7_returns_none():

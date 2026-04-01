@@ -31,7 +31,6 @@ from app.schemas.gemini_outputs import (
     MealPlanOutput,
     RecommendationOutput,
     SimpleAnswerOutput,
-    UserDbUpdateOutput,
 )
 from app.services.background_summary import run_background_summary
 
@@ -48,7 +47,6 @@ _MODE_NAME: dict[int, str] = {
     3: "운동플랜 수정",
     4: "식단플랜 작성",
     5: "식단플랜 수정",
-    6: "DB 수정 (프로필)",
     7: "식단 기록 분석",
     8: "운동/식단 추천",
 }
@@ -68,7 +66,6 @@ _MODE_SCHEMA_MAP: dict[int, type] = {
     3: ExercisePlanOutput,
     4: MealPlanOutput,
     5: MealPlanOutput,
-    6: UserDbUpdateOutput,
     7: MealLogOutput,
     8: RecommendationOutput,
 }
@@ -165,12 +162,6 @@ def _build_ai_chat_data(mode: int, parsed: dict) -> AiChatData:
         return AiChatData(
             message="식단 계획이 수정되었습니다.",
             detail=parsed.get("items"),
-        )
-
-    if mode == 6:
-        return AiChatData(
-            message="프로필이 업데이트되었습니다.",
-            detail=parsed.get("updated_fields"),
         )
 
     if mode == 7:

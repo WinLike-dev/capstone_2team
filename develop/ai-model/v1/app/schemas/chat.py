@@ -17,7 +17,7 @@ from app.schemas.common import UserProfile
 # Type aliases
 # ---------------------------------------------------------------------------
 
-DbModifiedFlag = Literal["none", "exercise", "meal", "profile"]
+DbModifiedFlag = Literal["none", "exercise", "meal"]
 
 # ---------------------------------------------------------------------------
 # Request schema
@@ -92,7 +92,6 @@ _MODE_TO_FLAG: dict[int, DbModifiedFlag] = {
     3: "exercise",
     4: "meal",
     5: "meal",
-    6: "profile",
 }
 
 
@@ -102,7 +101,6 @@ def get_db_modified_flag(mode: int) -> DbModifiedFlag:
     Mode-to-flag mapping (per project decision — FastAPI decides, not Gemini):
       mode 2, 3  -> "exercise"
       mode 4, 5  -> "meal"
-      mode 6     -> "profile"
       all others -> "none"
     """
     return _MODE_TO_FLAG.get(mode, "none")

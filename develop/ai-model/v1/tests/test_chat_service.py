@@ -4,7 +4,7 @@
   1. Router AI classify와 Vector DB context search가 asyncio.gather로 병렬 실행됨
   2. mode 1 요청 시 db_modified_flag="none"인 AiChatResponse 반환
   3. mode 2 요청 시 db_modified_flag="exercise"인 AiChatResponse 반환
-  4. mode 6 요청 시 db_modified_flag="profile"인 AiChatResponse 반환
+  4. (삭제됨 — mode 6 제거)
   5. user_instruction이 비어있으면 프롬프트에 사용자 지시사항 섹션 미포함
   6. BackgroundTasks.add_task가 run_background_summary로 호출됨
   7. Router AI 실패 시 mode=1 fallback으로 정상 응답
@@ -40,7 +40,6 @@ EXERCISE_PLAN_JSON = json.dumps(
 MEAL_PLAN_JSON = json.dumps(
     {"items": [{"date": "2026-03-22", "food": "닭가슴살 샐러드", "time": "12:00"}]}
 )
-USER_DB_UPDATE_JSON = json.dumps({"updated_fields": {"age": 30}})
 MEAL_LOG_JSON = json.dumps(
     {"calories": 500, "carbs": 60, "protein": 35, "fat": 15, "message": "균형 잡힌 식사입니다."}
 )
@@ -207,33 +206,6 @@ async def test_mode2_db_flag_exercise(
 
 
 # ---------------------------------------------------------------------------
-# Test 4: mode 6 → db_modified_flag="profile"
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.anyio
-async def test_mode6_db_flag_profile(
-    embed_mock, pinecone_mock, background_tasks
-):
-    """mode 6 요청 시 db_modified_flag='profile'이고 detail에 updated_fields가 담긴다."""
-    from app.clients.router import RouterOutput
-    from app.services.chat_service import handle_ai_chat
-
-    router_mock6 = AsyncMock()
-    router_mock6.classify = AsyncMock(return_value=RouterOutput(mode=6, reason="DB 수정"))
-    gemini_mock6 = AsyncMock()
-    gemini_mock6.generate = AsyncMock(return_value=USER_DB_UPDATE_JSON)
-    body = _make_body(user_message="나이 30으로 업데이트해줘")
-    request = _make_request(router_mock6, gemini_mock6, pinecone_mock, embed_mock)
-
-    result = await handle_ai_chat(body, request, background_tasks)
-
-    assert result.mode == 6
-    assert result.db_modified_flag == "profile"
-    assert result.data.detail is not None
-
-
-# ---------------------------------------------------------------------------
 # Test 5: user_instruction 비어있으면 프롬프트에 사용자 지시사항 섹션 미포함
 # ---------------------------------------------------------------------------
 
@@ -321,13 +293,12 @@ async def test_router_failure_fallback_mode1(
 
 
 def test_get_worker_response_schema_all_modes():
-    """_get_worker_response_schema()가 8개 모드 각각에 올바른 스키마 클래스를 반환한다."""
+    """_get_worker_response_schema()가 7개 모드 각각에 올바른 스키마 클래스를 반환한다."""
     from app.services.chat_service import _get_worker_response_schema
     from app.schemas.gemini_outputs import (
         SimpleAnswerOutput,
         ExercisePlanOutput,
         MealPlanOutput,
-        UserDbUpdateOutput,
         MealLogOutput,
         RecommendationOutput,
     )
@@ -337,7 +308,7 @@ def test_get_worker_response_schema_all_modes():
     assert _get_worker_response_schema(3) is ExercisePlanOutput
     assert _get_worker_response_schema(4) is MealPlanOutput
     assert _get_worker_response_schema(5) is MealPlanOutput
-    assert _get_worker_response_schema(6) is UserDbUpdateOutput
+    assert _get_worker_response_schema(6) is SimpleAnswerOutput  # mode 6 제거 → fallback
     assert _get_worker_response_schema(7) is MealLogOutput
     assert _get_worker_response_schema(8) is RecommendationOutput
 
@@ -377,18 +348,6 @@ def test_build_ai_chat_data_mode2():
 
     assert isinstance(result, AiChatData)
     assert result.detail == items
-
-
-def test_build_ai_chat_data_mode6():
-    """모드 6: detail에 updated_fields 딕셔너리가 담긴다."""
-    from app.services.chat_service import _build_ai_chat_data
-
-    parsed = {"updated_fields": {"age": 30}}
-    result = _build_ai_chat_data(6, parsed)
-
-    assert isinstance(result, AiChatData)
-    assert result.message == "프로필이 업데이트되었습니다."
-    assert result.detail == {"age": 30}
 
 
 def test_build_ai_chat_data_mode7():
