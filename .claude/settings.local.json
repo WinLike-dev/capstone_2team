@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip show:*)",
+      "Bash(py --version)",
+      "Bash(py:*)",
+      "Bash(py -c \":*)",
+      "Bash(curl:*)"
+    ]
+  }
+}
