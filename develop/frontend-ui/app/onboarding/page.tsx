@@ -42,10 +42,6 @@ export default function OnboardingPage() {
     try {
       const height = parseFloat(formData.height);
       const weight = parseFloat(formData.weight);
-      let bmi = 0;
-      if (height > 0) {
-        bmi = Math.round((weight / ((height / 100) * (height / 100))) * 10) / 10;
-      }
 
       const genderStr = formData.gender === '남성' ? 'male' : 'female';
 
@@ -58,7 +54,7 @@ export default function OnboardingPage() {
         age: parseInt(formData.age, 10),
         height,
         weight,
-        bmi,
+        bmi: 0,
         goal: formData.goal,
         activity_level: formData.activityLevel,
         medical_history: formData.conditions,
@@ -88,8 +84,16 @@ export default function OnboardingPage() {
         throw new Error('API 연동 실패');
       }
 
+      const responseData = await response.json();
+      let finalData = { ...formData } as any;
+      if (responseData?.data?.bmi) {
+        finalData.bmi = responseData.data.bmi;
+      } else if (responseData?.bmi) {
+        finalData.bmi = responseData.bmi;
+      }
+
       alert('등록이 완료되었습니다.');
-      localStorage.setItem('healthAppUser', JSON.stringify(formData));
+      localStorage.setItem('healthAppUser', JSON.stringify(finalData));
       router.push('/');
     } catch (error) {
       console.error(error);
