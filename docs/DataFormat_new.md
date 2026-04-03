@@ -17,7 +17,7 @@
 | `gender` | String | 성별 ("male", "female") |
 | `age` | Number | 나이 |
 | `height`, `weight` | Number | 체격 정보 |
-| `bmi` | Number | Front에서 계산한 비만수치 정보 |
+| `bmi` | Number | WAS(Backend)에서 계산되어 반환되는 비만수치 정보 |
 
 ### 1.2 홈 화면 ↔ 캘린더 연동 일정 객체 (Plan Context)
 사용자가 홈 화면에서 AI 추천을 받아 `+` 버튼으로 캘린더 전역 상태에 일정을 추가할 때 사용되는 데이터 구조입니다.

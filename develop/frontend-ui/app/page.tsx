@@ -59,6 +59,7 @@ export default function Home() {
   });
 
   // Current Intakes (mock for UI initially, gets updated by AI)
+  const [resetConfirmModal, setResetConfirmModal] = useState<{isOpen: boolean, target: 'calories' | 'macros' | null}>({isOpen: false, target: null});
   const [intakes, setIntakes] = useState({
     calories: 420,
     carbs: 120,
@@ -161,7 +162,7 @@ export default function Home() {
 
   // Diet Modal state
   const [isDietModalOpen, setIsDietModalOpen] = useState(false);
-  const [foodInput, setFoodInput] = useState('');
+  const [manualInput, setManualInput] = useState({calories: '', carbs: '', protein: '', fat: ''});
   const [dietAnalysis, setDietAnalysis] = useState<{ calories: number, carbs: number, protein: number, fat: number, message: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -274,107 +275,94 @@ export default function Home() {
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
+  const confirmResetIntake = () => {
+    if (!resetConfirmModal.target) return;
+    
+    setIntakes(prev => {
+      let newIntakes = { ...prev };
+      if (resetConfirmModal.target === 'calories') {
+        newIntakes.calories = 0;
+      } else if (resetConfirmModal.target === 'macros') {
+        newIntakes.carbs = 0;
+        newIntakes.protein = 0;
+        newIntakes.fat = 0;
+      }
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+      localStorage.setItem('healthAppNutrition', JSON.stringify({
+        date: todayStr,
+        targetKcal: targets.calories,
+        consumedKcal: newIntakes.calories,
+        targetMacros: targets,
+        consumedMacros: {
+          carbs: newIntakes.carbs,
+          protein: newIntakes.protein,
+          fat: newIntakes.fat
+        }
+      }));
+      
+      return newIntakes;
+    });
+    
+    setResetConfirmModal({ isOpen: false, target: null });
+  };
+
   const handleDietSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!foodInput.trim() || !userData) return;
+    if (!manualInput.calories && !manualInput.carbs && !manualInput.protein && !manualInput.fat) return;
+    
+    const inputCal = Number(manualInput.calories) || 0;
+    const inputCarbs = Number(manualInput.carbs) || 0;
+    const inputProtein = Number(manualInput.protein) || 0;
+    const inputFat = Number(manualInput.fat) || 0;
+
+    if (inputCal > 10000 || inputCarbs > 1000 || inputProtein > 1000 || inputFat > 1000) {
+      setAlertPopup({
+        isOpen: true,
+        message: "입력 가능한 범위를 초과했습니다\n(최대 10,000 kcal 또는 각 1,000g)"
+      });
+      return;
+    }
     
     setIsAnalyzing(true);
     setDietAnalysis(null);
 
-    try {
-      const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
-      // 슬래시 중복 방지를 위해 맨 끝의 슬래시 제거
-      const baseUrl = rawApiUrl.replace(/\/+$/, '');
-      
-      let endpoint = '/api/mock-save';
-      if (baseUrl) {
-        // 환경변수에 이미 /api/v1이 포함되어 있다면 중복되지 않게 처리
-        endpoint = baseUrl.endsWith('/api/v1') 
-          ? `${baseUrl}/ai/meal-record` 
-          : `${baseUrl}/api/v1/ai/meal-record`;
-      }
-      
-      const payload = {
-        user_id: userData.name || "user123", // fallback
-        user_message: foodInput
-      };
-
-      if (baseUrl) {
-        console.log('실제 요청 경로:', endpoint);
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true',
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          throw new Error('API request failed');
-        }
-
-        const resData = await response.json();
+    // Simulate save/analysis delay
+    setTimeout(() => {
+      setIntakes(prev => {
+        const newIntakes = {
+          calories: prev.calories + inputCal,
+          carbs: prev.carbs + inputCarbs,
+          protein: prev.protein + inputProtein,
+          fat: prev.fat + inputFat
+        };
         
-        // 서버 응답이 data 내에 있거나 fallback 객체 안에 있어도 모두 유연하게 처리
-        const hasData = resData.status === 'success' && resData.data;
-        const hasFallback = resData.fallback;
+        const todayStr = new Date().toISOString().split('T')[0];
+        localStorage.setItem('healthAppNutrition', JSON.stringify({
+          date: todayStr,
+          targetKcal: targets.calories,
+          consumedKcal: newIntakes.calories,
+          targetMacros: targets,
+          consumedMacros: {
+            carbs: newIntakes.carbs,
+            protein: newIntakes.protein,
+            fat: newIntakes.fat
+          }
+        }));
+        
+        return newIntakes;
+      });
 
-        if (hasData || hasFallback) {
-          const resultObj = hasData ? resData.data : resData.fallback;
-          const calories = Number(resultObj.calories) || 0;
-          const carbs = Number(resultObj.carbs) || 0;
-          const protein = Number(resultObj.protein) || 0;
-          const fat = Number(resultObj.fat) || 0;
-          const message = resultObj.message || "기록이 완료되었습니다.";
-          
-          setIntakes(prev => ({
-            calories: prev.calories + calories,
-            carbs: prev.carbs + carbs,
-            protein: prev.protein + protein,
-            fat: prev.fat + fat
-          }));
-          
-          setDietAnalysis({
-            calories,
-            carbs,
-            protein,
-            fat,
-            message
-          });
-        } else {
-           throw new Error("올바른 응답 데이터를 찾을 수 없습니다.");
-        }
-      } else {
-        // Mock fallback if no backend URL
-        setTimeout(() => {
-          const mockC = 320;
-          const mockMsg = "적당한 칼로리네요. 든든한 식사 되세요!";
-          
-          setIntakes(prev => ({
-            calories: prev.calories + mockC,
-            carbs: prev.carbs + 40,
-            protein: prev.protein + 15,
-            fat: prev.fat + 10
-          }));
-
-          setDietAnalysis({
-             calories: mockC,
-             carbs: 40,
-             protein: 15,
-             fat: 10,
-             message: mockMsg
-          });
-          setIsAnalyzing(false);
-        }, 1500);
-        return;
-      }
-    } catch (err) {
-      console.error(err);
-      alert('AI 분석에 실패했습니다. 다시 시도해주세요.');
-    } finally {
+      setDietAnalysis({
+        calories: inputCal,
+        carbs: inputCarbs,
+        protein: inputProtein,
+        fat: inputFat,
+        message: '직접 입력한 영양소가 추가되었습니다.'
+      });
       setIsAnalyzing(false);
-    }
+      setManualInput({calories: '', carbs: '', protein: '', fat: ''});
+    }, 600);
   };
 
   const addWater = (e?: React.MouseEvent) => {
@@ -489,9 +477,9 @@ export default function Home() {
               </div>
             </div>
             <div>
-              <div className="flex items-baseline space-x-1">
-                <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{intakes.calories}</p>
-                <span className="text-sm font-semibold text-gray-400">/ {targets.calories} kcal</span>
+              <div className="flex items-baseline space-x-1 truncate max-w-[150px]">
+                <p className="text-3xl font-extrabold text-gray-900 tracking-tight truncate min-w-0">{intakes.calories.toLocaleString()}</p>
+                <span className="text-sm font-semibold text-gray-400 truncate min-w-0">/ {targets.calories.toLocaleString()} kcal</span>
               </div>
               <div className="flex items-center space-x-1 mt-2.5">
                 <div className="w-full bg-gray-100 rounded-full h-1.5 flex-1 max-w-[120px] overflow-hidden">
@@ -516,25 +504,25 @@ export default function Home() {
               </div>
             </div>
             <div className="flex gap-4 items-end justify-between h-full pt-2">
-              <div className="flex-1 space-y-1.5">
-                <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500">
-                  <span>탄수화물</span><span>{intakes.carbs}/{targets.carbs}g</span>
+              <div className="flex-1 space-y-1.5 min-w-0">
+                <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500 whitespace-nowrap">
+                  <span>탄수화물</span><span className="truncate ml-1">{intakes.carbs.toLocaleString()}/{targets.carbs.toLocaleString()}g</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                   <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((intakes.carbs / targets.carbs) * 100, 100)}%` }} transition={{ duration: 1 }} className="bg-amber-400 h-2 rounded-full"></motion.div>
                 </div>
               </div>
-              <div className="flex-1 space-y-1.5">
-                <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500">
-                  <span>단백질</span><span>{intakes.protein}/{targets.protein}g</span>
+              <div className="flex-1 space-y-1.5 min-w-0">
+                <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500 whitespace-nowrap">
+                  <span>단백질</span><span className="truncate ml-1">{intakes.protein.toLocaleString()}/{targets.protein.toLocaleString()}g</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                   <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((intakes.protein / targets.protein) * 100, 100)}%` }} transition={{ duration: 1, delay: 0.1 }} className="bg-blue-400 h-2 rounded-full"></motion.div>
                 </div>
               </div>
-              <div className="flex-1 space-y-1.5">
-                <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500">
-                  <span>지방</span><span>{intakes.fat}/{targets.fat}g</span>
+              <div className="flex-1 space-y-1.5 min-w-0">
+                <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-500 whitespace-nowrap">
+                  <span>지방</span><span className="truncate ml-1">{intakes.fat.toLocaleString()}/{targets.fat.toLocaleString()}g</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                   <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((intakes.fat / targets.fat) * 100, 100)}%` }} transition={{ duration: 1, delay: 0.2 }} className="bg-rose-400 h-2 rounded-full"></motion.div>
@@ -643,7 +631,7 @@ export default function Home() {
               className="group bg-white p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/80 hover:shadow-[0_12px_40px_rgb(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-between text-left"
             >
               <div>
-                <h3 className="text-gray-900 font-bold text-lg mb-1">식단 기록하기</h3>
+                <h3 className="text-gray-900 font-bold text-lg mb-1">간편 영양 기록</h3>
                 <p className="text-gray-400 text-xs font-medium">칼로리 관리의 시작</p>
               </div>
               <div className="w-10 h-10 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-500 group-hover:bg-orange-50 group-hover:text-orange-500 transition-colors">
@@ -985,27 +973,66 @@ export default function Home() {
                   <Utensils className="w-5 h-5 text-[#2563eb]" />
                   <h3 className="font-bold text-lg text-gray-900">식단 기록하기</h3>
                 </div>
-                <button onClick={() => { setIsDietModalOpen(false); setTimeout(() => { setDietAnalysis(null); setFoodInput(''); }, 300); }} className="text-gray-400 hover:text-gray-600 transition-colors p-1 bg-white rounded-full shadow-sm">
+                <button onClick={() => { setIsDietModalOpen(false); setTimeout(() => { setDietAnalysis(null); setManualInput({calories: '', carbs: '', protein: '', fat: ''}); }, 300); }} className="text-gray-400 hover:text-gray-600 transition-colors p-1 bg-white rounded-full shadow-sm">
                   <X className="w-5 h-5" />
                 </button>
               </div>
               
               <div className="p-6">
                 <form onSubmit={handleDietSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">어떤 음식을 드셨나요?</label>
-                    <input 
-                      type="text" 
-                      value={foodInput}
-                      onChange={(e) => setFoodInput(e.target.value)}
-                      placeholder="예) 참치 김밥과 떡볶이" 
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-bold text-gray-700">섭취 칼로리 (kcal)</label>
+                        <button type="button" onClick={() => setResetConfirmModal({isOpen: true, target: 'calories'})} className="text-[11px] text-gray-400 hover:text-red-500 transition-colors bg-gray-100 hover:bg-red-50 px-2 py-1 rounded-md font-bold">오늘 섭취량 초기화</button>
+                      </div>
+                      <input 
+                        type="number" 
+                        value={manualInput.calories}
+                        onChange={(e) => setManualInput({...manualInput, calories: e.target.value})}
+                        placeholder="예) 500" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all"
+                      />
+                    </div>
+                    <div className="col-span-2 flex justify-between items-end mt-1 -mb-2">
+                      <label className="block text-sm font-bold text-gray-700">상세 영양소 (g)</label>
+                      <button type="button" onClick={() => setResetConfirmModal({isOpen: true, target: 'macros'})} className="text-[11px] text-gray-400 hover:text-red-500 transition-colors bg-gray-100 hover:bg-red-50 px-2 py-1 rounded-md font-bold">오늘 섭취량 초기화</button>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">탄수화물 (g)</label>
+                      <input 
+                        type="number" 
+                        value={manualInput.carbs}
+                        onChange={(e) => setManualInput({...manualInput, carbs: e.target.value})}
+                        placeholder="0" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">단백질 (g)</label>
+                      <input 
+                        type="number" 
+                        value={manualInput.protein}
+                        onChange={(e) => setManualInput({...manualInput, protein: e.target.value})}
+                        placeholder="0" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all text-center"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">지방 (g)</label>
+                      <input 
+                        type="number" 
+                        value={manualInput.fat}
+                        onChange={(e) => setManualInput({...manualInput, fat: e.target.value})}
+                        placeholder="0" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] transition-all text-center"
+                      />
+                    </div>
                   </div>
                   
                   <button 
                     type="submit" 
-                    disabled={!foodInput.trim() || isAnalyzing}
+                    disabled={(!manualInput.calories && !manualInput.carbs && !manualInput.protein && !manualInput.fat) || isAnalyzing}
                     className="w-full bg-[#2563eb] text-white font-bold py-3.5 rounded-xl shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:bg-blue-700 transition-all disabled:opacity-50 disabled:shadow-none flex justify-center items-center h-[52px]"
                   >
                     {isAnalyzing ? (
@@ -1013,10 +1040,10 @@ export default function Home() {
                         <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                         <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                         <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                        <span className="ml-2">AI 분석 중...</span>
+                        <span className="ml-2">저장 중...</span>
                       </div>
                     ) : (
-                      'AI 분석'
+                      '영양소 기록하기'
                     )}
                   </button>
                 </form>
@@ -1215,6 +1242,33 @@ export default function Home() {
               <button onClick={() => setAlertPopup({isOpen: false, message: ''})} className="w-full py-3.5 bg-[#2563eb] text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md">
                 확인
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Reset Confirmation Modal */}
+      <AnimatePresence>
+        {resetConfirmModal.isOpen && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setResetConfirmModal({isOpen: false, target: null})} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl shadow-xl w-full max-w-sm overflow-hidden z-10 px-6 py-8 text-center border border-gray-100">
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <RefreshCw className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 mb-2">섭취량 초기화</h3>
+              <p className="text-gray-500 mb-6 font-medium text-sm">
+                정말 오늘 기록을 초기화할까요?<br/>
+                진행 중인 {resetConfirmModal.target === 'calories' ? '칼로리' : '영양소(탄단지)'} 기록이 0으로 변경됩니다.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setResetConfirmModal({isOpen: false, target: null})} className="flex-1 py-3.5 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors">
+                  취소
+                </button>
+                <button onClick={confirmResetIntake} className="flex-1 py-3.5 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors shadow-[0_4px_12px_rgba(239,68,68,0.3)]">
+                  확인 (초기화)
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

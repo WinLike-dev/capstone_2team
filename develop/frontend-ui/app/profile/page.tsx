@@ -14,6 +14,7 @@ interface UserProfile {
   gender?: string;
   height?: string | number;
   weight?: string | number;
+  bmi?: number;
   goal?: string;
   activityLevel?: string;
   mbti?: string;
@@ -66,14 +67,9 @@ export default function ProfilePage() {
     setIsGoalModalOpen(true);
   };
 
-  const calculateBMI = (weight: number, height: number) => {
-    if (!weight || !height) return 0;
-    const heightInMeters = height / 100;
-    return Number((weight / (heightInMeters * heightInMeters)).toFixed(1));
-  };
-
   const saveProfileToAPI = async (data: Partial<UserProfile>) => {
     setIsSaving(true);
+    let finalData = { ...data };
     try {
       const payload = {
         user_id: data.user_id || data.email || 'unknown',
@@ -82,7 +78,7 @@ export default function ProfilePage() {
         age: Number(data.age) || 0,
         height: Number(data.height) || 0,
         weight: Number(data.weight) || 0,
-        bmi: calculateBMI(Number(data.weight), Number(data.height)),
+        bmi: 0, // BMI 계산은 백엔드에서 수행
         goal: data.goal || '',
         activity_level: data.activityLevel || '',
         medical_history: data.conditions || [],
@@ -98,12 +94,20 @@ export default function ProfilePage() {
       
       if (!res.ok) {
         console.warn('Failed to save to server, but continuing local update.');
+      } else {
+        const responseData = await res.json();
+        // 백엔드 응답 형태에 맞게 분기 (data 속성 내부 또는 최상단)
+        if (responseData?.data?.bmi) {
+          finalData.bmi = responseData.data.bmi;
+        } else if (responseData?.bmi) {
+          finalData.bmi = responseData.bmi;
+        }
       }
     } catch (error) {
       console.error('API Error:', error);
     } finally {
-      setUserData(data);
-      localStorage.setItem('healthAppUser', JSON.stringify(data));
+      setUserData(finalData);
+      localStorage.setItem('healthAppUser', JSON.stringify(finalData));
       setIsEditModalOpen(false);
       setIsGoalModalOpen(false);
       setIsSaving(false);
