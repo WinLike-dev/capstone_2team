@@ -1,0 +1,99 @@
+"""PineconeClient — VDB 읽기/쓰기 클라이언트.
+
+Layer 4 VDB 설계:
+  - vdb_memory:          에피소드 · 추억  (namespace: {user_id}-memory)
+  - vdb_user_important:  핵심 팩트 요약  (namespace: {user_id}-important)
+  - vdb_external:        외부 지식       (namespace: external)
+
+user_id를 namespace prefix로 사용하여 사용자 간 벡터를 격리한다.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+from uuid import uuid4
+
+
+class PineconeClient:
+    def __init__(self, index: Any) -> None:
+        self._index = index
+
+    # ── namespace 헬퍼 ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def _memory_ns(user_id: str) -> str:
+        return f"{user_id}-memory"
+
+    @staticmethod
+    def _important_ns(user_id: str) -> str:
+        return f"{user_id}-important"
+
+    EXTERNAL_NS: str = "external"
+
+    # ── 검색 ─────────────────────────────────────────────────────────────────
+
+    async def search_memory(self, user_id: str, vector: list[float], top_k: int = 5) -> list[dict]:
+        return await self._search(self._memory_ns(user_id), vector, top_k, source="memory")
+
+    async def search_important(self, user_id: str, vector: list[float], top_k: int = 5) -> list[dict]:
+        return await self._search(self._important_ns(user_id), vector, top_k, source="important")
+
+    async def search_external(self, vector: list[float], top_k: int = 5) -> list[dict]:
+        return await self._search(self.EXTERNAL_NS, vector, top_k, source="external")
+
+    # ── 저장 ─────────────────────────────────────────────────────────────────
+
+    async def upsert_memory(
+        self,
+        user_id: str,
+        vector: list[float],
+        text: str,
+        emotion_label: str = "",
+        intensity: float = 0.0,
+    ) -> str:
+        metadata = {
+            "text": text,
+            "source": "memory",
+            "timestamp": datetime.utcnow().isoformat(),
+            "emotion_label": emotion_label,
+            "emotion_intensity": intensity,
+        }
+        return await self._upsert(self._memory_ns(user_id), vector, metadata)
+
+    async def upsert_important(self, user_id: str, vector: list[float], text: str) -> str:
+        metadata = {
+            "text": text,
+            "source": "important",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        return await self._upsert(self._important_ns(user_id), vector, metadata)
+
+    # ── 내부 구현 ─────────────────────────────────────────────────────────────
+
+    async def _search(
+        self, namespace: str, vector: list[float], top_k: int, source: str
+    ) -> list[dict]:
+        result = await self._index.query(
+            vector=vector,
+            top_k=top_k,
+            namespace=namespace,
+            include_metadata=True,
+        )
+        return [
+            {
+                "id": m.id,
+                "score": m.score,
+                "text": m.metadata.get("text", ""),
+                "source": source,
+                "timestamp": m.metadata.get("timestamp", ""),
+            }
+            for m in result.matches
+        ]
+
+    async def _upsert(self, namespace: str, vector: list[float], metadata: dict) -> str:
+        vid = str(uuid4())
+        await self._index.upsert(
+            vectors=[{"id": vid, "values": vector, "metadata": metadata}],
+            namespace=namespace,
+        )
+        return vid

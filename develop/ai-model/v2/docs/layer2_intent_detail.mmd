@@ -1,0 +1,54 @@
+%% ============================================================
+%% 레이어 2: 의도 분석 상세
+%% ============================================================
+
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a1a2e', 'primaryTextColor': '#e0e0e0', 'lineColor': '#4fc3f7', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460'}}}%%
+
+graph TD
+    subgraph INTENT_DETAIL["레이어 2 — 의도 분석 상세"]
+
+        IN["사용자 입력 수신"] --> S1{"1단계\n규칙 기반 사전 필터"}
+
+        S1 -->|"is_safety = true\n(금칙어 매칭)"| ROUTE_SAFETY["→ 안전 경고 경로"]
+        S1 -->|"is_casual = true\n(인사 패턴 매칭)\n※ previous_intent가\n공감_케어면 스킵"| ROUTE_CASUAL["→ 응답 생성 직행"]
+        S1 -->|"통과"| S2
+
+        S2["2단계\nFlash-Lite 정밀 분석\n\n입력:\n• 현재 메시지\n• previous_intent\n• previous_emotion\n• rule_hints"]
+
+        S2 --> OUTPUT["State 기록"]
+
+        subgraph COMMON["공통 속성"]
+            direction LR
+            C1["intent\n공감_케어 · 기록 · 계획\n수정 · 정보 · 안전경고 · fallback"]
+            C2["confidence\n0.0 ~ 1.0"]
+            C3["emotion\nlabel + intensity"]
+        end
+
+        subgraph JUDGE["판단 기반 속성"]
+            direction LR
+            J3["has_fact_change\n프로필 변경 감지?"]
+            J4["requires_past_memory\n과거 에피소드 참조 필요?"]
+        end
+
+        subgraph COND["의도별 조건부 속성"]
+            direction LR
+            D1["공감_케어\n→ requires_past_memory\n→ should_save_episode"]
+            D2["기록\n→ record_type\n   (profile · plan_check)\n→ profile_changes\n→ is_today (plan_check 시)"]
+            D3["수정\n→ modify_target\n   (workout · diet)\n→ search_targets"]
+            D4["계획 · 정보\n→ search_targets"]
+        end
+
+        OUTPUT --> COMMON
+        OUTPUT --> JUDGE
+        OUTPUT --> COND
+
+        COND --> ROUTER{"의도 라우터\n→ 각 경로로 분기"}
+    end
+
+    classDef process fill:#1a1a2e,stroke:#4fc3f7,color:#e0e0e0,stroke-width:1px
+    classDef decision fill:#263238,stroke:#4fc3f7,color:#e0e0e0,stroke-width:2px
+    classDef output fill:#1b5e20,stroke:#66bb6a,color:#e0e0e0,stroke-width:2px
+
+    class IN,S2,OUTPUT,ROUTE_SAFETY,ROUTE_CASUAL process
+    class S1,ROUTER decision
+    class C1,C2,C3,J3,J4,D1,D2,D3,D4 output

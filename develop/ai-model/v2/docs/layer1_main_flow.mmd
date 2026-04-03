@@ -1,0 +1,49 @@
+%% ============================================================
+%% 레이어 1: 메인 플로우
+%% ============================================================
+
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a1a2e', 'primaryTextColor': '#e0e0e0', 'lineColor': '#4fc3f7', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460'}}}%%
+
+graph TD
+    subgraph MAIN["레이어 1 — 메인 플로우"]
+        A["🚀 사용자 입력"] --> PRE["전처리\n• 턴별 State 초기화\n• 세션 첫 턴: WAS API 동기 호출\n  (프로필 + 오늘 플랜) → State 캐싱\n• 이후 턴: State 캐시 사용\n• 요약 체크\n• 이전 턴 WAS 쓰기 실패 시 재시도"]
+        PRE --> INTENT["2단계 의도 분석\n(규칙 필터 → Flash-Lite)"]
+
+        INTENT -->|"is_casual"| GEN
+        INTENT -->|"is_safety"| SAFETY["안전 경고 처리"]
+        INTENT -->|"fallback"| FB["Fallback 처리"]
+        INTENT -->|"공감_케어"| CARE{"requires\n_past_memory?"}
+        INTENT -->|"기록"| RECORD["기록 처리\n(State.today_plan 기반 검증)"]
+        INTENT -->|"계획"| SEARCH["검색 파이프라인"]
+        INTENT -->|"수정"| MODIFY_LOAD["플랜 조회\n(WAS 동기 호출\nmodify_target 기반\n운동 or 식단)"]
+        MODIFY_LOAD --> SEARCH
+        INTENT -->|"정보"| SEARCH
+
+        CARE -->|"false"| GEN
+        CARE -->|"true"| SEARCH
+
+        RECORD --> GEN
+        SEARCH --> GEN
+        SAFETY --> OUT
+        FB -->|"재추론"| INTENT
+        FB -->|"Clarification"| A
+
+        GEN["응답 생성\n(Flash + Persona)\n+ 자기 평가"] --> OUT["💬 최종 출력"]
+
+        OUT --> ASYNC["비동기 WAS 쓰기\n• 기록: 프로필 변경 / 완료 체크\n• 계획: 새 플랜 저장\n• 수정: 플랜 변경\n※ 실패 시 State.pending_writes에 기록"]
+
+        ASYNC --> FEEDBACK["피드백 루프\n(반응 분석 · 에피소드 저장)"]
+        FEEDBACK -.-> PRE
+    end
+
+    classDef startEnd fill:#4fc3f7,stroke:#0288d1,color:#000,stroke-width:2px
+    classDef process fill:#1a1a2e,stroke:#4fc3f7,color:#e0e0e0,stroke-width:1px
+    classDef decision fill:#263238,stroke:#4fc3f7,color:#e0e0e0,stroke-width:2px
+    classDef safety fill:#e65100,stroke:#ff9800,color:#fff,stroke-width:2px
+    classDef async fill:#1565c0,stroke:#42a5f5,color:#e0e0e0,stroke-width:2px
+
+    class A,OUT startEnd
+    class PRE,INTENT,GEN,SEARCH,RECORD,FB,FEEDBACK,MODIFY_LOAD process
+    class CARE decision
+    class SAFETY safety
+    class ASYNC async
