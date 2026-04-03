@@ -5,7 +5,9 @@
       "Bash(py --version)",
       "Bash(py:*)",
       "Bash(py -c \":*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(python -c \":*)",
+      "Bash(start:*)"
     ]
   }
 }

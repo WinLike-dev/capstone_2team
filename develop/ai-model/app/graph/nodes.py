@@ -19,10 +19,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from app.graph.state import HealthMateState
 
 # ── LLM 인스턴스 (노드 역할에 따라 모델 분리) ──────────────────────────────────
-# 전문가 노드 + 플랜 초안: 최신 고성능 모델 (gemini-3-flash-preview)
-_llm_expert = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0.3)
+# 전문가 노드 + 플랜 초안: 무료 티어 지원 모델 (gemini-2.5-flash)
+_llm_expert = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
 
-# 의도 파악 / 평가 / 재질문: 빠르고 가벼운 모델 (gemini-2.5-flash)
+# 의도 파악 / 평가 / 재질문: 무료 티어 경량 모델 (gemini-2.5-flash-lite)
 _llm_router = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.3)
 
 
