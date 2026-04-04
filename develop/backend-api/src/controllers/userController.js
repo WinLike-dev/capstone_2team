@@ -72,6 +72,19 @@ exports.updateProfile = async (req, res) => {
     // user_id는 body에서 받지 않지만, 만약 섞여 들어왔다면 제외 (updateFields 방어)
     const { user_id, ...updateFields } = req.body;
 
+    // 만약 넘어온 데이터 중에 닉네임이 있다면 users 테이블 먼저 업데이트 수행
+    if (updateFields.nickname) {
+      const { error: nickErr } = await supabase
+        .from('users')
+        .update({ nickname: updateFields.nickname })
+        .eq('user_id', userId);
+
+      if (nickErr) throw nickErr;
+      
+      // user_health_profiles 테이블에는 nickname 컬럼이 없으므로 객체에서 지워줌
+      delete updateFields.nickname;  
+    }
+
     // 1. 기존 정보 조회
     const { data: existingProfile, error: fetchErr } = await supabase
       .from('user_health_profiles')
