@@ -96,7 +96,16 @@ exports.login = async (req, res) => {
             return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         }
 
-        // 3. JWT 토큰 생성
+        // 3. 온보딩(건강 프로필) 작성 여부 확인
+        const { data: profile } = await supabase
+            .from('user_health_profiles')
+            .select('user_id')
+            .eq('user_id', user.user_id)
+            .single();
+
+        user.has_health_profile = !!profile;
+
+        // 4. JWT 토큰 생성
         const payload = {
             user_id: user.user_id,
             login_id: user.login_id
@@ -135,6 +144,15 @@ exports.getMe = async (req, res) => {
         if (error || !user) {
             return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
         }
+
+        // 온보딩(건강 프로필) 작성 여부 확인
+        const { data: profile } = await supabase
+            .from('user_health_profiles')
+            .select('user_id')
+            .eq('user_id', userId)
+            .single();
+
+        user.has_health_profile = !!profile;
 
         res.json(user);
     } catch (err) {
