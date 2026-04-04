@@ -7,7 +7,7 @@ LangGraph StateGraph를 사용하여 사용자 입력 의도를 파악하고,
 
 ## 기술 스택
 - **Framework**: FastAPI + LangGraph + LangChain
-- **LLM (전문가 노드)**: `gemini-3-flash-preview` — Exercise Expert, Diet Expert, Plan Draft
+- **LLM (전문가 노드)**: `gemini-2.5-flash` — Exercise Expert, Diet Expert, Plan Draft
 - **LLM (라우터 노드)**: `gemini-2.5-flash-lite` — Super Agent, Evaluator, Reask
 - **Python**: 3.14
 - **주요 패키지**: `langgraph`, `langchain-google-genai`, `fastapi`, `uvicorn`, `python-dotenv`
@@ -41,9 +41,9 @@ START → [Super Agent] → confidence < 0.7 → [Reask] → END
 | 노드 | 역할 | 모델 |
 |---|---|---|
 | Super Agent | 의도(운동/식단) + 확신도 파악. Pydantic Structured Output 사용 | `gemini-2.5-flash-lite` |
-| Exercise Expert | 헬스 트레이너 페르소나. 운동 조언만 생성 (식단 내용 배제) | `gemini-3-flash-preview` |
-| Diet Expert | 영양사 페르소나. 식단 조언만 생성 (운동 내용 배제) | `gemini-3-flash-preview` |
-| Plan Draft | 전문가 조언 → 실행 가능한 플랜 초안. intent 기반 도메인 제한 | `gemini-3-flash-preview` |
+| Exercise Expert | 헬스 트레이너 페르소나. 운동 조언만 생성 (식단 내용 배제) | `gemini-2.5-flash` |
+| Diet Expert | 영양사 페르소나. 식단 조언만 생성 (운동 내용 배제) | `gemini-2.5-flash` |
+| Plan Draft | 전문가 조언 → 실행 가능한 플랜 초안. intent 기반 도메인 제한 | `gemini-2.5-flash` |
 | Evaluator | 환각/위험 가이드 자체 검증. Pydantic Structured Output 사용 | `gemini-2.5-flash-lite` |
 | Reask | 확신도 부족 or 평가 FAIL 시 재질문 안내 메시지 생성 | `gemini-2.5-flash-lite` |
 
@@ -104,3 +104,4 @@ Swagger UI: `http://localhost:8000/docs`
 | `.env` 파싱 실패 | 파일이 UTF-16으로 저장됨 | UTF-8로 재저장 |
 | `gemini-3-flash-preview` 응답이 `list[dict]` 형태 | 모델이 content를 블록 형태로 반환 | `_extract_text()` 헬퍼로 텍스트 추출 |
 | 운동 질문에 식단 답변 포함 | 전문가/플랜 프롬프트에 도메인 제한 없음 | 각 노드 프롬프트에 타 도메인 배제 명시 |
+| `gemini-2.0-flash` / `gemini-2.0-flash-lite` 429 오류 | 무료 티어 API 키에서 2.0 계열 free_tier quota=0 | `gemini-2.5-flash` / `gemini-2.5-flash-lite`로 교체 |
