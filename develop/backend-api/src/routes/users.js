@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const authMiddleware = require('../middleware/auth');
 
-// 기본 유저 정보 (프로토타입: 인증 미들웨어 없음, 추후 추가 예정)
-// router.get('/me', userController.getMe);
+// 모든 users 관련 API에 JWT 토큰 인증 강제 적용
+router.use(authMiddleware);
 
 // 1. 건강 프로필 (user_health_profiles)
 router.get('/profile', userController.getProfile);

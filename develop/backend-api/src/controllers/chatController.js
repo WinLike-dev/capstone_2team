@@ -10,11 +10,9 @@ const AI_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT) || 30000;
 // @access  Public (프로토타입 — 인증 미들웨어 없음)
 exports.sendMessage = async (req, res) => {
     try {
-        const { user_id, message, is_first_message } = req.body;
+        const userId = req.user.user_id;
+        const { message, is_first_message } = req.body;
 
-        if (!user_id) {
-            return res.status(400).json({ error: 'user_id가 필요합니다.' });
-        }
         if (!message) {
             return res.status(400).json({ error: '메시지를 입력해주세요.' });
         }
@@ -27,7 +25,7 @@ exports.sendMessage = async (req, res) => {
             const { data: profile } = await supabase
                 .from('user_health_profiles')
                 .select('*')
-                .eq('user_id', user_id)
+                .eq('user_id', userId)
                 .single();
 
             if (profile) {
@@ -49,7 +47,7 @@ exports.sendMessage = async (req, res) => {
         const { data: exercises } = await supabase
             .from('user_exercise_plans')
             .select('*, exercise_items(*)')
-            .eq('user_id', user_id)
+            .eq('user_id', userId)
             .gte('target_date', today)
             .order('created_at', { ascending: true });
 
@@ -57,13 +55,13 @@ exports.sendMessage = async (req, res) => {
         const { data: meals } = await supabase
             .from('user_meal_plans')
             .select('*')
-            .eq('user_id', user_id)
+            .eq('user_id', userId)
             .gte('target_date', today)
             .order('created_at', { ascending: true });
 
         // 4. AI 서버로 전송할 페이로드 구성
         const payload = {
-            user_id,
+            user_id: userId,
             ...(userProfile && { user_profile: userProfile }),  // 첫 메시지일 때만 포함
             user_message: message,
 
@@ -115,13 +113,13 @@ exports.sendMessage = async (req, res) => {
             // 운동 플랜 수정
             if ((action === 'modify_exercise' || action === 'modify_both')
                 && aiResponseData.data?.modified_exercise_plans) {
-                await applyExerciseModifications(aiResponseData.data.modified_exercise_plans, user_id, today);
+                await applyExerciseModifications(aiResponseData.data.modified_exercise_plans, userId, today);
             }
 
             // 식단 플랜 수정
             if ((action === 'modify_meal' || action === 'modify_both')
                 && aiResponseData.data?.modified_meal_plans) {
-                await applyMealModifications(aiResponseData.data.modified_meal_plans, user_id, today);
+                await applyMealModifications(aiResponseData.data.modified_meal_plans, userId, today);
             }
         }
 

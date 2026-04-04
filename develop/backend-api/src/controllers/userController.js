@@ -5,14 +5,18 @@ const supabase = require('../config/db');
 // @access  Public (프로토타입)
 exports.getProfile = async (req, res) => {
   try {
-    const userId = req.query.user_id;
-    if (!userId) return res.status(400).json({ error: 'user_id가 필요합니다.' });
+    const userId = req.user.user_id;
 
     const { data: profile, error } = await supabase
       .from('user_health_profiles')
-      .select('*')
+      .select('*, users(nickname)')
       .eq('user_id', userId)
       .single();
+
+    if (profile && profile.users) {
+      profile.nickname = profile.users.nickname;
+      delete profile.users;
+    }
 
     res.json(profile || {});
   } catch (err) {
@@ -25,13 +29,12 @@ exports.getProfile = async (req, res) => {
 // @access  Public (프로토타입)
 exports.saveProfile = async (req, res) => {
   try {
+    const userId = req.user.user_id;
     // 범용 정보만 받음 (목표 칼로리는 사용하지 않음)
     const {
-      user_id, mbti, gender, age, height, weight,
+      mbti, gender, age, height, weight,
       goal, activity_level, medical_history, allergies
     } = req.body;
-
-    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
 
     let calculatedBmi = null;
 
@@ -42,7 +45,7 @@ exports.saveProfile = async (req, res) => {
     }
 
     const profileData = {
-      user_id, mbti, gender, age, height, weight, bmi: calculatedBmi,
+      user_id: userId, mbti, gender, age, height, weight, bmi: calculatedBmi,
       goal, activity_level, medical_history, allergies
     };
 
@@ -65,14 +68,15 @@ exports.saveProfile = async (req, res) => {
 // @access  Public (프로토타입)
 exports.updateProfile = async (req, res) => {
   try {
+    const userId = req.user.user_id;
+    // user_id는 body에서 받지 않지만, 만약 섞여 들어왔다면 제외 (updateFields 방어)
     const { user_id, ...updateFields } = req.body;
-    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
 
     // 1. 기존 정보 조회
     const { data: existingProfile, error: fetchErr } = await supabase
       .from('user_health_profiles')
       .select('*')
-      .eq('user_id', user_id)
+      .eq('user_id', userId)
       .single();
 
     if (fetchErr) throw fetchErr;
@@ -81,7 +85,7 @@ exports.updateProfile = async (req, res) => {
     const mergedProfile = { ...existingProfile, ...updateFields };
 
     // 3. 재계산 로직 수행 (BMI)
-    
+
     // BMI 재계산
     let calculatedBmi = mergedProfile.bmi;
     if (mergedProfile.height && mergedProfile.weight) {
@@ -95,7 +99,7 @@ exports.updateProfile = async (req, res) => {
     const { data: updatedProfile, error: updateErr } = await supabase
       .from('user_health_profiles')
       .update(finalData)
-      .eq('user_id', user_id)
+      .eq('user_id', userId)
       .select()
       .single();
 
@@ -192,8 +196,9 @@ exports.updateMealStatus = async (req, res) => {
 // @access  Public (프로토타입)
 exports.addRecommendedExercise = async (req, res) => {
   try {
-    const { user_id, target_date, exercise_type, exercise_name, calories } = req.body;
-    if (!user_id || !target_date || !exercise_type || !exercise_name) {
+    const userId = req.user.user_id;
+    const { target_date, exercise_type, exercise_name, calories } = req.body;
+    if (!target_date || !exercise_type || !exercise_name) {
       return res.status(400).json({ error: '필수 파라미터가 누락되었습니다.' });
     }
 
@@ -201,7 +206,7 @@ exports.addRecommendedExercise = async (req, res) => {
     const { data: parentPlan, error: parentErr } = await supabase
       .from('user_exercise_plans')
       .select('*')
-      .eq('user_id', user_id)
+      .eq('user_id', userId)
       .eq('target_date', target_date)
       .eq('exercise_type', exercise_type)
       .single();
@@ -225,7 +230,7 @@ exports.addRecommendedExercise = async (req, res) => {
       const { data: newPlan, error: insertErr } = await supabase
         .from('user_exercise_plans')
         .insert({
-          user_id,
+          user_id: userId,
           exercise_type,
           total_calories: calories || 0,
           status: 0,
@@ -265,8 +270,9 @@ exports.addRecommendedExercise = async (req, res) => {
 // @access  Public (프로토타입)
 exports.replaceRecommendedMeal = async (req, res) => {
   try {
-    const { user_id, target_date, meal_type, food_name, calories } = req.body;
-    if (!user_id || !target_date || !meal_type || !food_name) {
+    const userId = req.user.user_id;
+    const { target_date, meal_type, food_name, calories } = req.body;
+    if (!target_date || !meal_type || !food_name) {
       return res.status(400).json({ error: '필수 파라미터가 누락되었습니다.' });
     }
 
@@ -274,7 +280,7 @@ exports.replaceRecommendedMeal = async (req, res) => {
     const { data: existingMeal } = await supabase
       .from('user_meal_plans')
       .select('meal_id')
-      .eq('user_id', user_id)
+      .eq('user_id', userId)
       .eq('target_date', target_date)
       .eq('meal_type', meal_type)
       .single();
@@ -300,7 +306,7 @@ exports.replaceRecommendedMeal = async (req, res) => {
       const { data: newMeal, error: insertErr } = await supabase
         .from('user_meal_plans')
         .insert({
-          user_id,
+          user_id: userId,
           target_date,
           meal_type,
           food_name,
@@ -325,12 +331,12 @@ exports.replaceRecommendedMeal = async (req, res) => {
 // @access  Public (프로토타입)
 exports.getCalendar = async (req, res) => {
   try {
-    const userId = req.query.user_id;
+    const userId = req.user.user_id;
     const startDate = req.query.start_date;
     const endDate = req.query.end_date;
 
-    if (!userId || !startDate || !endDate) {
-      return res.status(400).json({ error: 'user_id, start_date, end_date 파라미터가 모두 필요합니다.' });
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'start_date, end_date 파라미터가 모두 필요합니다.' });
     }
 
     // 1. 해당 기간의 운동 데이터 조회 (자식 아이템 포함)
