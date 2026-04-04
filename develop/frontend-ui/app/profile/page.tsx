@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 interface UserProfile {
   user_id?: string;
   email?: string;
+  nickname?: string;
   name?: string;
   age?: string | number;
   gender?: string;
@@ -48,8 +49,9 @@ export default function ProfilePage() {
   }, []);
 
   const handleLogout = () => {
+    localStorage.removeItem('healthAppToken');
     localStorage.removeItem('healthAppUser');
-    router.push('/onboarding');
+    router.push('/login');
   };
 
   const handleOpenEdit = () => {
@@ -73,6 +75,7 @@ export default function ProfilePage() {
     try {
       const payload = {
         user_id: data.user_id || data.email || 'unknown',
+        nickname: data.nickname || '',
         mbti: data.mbti || '',
         gender: data.gender || 'male',
         age: Number(data.age) || 0,
@@ -86,9 +89,17 @@ export default function ProfilePage() {
         user_instruction: data.user_instruction || '',
       };
 
-      const res = await fetch('/api/user/profile', {
+      const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      const endpoint = baseUrl ? `${baseUrl}/api/v1/users/profile` : '/api/v1/users/profile';
+
+      const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          'Authorization': `Bearer ${localStorage.getItem('healthAppToken')}`
+        },
         body: JSON.stringify(payload)
       });
       
@@ -182,7 +193,7 @@ export default function ProfilePage() {
           
           <div className="flex-1 relative z-10 w-full">
             <div className="flex items-center space-x-2 mb-1.5">
-              <h2 className="text-xl font-bold text-gray-900">{userData ? userData.name : '사용자'}</h2>
+              <h2 className="text-xl font-bold text-gray-900">{userData ? (userData.nickname || userData.name) : '사용자'}</h2>
               <CheckCircle2 className="w-4 h-4 text-[#2563eb]" />
             </div>
             
@@ -274,8 +285,8 @@ export default function ProfilePage() {
             <div className="p-6 overflow-y-auto flex-1 space-y-5 custom-scrollbar max-h-[70vh]">
               <div className="space-y-4 pb-24">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">이름</label>
-                  <input type="text" name="name" value={editForm.name || ''} onChange={handleFormChange} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">닉네임</label>
+                  <input type="text" name="nickname" value={editForm.nickname || editForm.name || ''} onChange={handleFormChange} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">

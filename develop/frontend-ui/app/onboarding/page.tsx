@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 export default function OnboardingPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: '',
     age: '',
     gender: '남성',
     height: '',
@@ -30,7 +29,6 @@ export default function OnboardingPage() {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!formData.name.trim()) return setErrorMsg('이름을 입력해주세요.');
     if (!formData.age || Number(formData.age) <= 0) return setErrorMsg('올바른 나이를 입력해주세요.');
     if (!formData.height || Number(formData.height) <= 0) return setErrorMsg('올바른 키를 입력해주세요.');
     if (!formData.weight || Number(formData.weight) <= 0) return setErrorMsg('올바른 몸무게를 입력해주세요.');
@@ -45,10 +43,12 @@ export default function OnboardingPage() {
 
       const genderStr = formData.gender === '남성' ? 'male' : 'female';
 
-      const storedUserId = localStorage.getItem('user_id');
+      const storedUserRaw = localStorage.getItem('healthAppUser');
+      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
+      const actualUserId = storedUser.user_id || 'unknown';
 
       const payload = {
-        user_id: storedUserId || formData.name, // 로그인 구현 전이라 이름을 id로 임시 사용
+        user_id: actualUserId,
         mbti: formData.mbti,
         gender: genderStr,
         age: parseInt(formData.age, 10),
@@ -76,6 +76,7 @@ export default function OnboardingPage() {
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
+          'Authorization': `Bearer ${localStorage.getItem('healthAppToken')}`
         },
         body: JSON.stringify(payload),
       });
@@ -93,7 +94,8 @@ export default function OnboardingPage() {
       }
 
       alert('등록이 완료되었습니다.');
-      localStorage.setItem('healthAppUser', JSON.stringify(finalData));
+      const mergedData = { ...storedUser, ...finalData };
+      localStorage.setItem('healthAppUser', JSON.stringify(mergedData));
       router.push('/');
     } catch (error) {
       console.error(error);
@@ -163,22 +165,10 @@ export default function OnboardingPage() {
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Name & Gender */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2 space-y-1.5 focus-within:text-[#2563eb] transition-colors">
-              <label className="text-sm font-bold ml-1 transition-colors">이름</label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full px-5 py-3.5 rounded-xl bg-gray-50/80 border border-gray-200 focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15 focus:bg-white focus:border-[#2563eb] transition-all font-medium placeholder-gray-400 text-gray-900"
-                placeholder="홍길동"
-              />
-            </div>
-            <div className="col-span-1 space-y-1.5 focus-within:text-[#2563eb] transition-colors">
-              <label className="text-sm font-bold ml-1 transition-colors">성별</label>
-              <div className="relative">
+          {/* Gender */}
+          <div className="space-y-1.5 focus-within:text-[#2563eb] transition-colors">
+            <label className="text-sm font-bold ml-1 transition-colors">성별</label>
+            <div className="relative">
                 <select
                   name="gender"
                   value={formData.gender}
@@ -195,8 +185,6 @@ export default function OnboardingPage() {
                 </div>
               </div>
             </div>
-          </div>
-
           {/* Age & Height */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5 focus-within:text-[#2563eb]">
