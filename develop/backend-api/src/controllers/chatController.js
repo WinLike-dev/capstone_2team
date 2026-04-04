@@ -39,10 +39,6 @@ exports.sendMessage = async (req, res) => {
                     bmi: profile.bmi,
                     goal: profile.goal,
                     activity_level: profile.activity_level,
-                    target_calories: profile.target_calories,
-                    target_carbs: profile.target_carbs,
-                    target_protein: profile.target_protein,
-                    target_fat: profile.target_fat,
                     medical_history: profile.medical_history,
                     allergies: profile.allergies
                 };

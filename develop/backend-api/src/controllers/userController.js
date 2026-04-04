@@ -1,5 +1,4 @@
 const supabase = require('../config/db');
-const calculator = require('../utils/calculator');
 
 // @route   GET /api/v1/users/profile
 // @desc    건강 프로필 조회
@@ -26,7 +25,7 @@ exports.getProfile = async (req, res) => {
 // @access  Public (프로토타입)
 exports.saveProfile = async (req, res) => {
   try {
-    // 문진표 정보만 받음 (target_*는 백엔드에서만 계산함)
+    // 범용 정보만 받음 (목표 칼로리는 사용하지 않음)
     const {
       user_id, mbti, gender, age, height, weight,
       goal, activity_level, medical_history, allergies
@@ -34,7 +33,6 @@ exports.saveProfile = async (req, res) => {
 
     if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
 
-    let targets = {};
     let calculatedBmi = null;
 
     // BMI 자동 계산
@@ -43,17 +41,9 @@ exports.saveProfile = async (req, res) => {
       calculatedBmi = parseFloat((weight / (heightInMeters * heightInMeters)).toFixed(1));
     }
 
-    // 백엔드에서 전적으로 자동 계산
-    if (gender && age && height && weight) {
-      const calculated = calculator.calculateTargets(gender, age, height, weight, activity_level, goal);
-      if (calculated) {
-        targets = calculated;
-      }
-    }
-
     const profileData = {
       user_id, mbti, gender, age, height, weight, bmi: calculatedBmi,
-      goal, activity_level, medical_history, allergies, ...targets
+      goal, activity_level, medical_history, allergies
     };
 
     const { data: profile, error } = await supabase
@@ -90,8 +80,8 @@ exports.updateProfile = async (req, res) => {
     // 2. 수정값과 기존 데이터 병합
     const mergedProfile = { ...existingProfile, ...updateFields };
 
-    // 3. 재계산 로직 수행 (BMI 및 목표 칼로리/단탄지)
-
+    // 3. 재계산 로직 수행 (BMI)
+    
     // BMI 재계산
     let calculatedBmi = mergedProfile.bmi;
     if (mergedProfile.height && mergedProfile.weight) {
@@ -99,21 +89,8 @@ exports.updateProfile = async (req, res) => {
       calculatedBmi = parseFloat((mergedProfile.weight / (heightInMeters * heightInMeters)).toFixed(1));
     }
 
-    let targets = {};
-    if (mergedProfile.gender && mergedProfile.age && mergedProfile.height && mergedProfile.weight) {
-      const calculated = calculator.calculateTargets(
-        mergedProfile.gender,
-        mergedProfile.age,
-        mergedProfile.height,
-        mergedProfile.weight,
-        mergedProfile.activity_level,
-        mergedProfile.goal
-      );
-      if (calculated) targets = calculated;
-    }
-
-    // 4. 재계산(BMI, 타겟) 데이터를 합쳐서 최종 업데이트
-    const finalData = { ...updateFields, bmi: calculatedBmi, ...targets };
+    // 4. 재계산(BMI) 데이터를 합쳐서 최종 업데이트
+    const finalData = { ...updateFields, bmi: calculatedBmi };
 
     const { data: updatedProfile, error: updateErr } = await supabase
       .from('user_health_profiles')
@@ -130,28 +107,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// @route   PUT /api/v1/users/targets
-// @desc    목표 섭취 칼로리 / 단탄지 수동 저장 (버튼 클릭 시)
-// @access  Public (프로토타입)
-exports.updateTargets = async (req, res) => {
-  try {
-    const { user_id, target_calories, target_carbs, target_protein, target_fat } = req.body;
-    if (!user_id) return res.status(400).json({ error: 'user_id가 필요합니다.' });
-
-    const { data: profile, error } = await supabase
-      .from('user_health_profiles')
-      .update({ target_calories, target_carbs, target_protein, target_fat })
-      .eq('user_id', user_id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.json({ message: '목표 수정 성공', profile });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
 
 // @route   PUT /api/v1/users/exercises/items/:item_id
 // @desc    개별 운동 항목 완료(체크) 토글 및 부모 상태(0,1,2) 자동 계산

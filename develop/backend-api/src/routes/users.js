@@ -9,7 +9,6 @@ const userController = require('../controllers/userController');
 router.get('/profile', userController.getProfile);
 router.post('/profile', userController.saveProfile);
 router.put('/profile', userController.updateProfile);
-router.put('/targets', userController.updateTargets);
 
 // 1-1. 캘린더 통합 조회 (user_exercise_plans, user_meal_plans)
 router.get('/calendar', userController.getCalendar);
