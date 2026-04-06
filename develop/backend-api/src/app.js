@@ -48,12 +48,16 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ─── API 라우터 ───────────────────────────────────────────────────────
+// ─── API 라우터 (프론트엔드용) ────────────────────────────────────────
 app.use('/api/v1/auth', require('./routes/auth'));
 app.use('/api/v1/users', require('./routes/users'));
 app.use('/api/v1/ai', require('./routes/ai'));
 app.use('/api/v1/admin', require('./routes/admin'));
 app.use('/api/v1/chat', require('./routes/chat'));
+
+// ─── Internal API 라우터 (FastAPI/AI 서버용) ──────────────────────────
+// was_api_contract.md 기준: /api/user/profile/:user_id 등
+app.use('/api', require('./routes/internal'));
 
 // ─── 에러 핸들러 (라우터 이후에 위치해야 함) ─────────────────────────
 app.use(notFoundHandler);

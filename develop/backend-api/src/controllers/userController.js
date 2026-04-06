@@ -1,4 +1,5 @@
 const supabase = require('../config/db');
+const aiEventService = require('../services/aiEventService');
 
 // @route   GET /api/v1/users/profile
 // @desc    건강 프로필 조회
@@ -56,6 +57,11 @@ exports.saveProfile = async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // AI 서버에 프로필 변경 이벤트 push (fire-and-forget)
+    const changedFields = Object.keys(profileData).filter(k => k !== 'user_id');
+    aiEventService.notifyProfileUpdated(userId, changedFields);
+
     res.json({ message: '프로필 저장 성공', profile });
   } catch (err) {
     console.error(err);
@@ -117,6 +123,11 @@ exports.updateProfile = async (req, res) => {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // AI 서버에 프로필 변경 이벤트 push (fire-and-forget)
+    const changedFields = Object.keys(finalData);
+    aiEventService.notifyProfileUpdated(userId, changedFields);
+
     res.json({ message: '프로필 업데이트 및 타겟 수치 조율 성공', profile: updatedProfile });
   } catch (err) {
     console.error(err);
