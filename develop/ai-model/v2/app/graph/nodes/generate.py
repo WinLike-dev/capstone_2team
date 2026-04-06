@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import date
 
 from app.core.draft_contract import normalize_draft_components, render_draft_preview
 from app.core.prompt_loader import compose_prompts, load_prompt
@@ -154,6 +155,8 @@ def _build_draft_system_prompt(state: GraphState, failure_reason: str | None) ->
     intent_prompt = _DRAFT_PROMPTS_BY_INTENT.get(intent, _DRAFT_DEFAULT_PROMPT)
 
     sections = [compose_prompts(_DRAFT_COMMON_PROMPT, intent_prompt)]
+
+    sections.append(f"오늘 날짜: {date.today().isoformat()}")
 
     emotion = state.get("emotion") or {}
     sections.append(

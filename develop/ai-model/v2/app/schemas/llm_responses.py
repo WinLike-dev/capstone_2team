@@ -31,10 +31,19 @@ class SelfEvalResponse(BaseModel):
     reason: str = Field(default="", description="Short failure reason when not passed")
 
 
+class ExerciseItem(BaseModel):
+    exercise_name: str = Field(description="세부 운동명 (예: 스쿼트, 데드리프트)")
+    sets: int = Field(default=3, description="세트 수")
+
+
 class PlanExtractItem(BaseModel):
-    name: str = Field(description="Plan item title")
-    detail: str = Field(default="", description="Plan item details")
-    day: str = Field(default="", description="Day or schedule slot")
+    name: str = Field(description="운동 종류 (workout: 근력/유산소/스트레칭 등) 또는 식사명 (diet: 아침/점심/저녁 등)")
+    detail: str = Field(default="", description="해당 세션 또는 식사의 간단한 설명")
+    day: str = Field(default="", description="날짜 (YYYY-MM-DD 형식)")
+    ex_list: list[ExerciseItem] = Field(
+        default_factory=list,
+        description="workout일 때만 채움 — 세부 운동 목록 [{exercise_name, sets}, ...]",
+    )
 
 
 PlanType = Literal["workout", "diet"]

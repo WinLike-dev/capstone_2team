@@ -64,6 +64,8 @@ class WASClient:
             raise ExternalServiceError(service="WAS", message="request timeout")
         except httpx.HTTPStatusError as exc:
             raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
+        except httpx.RequestError as exc:
+            raise ExternalServiceError(service="WAS", message=f"connection error: {exc}")
         return resp.json().get("data", resp.json())
 
     async def _post(self, path: str, body: dict) -> None:
@@ -74,6 +76,8 @@ class WASClient:
             raise ExternalServiceError(service="WAS", message="request timeout")
         except httpx.HTTPStatusError as exc:
             raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
+        except httpx.RequestError as exc:
+            raise ExternalServiceError(service="WAS", message=f"connection error: {exc}")
 
     async def _put(self, path: str, body: dict) -> None:
         try:
@@ -83,3 +87,5 @@ class WASClient:
             raise ExternalServiceError(service="WAS", message="request timeout")
         except httpx.HTTPStatusError as exc:
             raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
+        except httpx.RequestError as exc:
+            raise ExternalServiceError(service="WAS", message=f"connection error: {exc}")

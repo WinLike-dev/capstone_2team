@@ -31,12 +31,19 @@ class WASUserProfile(BaseModel):
     model_config = {"extra": "allow"}  # WAS에서 추가 필드 오면 무시 않고 보존
 
 
+class WASExerciseItem(BaseModel):
+    """세부 운동 항목 (workout 계획용)."""
+    exercise_name: str
+    sets: int = 3
+
+
 class WASPlanItem(BaseModel):
     """플랜 항목 하나."""
     id: Optional[str] = None
     name: str
     detail: Optional[str] = None
     day: Optional[str] = None
+    ex_list: list[WASExerciseItem] = Field(default_factory=list)
     completed: bool = False
 
     model_config = {"extra": "allow"}
@@ -112,7 +119,10 @@ def to_plan_create(extracted: dict[str, Any]) -> dict[str, Any] | None:
             name=item.get("name", ""),
             detail=item.get("detail"),
             day=item.get("day"),
-        ).model_dump(exclude_none=True)
+            ex_list=[
+                WASExerciseItem(**ex) for ex in item.get("ex_list", [])
+            ],
+        ).model_dump(exclude_none=True, exclude={"completed"})
         for item in extracted["items"]
     ]
     req = WASPlanCreateRequest(
@@ -134,7 +144,10 @@ def to_plan_update(extracted: dict[str, Any]) -> dict[str, Any] | None:
             name=item.get("name", ""),
             detail=item.get("detail"),
             day=item.get("day"),
-        ).model_dump(exclude_none=True)
+            ex_list=[
+                WASExerciseItem(**ex) for ex in item.get("ex_list", [])
+            ],
+        ).model_dump(exclude_none=True, exclude={"completed"})
         for item in extracted["items"]
     ]
     req = WASPlanUpdateRequest(
