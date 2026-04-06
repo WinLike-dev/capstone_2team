@@ -1,0 +1,93 @@
+F401 [*] `typing.Any` imported but unused
+  --> app\graph\nodes\generate.py:19:20
+   |
+17 | import json
+18 | import logging
+19 | from typing import Any
+   |                    ^^^
+20 |
+21 | from app.graph.deps import NodeDeps
+   |
+help: Remove unused import: `typing.Any`
+
+F401 [*] `json` imported but unused
+  --> app\graph\nodes\intent.py:14:8
+   |
+12 | from __future__ import annotations
+13 |
+14 | import json
+   |        ^^^^
+15 | import logging
+16 | import re
+   |
+help: Remove unused import: `json`
+
+F401 [*] `json` imported but unused
+  --> app\graph\nodes\search.py:14:8
+   |
+13 | import asyncio
+14 | import json
+   |        ^^^^
+15 | import logging
+16 | from typing import Any
+   |
+help: Remove unused import: `json`
+
+F401 [*] `typing.Any` imported but unused
+  --> app\graph\nodes\search.py:16:20
+   |
+14 | import json
+15 | import logging
+16 | from typing import Any
+   |                    ^^^
+17 |
+18 | from app.graph.deps import NodeDeps
+   |
+help: Remove unused import: `typing.Any`
+
+F401 [*] `app.schemas.was.to_plan_check` imported but unused
+  --> app\graph\nodes\was_write.py:17:29
+   |
+15 | from app.graph.deps import NodeDeps
+16 | from app.schemas.state import PendingWrite
+17 | from app.schemas.was import to_plan_check, to_plan_create, to_plan_update, to_profile_update
+   |                             ^^^^^^^^^^^^^
+18 | from app.schemas.llm_responses import PlanExtractResponse, PlanModifyResponse
+   |
+help: Remove unused import
+
+F401 [*] `app.schemas.was.to_plan_create` imported but unused
+  --> app\graph\nodes\was_write.py:17:44
+   |
+15 | from app.graph.deps import NodeDeps
+16 | from app.schemas.state import PendingWrite
+17 | from app.schemas.was import to_plan_check, to_plan_create, to_plan_update, to_profile_update
+   |                                            ^^^^^^^^^^^^^^
+18 | from app.schemas.llm_responses import PlanExtractResponse, PlanModifyResponse
+   |
+help: Remove unused import
+
+F401 [*] `app.schemas.was.to_plan_update` imported but unused
+  --> app\graph\nodes\was_write.py:17:60
+   |
+15 | from app.graph.deps import NodeDeps
+16 | from app.schemas.state import PendingWrite
+17 | from app.schemas.was import to_plan_check, to_plan_create, to_plan_update, to_profile_update
+   |                                                            ^^^^^^^^^^^^^^
+18 | from app.schemas.llm_responses import PlanExtractResponse, PlanModifyResponse
+   |
+help: Remove unused import
+
+F401 [*] `app.schemas.was.to_profile_update` imported but unused
+  --> app\graph\nodes\was_write.py:17:76
+   |
+15 | from app.graph.deps import NodeDeps
+16 | from app.schemas.state import PendingWrite
+17 | from app.schemas.was import to_plan_check, to_plan_create, to_plan_update, to_profile_update
+   |                                                                            ^^^^^^^^^^^^^^^^^
+18 | from app.schemas.llm_responses import PlanExtractResponse, PlanModifyResponse
+   |
+help: Remove unused import
+
+Found 8 errors.
+[*] 8 fixable with the `--fix` option.

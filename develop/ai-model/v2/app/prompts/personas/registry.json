@@ -1,0 +1,35 @@
+{
+  "default_persona": "default",
+  "personas": {
+    "default": {
+      "label": "Default Coach",
+      "prompt_file": "default.md",
+      "active": true,
+      "fallback": "default"
+    },
+    "spartan": {
+      "label": "Spartan Coach",
+      "prompt_file": "spartan.md",
+      "active": true,
+      "fallback": "default"
+    },
+    "warm": {
+      "label": "Warm Coach",
+      "prompt_file": "warm.md",
+      "active": true,
+      "fallback": "default"
+    },
+    "evidence": {
+      "label": "Evidence Coach",
+      "prompt_file": "evidence.md",
+      "active": true,
+      "fallback": "default"
+    },
+    "buddy": {
+      "label": "Buddy Coach",
+      "prompt_file": "buddy.md",
+      "active": true,
+      "fallback": "default"
+    }
+  }
+}

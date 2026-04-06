@@ -68,6 +68,33 @@ class PineconeClient:
         }
         return await self._upsert(self._important_ns(user_id), vector, metadata)
 
+    async def upsert_external(
+        self,
+        vector: list[float],
+        text: str,
+        source: str,
+        category: str,
+        tags: list[str] | None = None,
+        extra_metadata: dict[str, Any] | None = None,
+    ) -> str:
+        metadata = {
+            "text": text,
+            "source": source,
+            "category": category,
+            "tags": tags or [],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        if extra_metadata:
+            metadata.update(extra_metadata)
+        return await self._upsert(self.EXTERNAL_NS, vector, metadata)
+
+    # ── 삭제 ─────────────────────────────────────────────────────────────────
+
+    async def delete_important(self, user_id: str, ids: list[str]) -> None:
+        if not ids:
+            return
+        await self._index.delete(ids=ids, namespace=self._important_ns(user_id))
+
     # ── 내부 구현 ─────────────────────────────────────────────────────────────
 
     async def _search(
@@ -84,7 +111,13 @@ class PineconeClient:
                 "id": m.id,
                 "score": m.score,
                 "text": m.metadata.get("text", ""),
-                "source": source,
+                "source": m.metadata.get("source", source),
+                "category": m.metadata.get("category", ""),
+                "tags": m.metadata.get("tags", []),
+                "subtopic": m.metadata.get("subtopic", ""),
+                "chunk_title": m.metadata.get("chunk_title", ""),
+                "evidence_type": m.metadata.get("evidence_type", ""),
+                "year": m.metadata.get("year", ""),
                 "timestamp": m.metadata.get("timestamp", ""),
             }
             for m in result.matches

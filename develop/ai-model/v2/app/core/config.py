@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -18,10 +19,19 @@ class Settings(BaseSettings):
     WAS_TIMEOUT: float = 10.0
     # Summary
     SUMMARY_TURN_INTERVAL: int = 10  # 턴 카운터 임계값
-    MAX_MESSAGES: int = 20            # State에 보관할 최대 메시지 수
+    MAX_MESSAGES: int = 10            # State에 보관할 최대 메시지 수 (경량화)
+    # Checkpoint
+    CHECKPOINT_DB_PATH: str = "data/checkpoints.sqlite"
+    CHECKPOINT_TTL_HOURS: int = 72    # 오래된 체크포인트 자동 삭제 (시간)
     # App
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
+
+    # LangChain / LangSmith Tracing
+    LANGCHAIN_TRACING_V2: str = "false"
+    LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com"
+    LANGCHAIN_API_KEY: Optional[str] = None
+    LANGCHAIN_PROJECT: str = "capstone-v2"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

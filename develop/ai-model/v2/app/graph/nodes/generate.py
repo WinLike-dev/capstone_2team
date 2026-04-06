@@ -1,160 +1,266 @@
-"""응답 생성 노드 — Layer 3 응답 생성 + 자기 평가 상세 구현.
-
-Flash + Persona DB로 응답 생성:
-  - State.emotion → 톤 조절
-  - State.profile_changes → 변경 확인 문구
-  - State.today_plan → 기록 검증
-  - modify_plan_context → 수정 반영
-  - State.search_quality → degraded 안내
-  - 출처 태그 → 기억·정보 구분
-
-자기 평가 (안전경고 · 공감_케어만 실행):
-  - 통과: 최종 출력
-  - 실패: max=2 재생성 → 초과 시 부분 패치
-"""
+"""Draft generation node for responses and proposed plans."""
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 
+from app.core.draft_contract import normalize_draft_components, render_draft_preview
+from app.core.prompt_loader import compose_prompts, load_prompt
 from app.graph.deps import NodeDeps
-from app.schemas.state import GraphState
+from app.schemas.llm_responses import DraftResponse, SelfEvalResponse
+from app.schemas.state import DraftComponents, GraphState
 
 logger = logging.getLogger(__name__)
 
-MAX_SELF_EVAL = 2
+INTENT_CARE = "공감_케어"
+INTENT_PLAN = "계획"
+INTENT_MODIFY = "수정"
+INTENT_APPROVAL = "계획_승인"
+INTENT_INFO = "정보"
+INTENT_SAFETY = "안전경고"
 
-_SELF_EVAL_INTENTS = {"안전경고", "공감_케어"}
+MAX_SELF_EVAL = 1
+_SELF_EVAL_INTENTS = {INTENT_SAFETY, INTENT_CARE}
 
-_GENERATION_SYSTEM_PROMPT = """
-당신은 친절하고 전문적인 헬스 AI 코치입니다.
-사용자의 운동·식단·건강 목표를 돕는 개인 AI입니다.
+_PLAN_TYPE_KEYWORDS = {
+    "diet": ("식단", "식사", "영양", "칼로리", "다이어트", "meal", "diet", "nutrition", "calorie"),
+    "workout": ("운동", "러닝", "달리기", "헬스", "근력", "유산소", "웨이트", "exercise", "workout", "training", "run"),
+}
 
-응답 원칙:
-- 감정(emotion) 기반 톤 조절: 슬픔/불안 → 따뜻하고 공감적, 기쁨 → 밝고 격려적
-- 검색 결과가 있으면 출처를 [기억] 또는 [정보]로 표시
-- search_quality가 degraded이면 "정확한 정보를 찾기 어려워 일반적인 내용으로 답변"을 언급
-- profile_changes가 있으면 변경 사항을 확인하는 문구 포함
-- 수정 플랜이 있으면 구체적인 변경 내용을 반영
-- 응답은 한국어로, 자연스럽고 친근하게
-"""
+_DRAFT_COMMON_PROMPT = "nodes/generate/draft_common.md"
+_DRAFT_DEFAULT_PROMPT = "nodes/generate/draft_default.md"
+_DRAFT_PROMPTS_BY_INTENT = {
+    INTENT_PLAN: "nodes/generate/draft_plan.md",
+    INTENT_MODIFY: "nodes/generate/draft_modify.md",
+    INTENT_INFO: "nodes/generate/draft_info.md",
+    INTENT_CARE: "nodes/generate/draft_care.md",
+    INTENT_SAFETY: "nodes/generate/draft_safety.md",
+}
 
-_SELF_EVAL_PROMPT = """
-아래 응답을 평가하세요:
-1. 톤이 감정 상태에 적합한가?
-2. 할루시네이션(없는 정보 지어내기)이 없는가?
-3. 안전 제약사항을 위반하지 않는가?
-
-JSON: {"pass": true/false, "reason": "이유 (실패 시)"}
-"""
+_SELF_EVAL_PROMPT = load_prompt("nodes/generate/self_eval.md")
 
 
 def make_generate_node(deps: NodeDeps):
     async def generate_node(state: GraphState) -> dict:
-        # 이미 응답이 세팅된 경우 (record 에러, safety 등)
         if state.get("response"):
-            response = state["response"]
-            return {
-                "messages": [
-                    {"role": "user", "content": state["user_message"]},
-                    {"role": "assistant", "content": response},
-                ]
-            }
+            return {}
 
-        context = _build_generation_context(state)
         intent = state.get("intent", "")
         eval_count = state.get("self_eval_count", 0)
         failure_reason = state.get("self_eval_failure_reason")
 
-        system_prompt = _build_system_prompt(state, failure_reason)
+        if intent == INTENT_APPROVAL:
+            return _build_approval_draft(state)
+
+        context = _build_draft_context(state)
+        system_prompt = _build_draft_system_prompt(state, failure_reason)
 
         try:
-            response = await deps.gemini.generate_text(
+            raw = await deps.router.generate(
                 system_prompt=system_prompt,
                 user_content=context,
+                response_schema=DraftResponse,
             )
-        except Exception as e:
-            logger.error("응답 생성 실패: %s", e)
-            response = "죄송해요, 잠시 오류가 발생했어요. 다시 말씀해 주시겠어요?"
+            draft_result = DraftResponse.model_validate_json(raw)
+            draft_components = _build_components_from_result(draft_result, state)
+            draft_text = render_draft_preview(draft_components)
+            proposed_plan = [
+                item.model_dump() for item in draft_result.proposed_plan
+            ] if draft_result.proposed_plan else []
+            proposed_plan_type = _resolve_proposed_plan_type(state, draft_result, proposed_plan)
+            proposed_plan_action = _resolve_proposed_plan_action(state, proposed_plan)
+        except Exception as exc:
+            logger.error("Draft generation failed: %s", exc)
+            draft_components = normalize_draft_components(
+                None,
+                fallback_text="초안을 생성하는 중 오류가 발생했습니다. 다시 시도해 주세요.",
+            )
+            draft_text = render_draft_preview(draft_components)
+            proposed_plan = []
+            proposed_plan_type = None
+            proposed_plan_action = None
 
-        # ── 자기 평가 (안전경고 · 공감_케어만) ─────────────────────────────
+        if not proposed_plan and intent not in {INTENT_PLAN, INTENT_MODIFY}:
+            proposed_plan = state.get("proposed_plan")
+            proposed_plan_type = state.get("proposed_plan_type")
+            proposed_plan_action = state.get("proposed_plan_action")
+
         if intent in _SELF_EVAL_INTENTS:
-            passed, reason = await _self_evaluate(deps, state, response)
+            passed, reason = await _self_evaluate(deps, state, draft_text)
             if not passed:
                 if eval_count < MAX_SELF_EVAL:
-                    logger.info("자기 평가 실패, 재생성: count=%d, reason=%s", eval_count, reason)
+                    logger.info("Self-eval failed, retrying: count=%d reason=%s", eval_count, reason)
                     return {
                         "self_eval_count": eval_count + 1,
                         "self_eval_failure_reason": reason,
                     }
-                else:
-                    # 부분 패치
-                    logger.warning("자기 평가 최대 재시도 초과, 부분 패치 적용")
-                    response = _partial_patch(response, reason)
+                logger.warning("Self-eval retry limit reached, applying partial patch")
+                draft_components = _apply_partial_patch(draft_components, reason)
+                draft_text = render_draft_preview(draft_components)
 
         return {
-            "response": response,
+            "draft_response": draft_text,
+            "draft_components": draft_components,
+            "proposed_plan": proposed_plan,
+            "proposed_plan_type": proposed_plan_type,
+            "proposed_plan_action": proposed_plan_action,
             "self_eval_count": 0,
             "self_eval_failure_reason": None,
-            "messages": [
-                {"role": "user", "content": state["user_message"]},
-                {"role": "assistant", "content": response},
-            ],
         }
 
     return generate_node
 
 
-def _build_generation_context(state: GraphState) -> str:
+def _build_draft_context(state: GraphState) -> str:
     parts: list[str] = []
 
-    # 이전 대화 맥락
     messages = state.get("messages", [])
     if messages:
         history = "\n".join(
-            f"{m['role']}: {m['content']}" for m in messages[-6:]
+            f"{message['role']}: {message['content'][:200]}"
+            for message in messages[-4:]
         )
-        parts.append(f"[대화 맥락]\n{history}")
+        parts.append(f"[최근 대화]\n{history}")
 
-    # 현재 메시지
-    parts.append(f"\n[현재 질문]\n{state['user_message']}")
+    parts.append(f"[현재 질문]\n{state['user_message']}")
 
-    # 검색 결과
     results = state.get("search_results") or []
     if results:
         snippets = "\n".join(
-            f"[{r['source']}] {r['text'][:300]}" for r in results[:5]
+            f"[{result.get('source', 'unknown')}] {result.get('text', '')[:200]}"
+            for result in results[:3]
         )
-        parts.append(f"\n[참고 정보]\n{snippets}")
+        parts.append(f"[참고 정보]\n{snippets}")
 
-    # 수정 플랜 컨텍스트
-    modify_ctx = state.get("modify_plan_context")
-    if modify_ctx:
-        parts.append(f"\n[현재 전체 플랜]\n{json.dumps(modify_ctx, ensure_ascii=False)[:500]}")
+    modify_context = state.get("modify_plan_context")
+    if modify_context:
+        parts.append(f"[현재 전체 플랜]\n{json.dumps(modify_context, ensure_ascii=False)[:500]}")
 
-    # 프로필 변경사항
+    profile = state.get("user_profile")
+    if profile:
+        profile_copy = profile.copy()
+        profile_copy.pop("mbti", None)
+        parts.append(f"[사용자 프로필]\n{json.dumps(profile_copy, ensure_ascii=False)}")
+
     changes = state.get("profile_changes")
     if changes:
-        parts.append(f"\n[프로필 변경 사항]\n{json.dumps(changes, ensure_ascii=False)}")
+        parts.append(f"[프로필 변경 요청]\n{json.dumps(changes, ensure_ascii=False)}")
 
-    return "\n".join(parts)
+    return "\n\n".join(parts)
 
 
-def _build_system_prompt(state: GraphState, failure_reason: str | None) -> str:
-    prompt = _GENERATION_SYSTEM_PROMPT
+def _build_draft_system_prompt(state: GraphState, failure_reason: str | None) -> str:
+    intent = state.get("intent", "")
+    intent_prompt = _DRAFT_PROMPTS_BY_INTENT.get(intent, _DRAFT_DEFAULT_PROMPT)
+
+    sections = [compose_prompts(_DRAFT_COMMON_PROMPT, intent_prompt)]
+
     emotion = state.get("emotion") or {}
-    label = emotion.get("label", "중립")
-    intensity = emotion.get("intensity", 0.0)
-    prompt += f"\n\n현재 사용자 감정: {label} (강도 {intensity:.1f})"
+    sections.append(
+        f"현재 사용자 감정: {emotion.get('label', '중립')} (강도 {emotion.get('intensity', 0.0):.1f})"
+    )
 
     if state.get("search_quality") == "degraded":
-        prompt += "\n\n주의: 검색 결과가 충분하지 않으므로 일반적인 내용으로 답변하고 이를 안내하세요."
+        sections.append(
+            "주의: 검색 결과가 충분하지 않으므로 일반 원칙 수준으로만 답하고, 근거의 한계를 분명히 드러낸다."
+        )
 
     if failure_reason:
-        prompt += f"\n\n이전 응답 실패 이유: {failure_reason}\n이를 개선하여 다시 작성하세요."
+        sections.append(
+            f"이전 Draft는 자기 평가를 통과하지 못했다. 실패 이유: {failure_reason}"
+        )
 
-    return prompt
+    return "\n\n".join(section for section in sections if section)
+
+
+def _build_components_from_result(draft_result: DraftResponse, state: GraphState) -> DraftComponents:
+    payload = draft_result.model_dump()
+    components = normalize_draft_components(payload)
+
+    if not components["search_grounding_summary"] and state.get("search_results"):
+        components["search_grounding_summary"] = "검색 결과를 참고해 핵심 근거만 정리했다."
+
+    return components
+
+
+def _build_approval_draft(state: GraphState) -> dict:
+    proposed_plan = state.get("proposed_plan") or []
+    if not proposed_plan:
+        components = normalize_draft_components(
+            {
+                "core_message": "현재 승인 대기 중인 계획이 없습니다.",
+                "suggested_action": "먼저 계획 제안을 받은 뒤 승인 요청을 해 주세요.",
+            }
+        )
+        return {
+            "draft_response": render_draft_preview(components),
+            "draft_components": components,
+            "proposed_plan": None,
+            "proposed_plan_type": None,
+            "proposed_plan_action": None,
+            "self_eval_count": 0,
+            "self_eval_failure_reason": None,
+        }
+
+    proposed_plan_type = state.get("proposed_plan_type")
+    proposed_plan_action = state.get("proposed_plan_action") or "create"
+    plan_label = "식단" if proposed_plan_type == "diet" else "운동"
+    action_label = "수정안" if proposed_plan_action == "update" else "계획"
+
+    components = normalize_draft_components(
+        {
+            "core_message": f"{plan_label} {action_label} 승인을 확인했다.",
+            "suggested_action": "이제 저장 절차를 진행한다.",
+            "search_grounding_summary": "",
+        }
+    )
+    return {
+        "draft_response": render_draft_preview(components),
+        "draft_components": components,
+        "proposed_plan": proposed_plan,
+        "proposed_plan_type": proposed_plan_type,
+        "proposed_plan_action": proposed_plan_action,
+        "self_eval_count": 0,
+        "self_eval_failure_reason": None,
+    }
+
+
+def _resolve_proposed_plan_type(
+    state: GraphState,
+    draft_result: DraftResponse,
+    proposed_plan: list[dict],
+) -> str | None:
+    if not proposed_plan:
+        return None
+
+    modify_target = state.get("modify_target")
+    if modify_target in {"workout", "diet"}:
+        return modify_target
+
+    if draft_result.proposed_plan_type in {"workout", "diet"}:
+        return draft_result.proposed_plan_type
+
+    return _infer_plan_type_from_message(state["user_message"])
+
+
+def _resolve_proposed_plan_action(state: GraphState, proposed_plan: list[dict]) -> str | None:
+    if not proposed_plan:
+        return None
+    if state.get("intent") == INTENT_MODIFY:
+        return "update"
+    return "create"
+
+
+def _infer_plan_type_from_message(message: str) -> str | None:
+    lowered = message.lower()
+    diet_hits = sum(1 for keyword in _PLAN_TYPE_KEYWORDS["diet"] if keyword in lowered)
+    workout_hits = sum(1 for keyword in _PLAN_TYPE_KEYWORDS["workout"] if keyword in lowered)
+
+    if diet_hits > workout_hits:
+        return "diet"
+    if workout_hits > diet_hits:
+        return "workout"
+    return None
 
 
 async def _self_evaluate(deps: NodeDeps, state: GraphState, response: str) -> tuple[bool, str]:
@@ -162,26 +268,30 @@ async def _self_evaluate(deps: NodeDeps, state: GraphState, response: str) -> tu
     user_content = (
         f"감정 상태: {emotion.get('label', '중립')} (강도 {emotion.get('intensity', 0):.1f})\n"
         f"사용자 메시지: {state['user_message']}\n"
-        f"생성된 응답:\n{response}"
+        f"생성된 Draft:\n{response}"
     )
+
     try:
         raw = await deps.router.generate(
             system_prompt=_SELF_EVAL_PROMPT,
             user_content=user_content,
-            response_schema=dict,
+            response_schema=SelfEvalResponse,
         )
-        result = json.loads(raw)
-        passed = bool(result.get("pass", True))
-        reason = result.get("reason", "")
-        return passed, reason
-    except Exception as e:
-        logger.warning("자기 평가 API 실패, 통과 처리: %s", e)
+        result = SelfEvalResponse.model_validate_json(raw)
+        return result.passed, result.reason
+    except Exception as exc:
+        logger.warning("Self-eval failed, passing through: %s", exc)
         return True, ""
 
 
-def _partial_patch(response: str, reason: str) -> str:
-    """최대 재시도 초과 시 간단한 안전 문구 추가."""
-    safe_suffix = "\n\n(더 정확한 도움이 필요하시면 전문가 상담을 권장드립니다.)"
-    if safe_suffix not in response:
-        return response + safe_suffix
-    return response
+def _apply_partial_patch(components: DraftComponents, reason: str) -> DraftComponents:
+    patched = normalize_draft_components(dict(components))
+    safety_line = "증상이 심하거나 위험하다고 느껴지면 전문가 상담이나 지역 응급 지원을 우선해 주세요."
+
+    if safety_line not in patched["safety_notes"]:
+        patched["safety_notes"].append(safety_line)
+
+    if reason and not patched["search_grounding_summary"]:
+        patched["search_grounding_summary"] = f"검토 메모: {reason}"
+
+    return patched

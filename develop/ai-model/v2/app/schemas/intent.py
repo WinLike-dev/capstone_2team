@@ -13,10 +13,14 @@ class EmotionOutput(BaseModel):
     intensity: float = Field(ge=0.0, le=1.0, description="감정 강도 0.0~1.0")
 
 
-IntentType = Literal["공감_케어", "기록", "계획", "수정", "정보", "안전경고", "fallback"]
+IntentType = Literal["casual", "공감_케어", "기록", "계획", "수정", "계획_승인", "정보", "안전경고", "fallback"]
 RecordType = Literal["profile", "plan_check"]
 ModifyTarget = Literal["workout", "diet"]
 
+
+class ProfileChange(BaseModel):
+    field: str = Field(description="변경할 프로필 필드명 (예: weight, height)")
+    value: str = Field(description="변경할 값")
 
 class IntentOutput(BaseModel):
     """Flash-Lite가 반환하는 의도 분석 결과."""
@@ -36,7 +40,7 @@ class IntentOutput(BaseModel):
 
     # 기록
     record_type: Optional[RecordType] = None
-    profile_changes: Optional[dict] = None
+    profile_changes: Optional[list[ProfileChange]] = None
     is_today: Optional[bool] = None
 
     # 수정

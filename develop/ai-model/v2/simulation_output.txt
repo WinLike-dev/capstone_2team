@@ -1,0 +1,49 @@
+2026-04-04 13:56:14,496 INFO app.core.lifespan EmbeddingClient initialized (dim=384)
+2026-04-04 13:56:17,150 INFO app.core.lifespan Pinecone initialized (index=health-coach-ai)
+2026-04-04 13:56:18,290 INFO app.core.lifespan GeminiClient initialized (model=gemini-2.5-flash)
+2026-04-04 13:56:19,397 INFO app.core.lifespan RouterClient initialized (model=gemini-2.5-flash-lite)
+2026-04-04 13:56:19,767 INFO app.core.lifespan WASClient initialized (base_url=http://168.107.14.81:8080)
+2026-04-04 13:56:19,793 INFO app.core.lifespan SQLite checkpointer initialized (path=data/checkpoints.sqlite)
+2026-04-04 13:56:19,814 INFO app.core.lifespan LangGraph compiled and ready
+2026-04-04 13:56:19,833 INFO app.core.lifespan 정리할 만료 세션 없음
+2026-04-04 13:56:19,872 INFO httpx HTTP Request: GET http://168.107.14.81:8080/api/user/profile/test_user_18783d "HTTP/1.1 404 Not Found"
+2026-04-04 13:56:19,872 ERROR app.graph.nodes.preprocess 세션 초기화 WAS 호출 실패: WAS: HTTP 404
+2026-04-04 13:56:19,876 INFO google_genai.models AFC is enabled with max remote calls: 10.
+2026-04-04 13:56:20,131 WARNING app.graph.nodes.intent 의도 분석 실패, fallback 적용: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'field': 'generation_config.response_schema.properties[7].value', 'description': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.'}]}]}}
+2026-04-04 13:56:20,132 INFO app.graph.nodes.fallback Fallback Clarification 요청: fallback_count=0
+2026-04-04 13:56:20,151 INFO app.graph.nodes.feedback EMOTION_LOG | user_id=test_user_18783d | label=중립 | intensity=0.00
+2026-04-04 13:56:20,152 INFO httpx HTTP Request: POST http://testserver/chat "HTTP/1.1 200 OK"
+2026-04-04 13:56:20,157 INFO google_genai.models AFC is enabled with max remote calls: 10.
+2026-04-04 13:56:20,242 WARNING app.graph.nodes.intent 의도 분석 실패, fallback 적용: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'field': 'generation_config.response_schema.properties[7].value', 'description': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.'}]}]}}
+2026-04-04 13:56:20,243 INFO app.graph.nodes.fallback Fallback 재추론 시도: fallback_count=1
+2026-04-04 13:56:20,245 INFO google_genai.models AFC is enabled with max remote calls: 10.
+2026-04-04 13:56:20,326 WARNING app.graph.nodes.intent 의도 분석 실패, fallback 적용: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'field': 'generation_config.response_schema.properties[7].value', 'description': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.'}]}]}}
+2026-04-04 13:56:20,327 INFO app.graph.nodes.fallback Fallback Clarification 요청: fallback_count=2
+2026-04-04 13:56:20,345 INFO app.graph.nodes.feedback EMOTION_LOG | user_id=test_user_18783d | label=중립 | intensity=0.00
+2026-04-04 13:56:20,345 INFO httpx HTTP Request: POST http://testserver/chat "HTTP/1.1 200 OK"
+2026-04-04 13:56:20,350 INFO google_genai.models AFC is enabled with max remote calls: 10.
+2026-04-04 13:56:20,436 WARNING app.graph.nodes.intent 의도 분석 실패, fallback 적용: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'field': 'generation_config.response_schema.properties[7].value', 'description': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.'}]}]}}
+2026-04-04 13:56:20,438 INFO app.graph.nodes.fallback Fallback Clarification 요청: fallback_count=3
+2026-04-04 13:56:20,458 INFO app.graph.nodes.feedback EMOTION_LOG | user_id=test_user_18783d | label=중립 | intensity=0.00
+2026-04-04 13:56:20,458 INFO httpx HTTP Request: POST http://testserver/chat "HTTP/1.1 200 OK"
+2026-04-04 13:56:20,463 INFO google_genai.models AFC is enabled with max remote calls: 10.
+2026-04-04 13:56:20,545 WARNING app.graph.nodes.intent 의도 분석 실패, fallback 적용: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'field': 'generation_config.response_schema.properties[7].value', 'description': 'Invalid JSON payload received. Unknown name "additional_properties" at \'generation_config.response_schema.properties[7].value\': Cannot find field.'}]}]}}
+2026-04-04 13:56:20,546 INFO app.graph.nodes.fallback Fallback Clarification 요청: fallback_count=4
+2026-04-04 13:56:20,563 INFO app.graph.nodes.feedback EMOTION_LOG | user_id=test_user_18783d | label=중립 | intensity=0.00
+2026-04-04 13:56:20,564 INFO httpx HTTP Request: POST http://testserver/chat "HTTP/1.1 200 OK"
+2026-04-04 13:56:20,570 INFO app.core.lifespan Shutdown complete
+=== Starting Local Setup Simulation for test_user_18783d ===
+
+[인사] 사용자: 안녕? 오늘 운동 기록하러 왔어!
+AI (의도: fallback, 감정: 중립): 죄송해요, 질문을 정확히 이해하지 못했어요. 조금 더 구체적으로 말씀해 주시겠어요? 예를 들어, 운동 계획, 식단 기록, 건강 정보 등 어떤 도움이 필요하신지 알려주세요.
+
+[목표] 사용자: 오늘 웨이트 트레이닝 운동 목표 어떻게 짤까?
+AI (의도: fallback, 감정: 중립): 죄송해요, 질문을 정확히 이해하지 못했어요. 조금 더 구체적으로 말씀해 주시겠어요? 예를 들어, 운동 계획, 식단 기록, 건강 정보 등 어떤 도움이 필요하신지 알려주세요.
+
+[기록] 사용자: 방금 스쿼트 3세트 끝냈어.
+AI (의도: fallback, 감정: 중립): 죄송해요, 질문을 정확히 이해하지 못했어요. 조금 더 구체적으로 말씀해 주시겠어요? 예를 들어, 운동 계획, 식단 기록, 건강 정보 등 어떤 도움이 필요하신지 알려주세요.
+
+[상담] 사용자: 근데 너무 피곤해서 다 포기하고 싶어..
+AI (의도: fallback, 감정: 중립): 죄송해요, 질문을 정확히 이해하지 못했어요. 조금 더 구체적으로 말씀해 주시겠어요? 예를 들어, 운동 계획, 식단 기록, 건강 정보 등 어떤 도움이 필요하신지 알려주세요.
+2026-04-04 13:56:20,694 ERROR asyncio Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000002DE9AC4C750>

@@ -1,0 +1,24 @@
+services:
+  ai-hub-v2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: capstone-ai-hub-v2:latest
+    container_name: ai-hub-v2
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      CHECKPOINT_DB_PATH: /app/data/checkpoints.sqlite
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

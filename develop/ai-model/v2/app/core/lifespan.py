@@ -1,9 +1,15 @@
-"""FastAPI lifespan — 클라이언트 초기화 및 LangGraph 빌드."""
+"""FastAPI lifespan setup for clients, graph, and background services."""
+from __future__ import annotations
+
+import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
+import aiosqlite
 import httpx
 from fastapi import FastAPI
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pinecone import PineconeAsyncio, ServerlessSpec
 
 from app.clients.embedding import EMBEDDING_DIM, EmbeddingClient
@@ -11,10 +17,72 @@ from app.clients.gemini import GeminiClient
 from app.clients.pinecone import PineconeClient
 from app.clients.was import WASClient
 from app.core.config import get_settings
+from app.core.profile_sync import ProfileSyncTracker
 from app.graph.builder import build_graph
 from app.graph.deps import NodeDeps
 
 logger = logging.getLogger(__name__)
+
+
+async def _ensure_activity_table(db_path: str) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "CREATE TABLE IF NOT EXISTS session_activity ("
+            "  thread_id TEXT PRIMARY KEY,"
+            "  last_active TEXT NOT NULL DEFAULT (datetime('now'))"
+            ")"
+        )
+        await db.commit()
+
+
+async def update_session_activity(db_path: str, thread_id: str) -> None:
+    try:
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                "INSERT INTO session_activity (thread_id, last_active) VALUES (?, datetime('now')) "
+                "ON CONFLICT(thread_id) DO UPDATE SET last_active = datetime('now')",
+                (thread_id,),
+            )
+            await db.commit()
+    except Exception as exc:
+        logger.warning("Failed to update session activity: %s", exc)
+
+
+async def _cleanup_old_checkpoints(db_path: str, ttl_hours: int) -> None:
+    try:
+        async with aiosqlite.connect(db_path) as db:
+            cursor = await db.execute(
+                "SELECT thread_id FROM session_activity "
+                "WHERE last_active < datetime('now', ?)",
+                (f"-{ttl_hours} hours",),
+            )
+            expired = [row[0] for row in await cursor.fetchall()]
+
+            if not expired:
+                logger.info("No expired sessions to clean up")
+                return
+
+            placeholders = ",".join("?" for _ in expired)
+            for table in ("checkpoints", "writes"):
+                await db.execute(
+                    f"DELETE FROM {table} WHERE thread_id IN ({placeholders})",
+                    expired,
+                )
+            await db.execute(
+                f"DELETE FROM session_activity WHERE thread_id IN ({placeholders})",
+                expired,
+            )
+            await db.commit()
+            await db.execute("VACUUM")
+            logger.info("Cleaned up %d expired sessions", len(expired))
+    except Exception as exc:
+        logger.warning("Checkpoint cleanup failed: %s", exc)
+
+
+async def _periodic_cleanup(db_path: str, ttl_hours: int, interval: int = 3600) -> None:
+    while True:
+        await asyncio.sleep(interval)
+        await _cleanup_old_checkpoints(db_path, ttl_hours)
 
 
 @asynccontextmanager
@@ -26,11 +94,9 @@ async def lifespan(app: FastAPI):
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
 
-    # 1. EmbeddingClient
     embed_client = EmbeddingClient(api_key=settings.GEMINI_API_KEY)
     logger.info("EmbeddingClient initialized (dim=%d)", EMBEDDING_DIM)
 
-    # 2. Pinecone
     pc = PineconeAsyncio(api_key=settings.PINECONE_API_KEY)
     app.state._pinecone_control = pc
 
@@ -47,41 +113,60 @@ async def lifespan(app: FastAPI):
     pinecone_client = PineconeClient(index)
     logger.info("Pinecone initialized (index=%s)", settings.PINECONE_INDEX_NAME)
 
-    # 3. Gemini Flash (응답 생성)
     gemini_client = GeminiClient(
         api_key=settings.GEMINI_API_KEY,
         model_name=settings.GEMINI_MODEL_NAME,
     )
     logger.info("GeminiClient initialized (model=%s)", settings.GEMINI_MODEL_NAME)
 
-    # 4. Gemini Flash-Lite (의도 분석 · 평가)
     router_client = GeminiClient(
         api_key=settings.ROUTER_API_KEY,
         model_name=settings.ROUTER_MODEL_NAME,
     )
     logger.info("RouterClient initialized (model=%s)", settings.ROUTER_MODEL_NAME)
 
-    # 5. WASClient
     http_client = httpx.AsyncClient(timeout=httpx.Timeout(settings.WAS_TIMEOUT))
     was_client = WASClient(base_url=settings.WAS_BASE_URL, client=http_client)
     app.state._was_http_client = http_client
     logger.info("WASClient initialized (base_url=%s)", settings.WAS_BASE_URL)
 
-    # 6. LangGraph 빌드
+    profile_sync = ProfileSyncTracker()
+    app.state.profile_sync = profile_sync
+    logger.info("ProfileSyncTracker initialized")
+
+    db_path = settings.CHECKPOINT_DB_PATH
+    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+    checkpointer_conn = await aiosqlite.connect(db_path)
+    checkpointer = AsyncSqliteSaver(checkpointer_conn)
+    await checkpointer.setup()
+    app.state._checkpointer = checkpointer
+    logger.info("SQLite checkpointer initialized (path=%s)", db_path)
+
     deps = NodeDeps(
         gemini=gemini_client,
         router=router_client,
         was=was_client,
         pinecone=pinecone_client,
         embed=embed_client,
+        profile_sync=profile_sync,
     )
-    app.state.graph = build_graph(deps)
+    app.state.graph = build_graph(deps, checkpointer=checkpointer)
     app.state.deps = deps
     logger.info("LangGraph compiled and ready")
 
+    await _ensure_activity_table(db_path)
+    cleanup_task = asyncio.create_task(
+        _periodic_cleanup(db_path, settings.CHECKPOINT_TTL_HOURS)
+    )
+    await _cleanup_old_checkpoints(db_path, settings.CHECKPOINT_TTL_HOURS)
+
     yield
 
-    # Shutdown
+    cleanup_task.cancel()
+    try:
+        await app.state._checkpointer.conn.close()
+    except Exception as exc:
+        logger.warning("Failed to close checkpointer: %s", exc)
     await app.state._pinecone_control.close()
     await app.state._was_http_client.aclose()
     logger.info("Shutdown complete")

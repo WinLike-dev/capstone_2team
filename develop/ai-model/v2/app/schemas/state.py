@@ -1,12 +1,4 @@
-"""LangGraph GraphState — 전체 대화 State 정의.
-
-Layer 4 데이터 흐름 기반:
-  - user_profile / today_plan: WAS에서 로드한 세션 캐시
-  - emotion / intent: 의도 분석 결과
-  - search_results / search_quality: 검색 파이프라인 결과
-  - pending_writes: WAS 쓰기 실패 큐
-  - messages: 최근 N턴 대화 기록
-"""
+"""Shared LangGraph state for the v2 model."""
 from __future__ import annotations
 
 from typing import Annotated, Any, Optional
@@ -15,86 +7,81 @@ from typing_extensions import TypedDict
 
 from app.core.config import get_settings
 
-# ---------------------------------------------------------------------------
-# 메시지 리듀서: 최근 MAX_MESSAGES 개만 유지
-# ---------------------------------------------------------------------------
 
 def _append_messages(existing: list[dict], new: list[dict] | dict) -> list[dict]:
     if isinstance(new, dict):
         new = [new]
     combined = existing + new
-    max_n = get_settings().MAX_MESSAGES
-    return combined[-max_n:]
+    return combined[-get_settings().MAX_MESSAGES :]
 
-
-# ---------------------------------------------------------------------------
-# 서브 타입
-# ---------------------------------------------------------------------------
 
 class EmotionState(TypedDict):
-    label: str       # 예: "슬픔", "기쁨", "불안", "중립"
-    intensity: float  # 0.0 ~ 1.0
+    label: str
+    intensity: float
 
 
 class PendingWrite(TypedDict):
-    """WAS 쓰기 실패 시 다음 턴 재시도용 큐 항목."""
-    write_type: str   # "profile" | "plan_check" | "plan_create" | "plan_update"
+    write_type: str
     payload: dict[str, Any]
 
 
-# ---------------------------------------------------------------------------
-# GraphState
-# ---------------------------------------------------------------------------
+class DraftComponents(TypedDict):
+    core_message: str
+    reason_points: list[str]
+    suggested_action: str
+    safety_notes: list[str]
+    approval_question: Optional[str]
+    search_grounding_summary: str
+
 
 class GraphState(TypedDict):
-    # ── 요청 컨텍스트 ────────────────────────────────────────────────────────
     user_id: str
     user_message: str
 
-    # ── 세션 캐시 (WAS에서 첫 턴에 로드) ───────────────────────────────────
     user_profile: Optional[dict[str, Any]]
     today_plan: Optional[list[dict[str, Any]]]
 
-    # ── 턴 추적 ──────────────────────────────────────────────────────────────
     turn_count: int
     is_session_start: bool
 
-    # ── 의도 분석 결과 ────────────────────────────────────────────────────────
-    intent: str                           # 공감_케어|기록|계획|수정|정보|안전경고|fallback|casual
+    intent: str
     confidence: float
     emotion: Optional[EmotionState]
     previous_intent: Optional[str]
     previous_emotion: Optional[EmotionState]
 
-    # ── 의도별 조건부 속성 ────────────────────────────────────────────────────
     requires_past_memory: bool
     should_save_episode: bool
     has_fact_change: bool
-    record_type: Optional[str]            # "profile" | "plan_check"
+    record_type: Optional[str]
     profile_changes: Optional[dict[str, Any]]
     is_today: Optional[bool]
-    modify_target: Optional[str]          # "workout" | "diet"
-    search_targets: list[str]             # ["vdb_memory", "vdb_user_important", "vdb_external", "web"]
-    modify_plan_context: Optional[dict[str, Any]]  # 수정 의도 전체 플랜 (transient)
+    modify_target: Optional[str]
+    search_targets: list[str]
+    modify_plan_context: Optional[dict[str, Any]]
 
-    # ── 검색 파이프라인 ───────────────────────────────────────────────────────
     search_results: list[dict[str, Any]]
-    search_quality: str                   # "ok" | "degraded"
+    search_quality: str
     search_retry_count: int
-    search_query: Optional[str]           # 재생성된 검색 쿼리
+    search_query: Optional[str]
 
-    # ── WAS 쓰기 큐 ──────────────────────────────────────────────────────────
     pending_writes: list[PendingWrite]
 
-    # ── 응답 생성 ─────────────────────────────────────────────────────────────
+    draft_response: Optional[str]
+    draft_components: Optional[DraftComponents]
+    proposed_plan: Optional[list[dict[str, Any]]]
+    proposed_plan_type: Optional[str]
+    proposed_plan_action: Optional[str]
+    intimacy_level: int
+    resolved_persona_id: Optional[str]
+    profile_sync_version: int
+
     response: Optional[str]
     self_eval_count: int
     self_eval_failure_reason: Optional[str]
 
-    # ── Fallback ─────────────────────────────────────────────────────────────
     fallback_count: int
     needs_clarification: bool
 
-    # ── 대화 이력 ─────────────────────────────────────────────────────────────
     summary: Optional[str]
     messages: Annotated[list[dict[str, Any]], _append_messages]

@@ -9,6 +9,7 @@ from app.core.exceptions import AppError
 from app.core.lifespan import lifespan
 from app.routers.chat import router as chat_router
 from app.routers.debug import router as debug_router
+from app.routers.profile_events import router as profile_events_router
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ app = FastAPI(title="AI Hub v2 (LangGraph)", lifespan=lifespan)
 
 app.include_router(chat_router)
 app.include_router(debug_router)
+app.include_router(profile_events_router)
 
 
 @app.exception_handler(AppError)
@@ -29,8 +31,12 @@ async def app_error_handler(request: FastAPIRequest, exc: AppError) -> JSONRespo
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: FastAPIRequest, exc: HTTPException) -> JSONResponse:
     status_map = {
-        400: "BAD_REQUEST", 401: "UNAUTHORIZED", 403: "FORBIDDEN",
-        404: "NOT_FOUND", 422: "VALIDATION_ERROR", 500: "INTERNAL_ERROR",
+        400: "BAD_REQUEST",
+        401: "UNAUTHORIZED",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        422: "VALIDATION_ERROR",
+        500: "INTERNAL_ERROR",
     }
     return JSONResponse(
         status_code=exc.status_code,
@@ -49,7 +55,13 @@ async def global_exception_handler(request: FastAPIRequest, exc: Exception) -> J
     logger.error("Unhandled exception: %s\n%s", str(exc), traceback.format_exc())
     return JSONResponse(
         status_code=500,
-        content={"status": "error", "error": {"code": "INTERNAL_ERROR", "message": "내부 서버 오류가 발생했습니다."}},
+        content={
+            "status": "error",
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "내부 서버 오류가 발생했습니다.",
+            },
+        },
     )
 
 

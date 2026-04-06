@@ -1,128 +1,37 @@
-%% ============================================================
-%% 레이어 4: 데이터 흐름
-%% ============================================================
+flowchart LR
+    USER["사용자 / 앱"] -->|"채팅 요청"| CHAT["FastAPI 채팅 라우터"]
+    DEV["개발자 브라우저"] -->|"디버그 요청"| DEBUG["디버그 UI"]
+    WAS["WAS"] -->|"프로필 변경 이벤트"| EVENTS["프로필 이벤트 라우터"]
 
-%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a1a2e', 'primaryTextColor': '#e0e0e0', 'lineColor': '#4fc3f7', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460'}}}%%
+    CHAT -->|"세션 ID"| SQLITE["SQLite 체크포인터"]
+    SQLITE -->|"상태 불러오기 / 저장"| GRAPH["LangGraph 엔진"]
 
-graph LR
+    GRAPH --> PRE["전처리"]
+    GRAPH --> INTENT["의도 분석"]
+    GRAPH --> MODIFY["수정 컨텍스트 로드"]
+    GRAPH --> SEARCH["검색"]
+    GRAPH --> GEN["초안 생성"]
+    GRAPH --> PERSONA["페르소나"]
 
-    %% ============================================================
-    %% WAS API (RDB 접근 게이트웨이)
-    %% ============================================================
-    subgraph WAS["WAS (API Server)"]
-        direction TB
-        API_READ["읽기 API\nGET /api/user/profile\nGET /api/plan/today\nGET /api/workout-plan/full\nGET /api/diet-plan/full"]
-        API_WRITE["쓰기 API\nPUT /api/user/profile\nPOST /api/plan/create\nPUT /api/plan/update\nPUT /api/plan/check"]
-    end
+    PRE -->|"프로필 / 오늘 플랜 조회"| WAS
+    MODIFY -->|"운동 / 식단 전체 플랜 조회"| WAS
+    PRE --> SYNC["프로필 동기화 추적기"]
+    EVENTS --> SYNC
 
-    subgraph RDB["RDB (WAS 뒤)"]
-        direction TB
-        RDB_PROFILE[("rdb_user_profile\n체중 · 키 · 식단유형\n알레르기 · 부상이력")]
-        RDB_PLAN[("rdb_plan\n운동·식단 플랜\n요일별 리스트 + 완료 상태")]
-    end
+    SEARCH --> EMBED["임베딩 클라이언트"]
+    EMBED --> PINE["Pinecone<br/>기억 / 중요정보 / 외부지식"]
+    SEARCH --> ROUTER["Gemini 라우터 클라이언트"]
+    ROUTER -->|"웹 검색 / 평가 / 검색어 재작성"| SEARCH
 
-    API_READ --> RDB_PROFILE
-    API_READ --> RDB_PLAN
-    API_WRITE --> RDB_PROFILE
-    API_WRITE --> RDB_PLAN
+    GEN --> PROMPTS["프롬프트 자산<br/>app/prompts/nodes"]
+    PERSONA --> PERSONA_REG["페르소나 레지스트리<br/>registry.json"]
+    PERSONA_REG --> PERSONA_FILES["페르소나 프롬프트 파일"]
+    PERSONA_FILES --> PERSONA
+    ROUTER --> GEN
+    ROUTER --> PERSONA
 
-    %% ============================================================
-    %% VDB (LangGraph 직접 접근)
-    %% ============================================================
-    subgraph VDB["VDB (직접 접근)"]
-        direction TB
-        VDB_MEMORY[("vdb_memory\n에피소드 · 추억")]
-        VDB_IMPORTANT[("vdb_user_important\n핵심 팩트 요약")]
-        VDB_EXTERNAL[("vdb_external\n외부 지식")]
-        CHECKPOINTER[("Checkpointer DB\n전체 대화 원본")]
-    end
+    CHAT --> BG["백그라운드 작업"]
+    BG -->|"프로필 / 체크 / 생성 / 수정 쓰기"| WAS
 
-    %% ============================================================
-    %% 동기 읽기 (세션 첫 턴)
-    %% ============================================================
-    subgraph SYNC_READ["🔵 동기 읽기"]
-        direction TB
-        SR1["전처리 노드 (세션 첫 턴)\n→ WAS API 동기 호출\n→ State에 캐싱"]
-        SR2["수정 의도 (해당 턴만)\n→ modify_target 기반\n→ 운동 or 식단 전체 플랜 조회\n※ State에 저장하지 않음"]
-    end
-
-    SR1 -->|"GET /api/user/profile\nGET /api/plan/today"| API_READ
-    SR2 -->|"GET /api/workout-plan/full\nor GET /api/diet-plan/full"| API_READ
-
-    %% ============================================================
-    %% 비동기 쓰기 (응답 출력 후)
-    %% ============================================================
-    subgraph ASYNC_WRITE["🟠 비동기 쓰기 — 응답 출력 후"]
-        direction TB
-        AW1["기록 (profile)\n→ PUT /api/user/profile"]
-        AW2["기록 (plan_check)\n→ PUT /api/plan/check"]
-        AW3["계획\n→ POST /api/plan/create"]
-        AW4["수정\n→ PUT /api/plan/update"]
-        AW5["실패 시\nState.pending_writes 기록\n→ 다음 턴 전처리에서 재시도"]
-    end
-
-    AW1 --> API_WRITE
-    AW2 --> API_WRITE
-    AW3 --> API_WRITE
-    AW4 --> API_WRITE
-
-    %% ============================================================
-    %% VDB 읽기/쓰기 (LangGraph 직접)
-    %% ============================================================
-    subgraph VDB_RW["🟢 VDB 읽기/쓰기 — LangGraph 직접"]
-        direction TB
-        VR1["검색 파이프라인\nsearch_targets 기반 조회"]
-        VW1["피드백 루프\nshould_save_episode = true\n→ vdb_memory 저장"]
-        VW2["전처리 대화 요약\n→ vdb_user_important 저장"]
-        VW3["전처리 대화 요약\n→ Checkpointer DB 보존"]
-        VW4["관리자\n→ vdb_external 수동 적재"]
-    end
-
-    VR1 --> VDB_MEMORY
-    VR1 --> VDB_IMPORTANT
-    VR1 --> VDB_EXTERNAL
-    VW1 --> VDB_MEMORY
-    VW2 --> VDB_IMPORTANT
-    VW3 --> CHECKPOINTER
-    VW4 --> VDB_EXTERNAL
-
-    %% ============================================================
-    %% State 캐시 구조
-    %% ============================================================
-    subgraph STATE["📦 State 캐시 구조"]
-        direction TB
-        ST["State\n\n• user_profile — 프로필 캐시\n• today_plan — 오늘 플랜 캐시\n• profile_changes — 변경 내역\n• pending_writes — 실패한 WAS 쓰기 큐\n• emotion — 감정 라벨·강도\n• summary — 대화 요약\n• messages — 최근 N턴\n• search_results — 검색 결과\n• search_quality — degraded 여부"]
-    end
-
-    %% ============================================================
-    %% 의도별 검색 대상 매핑
-    %% ============================================================
-    subgraph SEARCH_MAP["🔀 의도별 검색 대상 매핑"]
-        direction TB
-        SM["공감_케어 → vdb_memory 우선\n계획 → vdb_external + vdb_user_important\n수정 → 전체 플랜(WAS 조회) + vdb_external\n정보 → vdb_external 우선"]
-    end
-
-    %% ============================================================
-    %% State 캐시 갱신 트리거
-    %% ============================================================
-    subgraph CACHE["🔄 State 캐시 갱신 트리거"]
-        direction TB
-        CT["user_profile 갱신\n← 기록(profile) 처리 후\n\ntoday_plan 갱신\n← 기록(plan_check) 완료 후\n← 계획 새 플랜 저장 후 (오늘 포함 시만)\n← 수정 플랜 변경 후 (오늘 포함 시만)\n\npending_writes 갱신\n← WAS 쓰기 실패 시 추가\n← 재시도 성공 시 삭제"]
-    end
-
-    %% ===== 스타일 =====
-    classDef db fill:#4a148c,stroke:#ce93d8,color:#e0e0e0,stroke-width:2px
-    classDef api fill:#1565c0,stroke:#42a5f5,color:#e0e0e0,stroke-width:2px
-    classDef sync fill:#1b5e20,stroke:#66bb6a,color:#e0e0e0,stroke-width:1px
-    classDef async fill:#e65100,stroke:#ff9800,color:#fff,stroke-width:1px
-    classDef vdb fill:#1b5e20,stroke:#66bb6a,color:#e0e0e0,stroke-width:1px
-    classDef state fill:#263238,stroke:#4fc3f7,color:#e0e0e0,stroke-width:2px
-    classDef map fill:#263238,stroke:#4fc3f7,color:#e0e0e0,stroke-width:1px
-
-    class RDB_PROFILE,RDB_PLAN,VDB_MEMORY,VDB_IMPORTANT,VDB_EXTERNAL,CHECKPOINTER db
-    class API_READ,API_WRITE api
-    class SR1 sync
-    class AW1,AW2,AW3,AW4,AW5 async
-    class VR1,VW1,VW2,VW3,VW4 vdb
-    class ST state
-    class SM,CT map
+    PERSONA --> RESP["채팅 응답"]
+    RESP -->|"응답 반환"| USER

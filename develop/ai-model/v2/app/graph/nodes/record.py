@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # rdb_user_profile에서 허용하는 필드 목록
 _ALLOWED_PROFILE_FIELDS = {
     "weight", "height", "diet_type", "allergies",
-    "injury_history", "goal", "activity_level", "age", "gender",
+    "injury_history", "goal", "activity_level", "age", "gender", "mbti",
 }
 
 _ERR_INVALID_FIELD = "이 항목은 수정할 수 없어요. 수정 가능한 항목: 체중, 키, 식단유형, 알레르기, 부상이력 등"

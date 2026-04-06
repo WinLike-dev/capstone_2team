@@ -1,247 +1,183 @@
-# v2 AI 모델 아키텍처 분석
+# v2 모델 구조 분석
 
-## 한줄 요약
+이 문서는 현재 `ai-model/v2`의 실제 구현을 기준으로, 다른 개발자가 빠르게 구조를 이해할 수 있게 정리한 문서입니다.
 
-**헬스 AI 챗봇 백엔드** — LangGraph StateGraph 기반으로 `의도 분석 → 검색 → 응답 생성` 파이프라인을 구현하며, WAS(RDB)와 Pinecone(VDB)를 통해 사용자 데이터와 지식을 관리하는 시스템.
+## 1. 핵심 요약
 
----
+v2는 `FastAPI + LangGraph` 기반 대화형 코칭 모델입니다.
+핵심 특징은 아래 4가지입니다.
 
-## 1. 기술 스택
+1. `Draft -> Persona` 2단계 생성 구조
+2. `계획 제안 -> 사용자 승인 -> WAS 반영` 2-phase flow
+3. `selected_ai_persona` 기반 캐릭터 시스템
+4. `WAS push event + next-turn refresh` 기반 프로필 동기화
 
-| 계층 | 기술 | 역할 |
-|------|------|------|
-| API 서버 | **FastAPI** | REST 엔드포인트 (`POST /chat`, `GET /health`) |
-| 파이프라인 | **LangGraph** (StateGraph) | 멀티 노드 조건부 라우팅 그래프 |
-| 세션 관리 | **MemorySaver** (인메모리 체크포인터) | thread_id 기반 대화 State 영속 |
-| LLM (응답) | **Gemini 2.5 Flash** | 응답 생성 + 자기 평가 |
-| LLM (라우팅) | **Gemini 2.5 Flash-Lite** | 의도 분석 + 검색 결과 평가 |
-| 임베딩 | **gemini-embedding-001** | VDB 검색용 벡터 생성 |
-| 벡터 DB | **Pinecone** (3 namespace) | 에피소드·팩트·외부지식 저장 |
-| RDB 접근 | **WAS API** (httpx 비동기) | 프로필·플랜 CRUD |
-| 설정 | **pydantic-settings** | 환경변수 관리 |
+## 2. 전체 그래프
 
----
+현재 그래프는 아래 흐름으로 구성됩니다.
 
-## 2. 메인 파이프라인 플로우 (Layer 1)
+```mermaid
+graph TD
+    START((START)) --> preprocess["preprocess"]
+    preprocess --> analyze_intent["analyze_intent"]
 
-```
-START → preprocess → analyze_intent
-  ├─ casual          → generate → END
-  ├─ 안전경고         → safety → END
-  ├─ fallback        → fallback → (재추론: analyze_intent | clarification: END)
-  ├─ 공감_케어        → care → (requires_past_memory? → search | generate) → END
-  ├─ 기록            → record → generate → END
-  ├─ 계획 / 정보      → search → generate → END
-  └─ 수정            → modify_load → search → generate → END
-```
+    analyze_intent -->|casual| generate["generate / Draft"]
+    analyze_intent -->|안전경고| safety["safety"]
+    analyze_intent -->|fallback| fallback["fallback"]
+    analyze_intent -->|공감_케어| care["care"]
+    analyze_intent -->|기록| record["record"]
+    analyze_intent -->|계획/정보| search["search"]
+    analyze_intent -->|수정| modify["modify_load"]
+    analyze_intent -->|계획_승인| generate
 
-> [!IMPORTANT]
-> - `generate` 노드 내부에 **자기 평가 루프** (max=2) 존재 — 톤·할루시네이션 체크 후 재생성
-> - `search` 노드 내부에 **재시도 루프** (max=3) 존재 — 스코어 기반 쿼리 재생성 or 재검색
-
----
-
-## 3. 의도 분류 체계 (Layer 2)
-
-### 3.1. 2단계 분류 구조
-
-| 단계 | 방식 | 설명 |
-|------|------|------|
-| **1단계** | 규칙 기반 사전 필터 | 금칙어 매칭 → `안전경고`, 인사 패턴 → `casual` (단, previous_intent가 공감_케어면 스킵) |
-| **2단계** | Flash-Lite LLM 정밀 분석 | 현재 메시지 + previous_intent + previous_emotion + rule_hints 입력 |
-
-### 3.2. 의도 목록 및 라우팅
-
-| 의도 | 다음 노드 | 핵심 동작 |
-|------|-----------|-----------|
-| `casual` | generate | 인사·잡담 바로 응답 |
-| `공감_케어` | care → (search \| generate) | 감정 표현 시 과거 기억 검색 여부 판단 |
-| `기록` | record → generate | 운동 완료 체크 / 프로필 변경 |
-| `계획` | search → generate | 운동·식단 계획 생성 |
-| `수정` | modify_load → search → generate | 기존 플랜 WAS 조회 후 수정 |
-| `정보` | search → generate | 운동·영양 정보 질의 |
-| `안전경고` | safety → END | 자해·극단 행동 즉시 차단 |
-| `fallback` | fallback → (재추론 \| END) | 맥락 있으면 재추론, 없으면 Clarification |
-
-### 3.3. 의도 분석 출력 속성
-
-- **공통**: `intent`, `confidence` (0~1), `emotion` (label+intensity)
-- **판단 기반**: `has_fact_change`, `requires_past_memory`
-- **조건부**: `record_type` (기록), `profile_changes` (기록), `modify_target` (수정), `search_targets` (계획·정보·수정)
-
----
-
-## 4. 노드별 상세 동작 (Layer 3)
-
-### 4.1. 전처리 (`preprocess.py`)
-1. **턴별 State 초기화** — search_results, profile_changes 등 null로 리셋
-2. **pending_writes 재시도** — 이전 턴 WAS 쓰기 실패 건 재시도
-3. **세션 첫 턴** → WAS API 동기 호출 (프로필 + 오늘 플랜) → State 캐싱
-4. **대화 요약** — `SUMMARY_TURN_INTERVAL` 배수 턴마다 오래된 메시지 압축 → vdb_user_important 저장
-
-### 4.2. 검색 파이프라인 (`search.py`)
-1. `search_targets` 기반 VDB 선택
-2. **병렬 검색** — vdb_memory, vdb_user_important, vdb_external, Web
-3. 결과 **병합** — 중복 제거 + 우선순위 정렬 + 출처 태깅
-4. Flash-Lite **평가** — score 산출
-   - `> 0.7` → 그대로 사용
-   - `0.4~0.7` → 재검색
-   - `< 0.4` → 쿼리 재생성 후 재시도
-5. **Graceful Degradation** — 재시도 초과 시 공감_케어는 즉각 위로, 나머지는 부분 결과로 degraded 응답
-
-### 4.3. 응답 생성 (`generate.py`)
-- **입력 참조**: emotion(톤 조절), profile_changes, today_plan, modify_plan_context, search_quality, 출처 태그
-- **자기 평가 루프** (max=2): 톤·할루시네이션·제약사항 체크, 실패 시 failure_reason과 함께 재생성
-- 초과 시 **부분 패치**로 종료
-
-### 4.4. 기록 (`record.py`)
-- **profile 변경**: RDB 스키마 검증 → 통과 시 State.profile_changes 기록, 캐시 갱신
-- **plan_check**: is_today 검증 → today_plan 리스트 항목 검증 → 통과 시 완료 체크
-
-### 4.5. 수정 (`modify.py`)
-- `modify_target` (workout/diet) 기반으로 WAS에서 전체 플랜 동기 조회
-- 결과를 실행 컨텍스트(`modify_plan_context`)에 보관 → search + generate에 전달
-
-### 4.6. 비동기 WAS 쓰기 (`was_write.py`)
-- 응답 반환 후 FastAPI `BackgroundTasks`로 실행
-- 대상: profile 변경, plan_check 완료, plan_create, plan_update
-- 실패 시 `pending_writes`에 기록 → 다음 턴 전처리에서 재시도
-- 성공 시 `today_plan` 캐시 갱신 (오늘 포함 조건 체크)
-
-### 4.7. 피드백 루프 (`feedback.py`)
-- 반응 분석 (친밀도·페르소나 진화)
-- `should_save_episode = true`이면 vdb_memory에 에피소드 저장 (날짜·감정·핵심 사건 요약)
-- 감정 이력 누적
-
----
-
-## 5. 데이터 흐름 (Layer 4)
-
-### 5.1. 외부 시스템
-
-```
-┌──────────────────┐     ┌──────────────────────────┐
-│    WAS (API)     │     │  Pinecone VDB (직접접근)  │
-│  ┌─────────────┐ │     │  ┌────────────────────┐  │
-│  │ 읽기 API    │ │     │  │ vdb_memory         │  │
-│  │ 쓰기 API    │ │     │  │ vdb_user_important │  │
-│  └──────┬──────┘ │     │  │ vdb_external       │  │
-│         │        │     │  └────────────────────┘  │
-│    ┌────▼────┐   │     │  ┌────────────────────┐  │
-│    │   RDB   │   │     │  │ Checkpointer DB    │  │
-│    └─────────┘   │     │  │ (MemorySaver)      │  │
-└──────────────────┘     │  └────────────────────┘  │
-                         └──────────────────────────┘
+    care -->|memory 필요| search
+    care -->|즉시 응답| generate
+    record --> generate
+    modify --> search
+    search --> generate
+    fallback --> analyze_intent
+    fallback --> END
+    generate --> persona["persona"]
+    persona --> END
+    safety --> END
 ```
 
-### 5.2. VDB 네임스페이스 설계
+핵심 파일:
+- `app/graph/builder.py`
+- `app/graph/nodes/*.py`
 
-| VDB | 네임스페이스 패턴 | 용도 | 접근 시점 |
-|-----|:--:|------|------|
-| `vdb_memory` | `{user_id}-memory` | 에피소드·추억 (per user) | 공감_케어 검색 / 피드백 저장 |
-| `vdb_user_important` | `{user_id}-important` | 핵심 팩트 요약 (per user) | 계획 검색 / 요약 저장 |
-| `vdb_external` | `external` | 외부 운동·영양 지식 (공유) | 정보·계획·수정 검색 |
+## 3. Draft-Persona 계약
 
-### 5.3. 의도별 검색 대상 매핑
+예전에는 `draft_text`를 Persona가 통째로 다시 쓰는 구조에 가까웠습니다.
+현재는 계약이 더 명확합니다.
 
-| 의도 | 검색 대상 |
-|------|-----------|
-| 공감_케어 | vdb_memory 우선 |
-| 계획 | vdb_external + vdb_user_important |
-| 수정 | 전체 플랜(WAS 조회) + vdb_external |
-| 정보 | vdb_external 우선 |
+### Draft의 책임
+`generate` 노드는 말투를 꾸미지 않고, 아래 구조를 만듭니다.
 
-### 5.4. State 캐시 갱신 트리거
+- `core_message`
+- `reason_points`
+- `suggested_action`
+- `safety_notes`
+- `approval_question`
+- `search_grounding_summary`
+- `proposed_plan`
+- `proposed_plan_type`
 
-- `user_profile` ← 기록(profile) 처리 후
-- `today_plan` ← plan_check 완료 / 새 플랜 저장(오늘 포함) / 수정(오늘 포함)
-- `pending_writes` ← WAS 쓰기 실패 추가 / 재시도 성공 삭제
+관련 파일:
+- `app/schemas/llm_responses.py`
+- `app/core/draft_contract.py`
+- `app/graph/nodes/generate.py`
 
----
+### Persona의 책임
+`persona` 노드는 위 구조를 받아서:
+- 말투
+- 세계관
+- 캐릭터 분위기
+- 문장 연결 방식
+만 바꿉니다.
 
-## 6. 의존성 주입 구조
+바꾸면 안 되는 것:
+- 새 근거 추가
+- 새 경고 추가
+- 새 플랜 항목 추가
+- approval question 삭제/왜곡
 
-모든 노드는 `NodeDeps` 데이터클래스를 통해 클라이언트를 주입받음:
+관련 파일:
+- `app/graph/nodes/persona.py`
+- `app/prompts/personas/*.md`
 
-```python
-@dataclass
-class NodeDeps:
-    gemini: GeminiClient      # Flash — 응답 생성
-    router: GeminiClient      # Flash-Lite — 의도 분석 · 검색 평가
-    was: WASClient            # RDB CRUD
-    pinecone: PineconeClient  # VDB 검색/저장
-    embed: EmbeddingClient    # 벡터 임베딩
-```
+## 4. Persona 시스템
 
-각 노드는 `make_xxx_node(deps)` 팩토리 패턴으로 생성 → 테스트 시 mock 교체 용이.
+### 사용자 값
+사용자 프로필의 공식 persona 필드는 아래입니다.
 
----
+- `selected_ai_persona`
 
-## 7. API 엔드포인트
+이 값은 WAS 프로필에서 읽어옵니다.
 
-### `POST /chat`
-```json
-// Request
-{
-  "user_id": "user123",
-  "user_message": "오늘 운동 다 했어!",
-  "session_id": "optional-uuid"   // 생략 시 자동 생성
-}
+### Registry 기반 resolve
+Persona는 더 이상 파일명 직접 접근이 아니라 registry를 통해 해석됩니다.
 
-// Response
-{
-  "session_id": "...",
-  "response": "...",
-  "intent": "기록",
-  "emotion": { "label": "기쁨", "intensity": 0.8 }
-}
-```
+구조:
+- `app/prompts/personas/registry.json`
+- `app/core/persona_registry.py`
 
-### 처리 흐름
-1. session_id 기반 checkpointer 조회 → 첫 턴이면 전체 초기 State, 이후 턴이면 checkpoint 복원
-2. `graph.ainvoke()` → 파이프라인 실행
-3. 응답 즉시 반환
-4. **BackgroundTasks**로 WAS 쓰기 + 피드백 루프 비동기 실행
+resolve 규칙:
+1. `selected_ai_persona`가 registry에 있고 active면 사용
+2. 없거나 비활성이면 fallback 사용
+3. prompt 파일이 없으면 다시 default 사용
 
----
+### 현재 예시 persona
+- `default`
+- `spartan`
+- `warm`
+- `evidence`
+- `buddy`
 
-## 8. 제약사항 및 플레이스홀더
+## 5. Prompt Asset 구조
 
-> [!WARNING]
-> 현재 미구현(플레이스홀더) 항목:
+현재는 node별 시스템 지시사항도 코드 밖으로 분리되어 있습니다.
 
-| 항목 | 위치 | 상태 |
-|------|------|------|
-| `MemorySaver` → 영속 체크포인터 | `builder.py` | 인메모리, 서버 재시작 시 소멸 |
-| `_extract_plan_from_results()` | `was_write.py` | 응답→구조화 플랜 파싱 미구현 |
-| `_web_search_stub()` | `search.py` | Web 검색 API 미연동 |
-| `vdb_external` 데이터 적재 | 관리자 수동 | 적재 파이프라인 없음 |
+위치:
+- `app/prompts/nodes/intent/system.md`
+- `app/prompts/nodes/search/eval.md`
+- `app/prompts/nodes/search/query_regen.md`
+- `app/prompts/nodes/generate/*.md`
 
----
+이 구조의 장점:
+- 프롬프트 수정이 코드 수정과 분리됨
+- 다른 개발자가 파일만 읽어도 규칙을 이해 가능
+- persona 레이어와 fact 레이어가 분리됨
 
-## 9. 전체 아키텍처 개념도
+## 6. WAS 동기화 구조
 
-```
-사용자 ──▶ FastAPI (POST /chat)
-              │
-              ▼
-        ┌─────────────────────────────────────────┐
-        │         LangGraph StateGraph            │
-        │                                         │
-        │  preprocess ─▶ intent ─▶ [라우팅] ─▶    │
-        │    ┌─ care ─▶ (search?) ─▶ generate    │
-        │    ├─ record ─────────────▶ generate    │
-        │    ├─ modify ─▶ search ──▶ generate    │
-        │    ├─ search ────────────▶ generate    │
-        │    ├─ safety ─────────────▶ END        │
-        │    └─ fallback ─▶ (재추론 | END)       │
-        │                                         │
-        │  Gemini Flash: 응답 생성 + 자기 평가     │
-        │  Gemini Flash-Lite: 의도 분석 + 평가    │
-        └──────────────┬──────────────────────────┘
-                       │
-            ┌──────────┼──────────┐
-            ▼          ▼          ▼
-       WAS (RDB)   Pinecone   Checkpointer
-       프로필/플랜   VDB 3종    세션 State
-```
+현재 프로필 동기화는 `pull only`가 아니라 `push event + next-turn refresh`입니다.
+
+흐름:
+1. WAS에서 프로필 수정
+2. WAS가 `POST /internal/events/profile-updated` 호출
+3. FastAPI가 `ProfileSyncTracker`에 version 기록
+4. 다음 `/chat` 요청의 `preprocess`가 stale 여부 판단
+5. stale이면 `get_user_profile()` 재호출
+
+관련 파일:
+- `app/routers/profile_events.py`
+- `app/core/profile_sync.py`
+- `app/graph/nodes/preprocess.py`
+- `docs/was_api_contract.md`
+
+## 7. 승인 저장 구조
+
+계획은 바로 저장되지 않습니다.
+
+흐름:
+1. `generate`가 `proposed_plan` 생성
+2. 사용자 승인 메시지가 `계획_승인`으로 분류
+3. BackgroundTasks에서 WAS 쓰기 실행
+4. 성공 시 checkpoint의 pending proposal state 정리
+
+관련 파일:
+- `app/graph/nodes/generate.py`
+- `app/graph/nodes/was_write.py`
+- `app/routers/chat.py`
+
+## 8. 현재 운영상 중요한 규칙
+
+- Persona는 표현만 담당하고 사실을 새로 만들면 안 됨
+- `selected_ai_persona`는 WAS 프로필이 source of truth
+- profile update 이벤트는 현재 응답을 끊지 않고 다음 턴에서 반영
+- `user_profile_override`는 개발/테스트 보조용
+- `debug_state`는 development 환경에서만 노출
+
+## 9. 먼저 보면 좋은 파일
+
+처음 파악할 때 추천 순서:
+
+1. `app/graph/builder.py`
+2. `app/routers/chat.py`
+3. `app/graph/nodes/preprocess.py`
+4. `app/graph/nodes/intent.py`
+5. `app/graph/nodes/search.py`
+6. `app/graph/nodes/generate.py`
+7. `app/graph/nodes/persona.py`
+8. `docs/was_api_contract.md`

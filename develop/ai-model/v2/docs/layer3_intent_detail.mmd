@@ -1,200 +1,51 @@
-%% ============================================================
-%% 레이어 3: 의도별 처리 상세
-%% ============================================================
-
-%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a1a2e', 'primaryTextColor': '#e0e0e0', 'lineColor': '#4fc3f7', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460'}}}%%
-
-graph TD
-
-    %% ============================================================
-    %% A. 전처리 상세
-    %% ============================================================
-    subgraph PREPROCESS["전처리 상세"]
-        direction TB
-        P_RESET["턴별 State 초기화\nsearch_results · search_quality\nprofile_changes → null"]
-        P_RESET --> P0{"이전 턴\npending_writes\n존재?"}
-        P0 -->|"Yes"| P0R["WAS API 재시도\n실패 시 pending 유지\n성공 시 pending 삭제"]
-        P0 -->|"No"| P1
-        P0R --> P1
-
-        P1{"세션 첫 턴?"}
-        P1 -->|"Yes"| P2["WAS API 동기 호출\n프로필 + 오늘 플랜 로드\n→ State 캐싱"]
-        P1 -->|"No"| P3["State 캐시 사용"]
-        P2 --> P4{"턴 카운터\n임계값 배수?"}
-        P3 --> P4
-        P4 -->|"Yes"| P5["📝 대화 요약\n오래된 메시지 압축\n핵심 팩트 → vdb_user_important 저장\n※ rdb_user_profile 기존 필드와 중복 시 스킵\n전체 원본 → Checkpointer DB"]
-        P4 -->|"No"| P6["→ 의도 분석으로"]
-        P5 --> P6
+flowchart TD
+    subgraph PREPROCESS["1. 전처리"]
+        P1["턴 범위 필드 초기화"] --> P2["대기 중 쓰기 재실행"]
+        P2 --> P3{"세션 시작인가?"}
+        P3 -->|"예"| P4["사용자 프로필 조회<br/>오늘 플랜 조회"]
+        P3 -->|"아니오"| P5{"프로필 동기화 버전이 오래됐나?"}
+        P5 -->|"예"| P6["사용자 프로필 새로고침"]
+        P5 -->|"아니오"| P7["기존 캐시 상태 유지"]
     end
 
-    %% ============================================================
-    %% B. 기록 의도 상세
-    %% ============================================================
-    subgraph RECORD_DETAIL["기록 의도 상세"]
-        direction TB
-        RD1{"record_type?"}
-
-        RD1 -->|"profile"| RD2{"rdb_user_profile\n스키마 검증\n해당 필드 존재?"}
-        RD2 -->|"Yes"| RD3["State.profile_changes 기록\nState 캐시 갱신\n※ WAS 쓰기는 응답 후 비동기"]
-        RD2 -->|"No"| RD4["❌ '이 항목은 수정할 수 없어요'"]
-
-        RD1 -->|"plan_check"| RD5{"is_today = true?"}
-        RD5 -->|"No"| RD6["❌ '오늘 플랜만 기록할 수 있어요'"]
-        RD5 -->|"Yes"| RD7{"항목 검증\nState.today_plan\n리스트에 있는 항목?"}
-        RD7 -->|"No"| RD8["❌ '플랜에 없는 항목이에요'"]
-        RD7 -->|"Yes"| RD9["✅ State.today_plan 완료 체크\nState 캐시 갱신\n※ WAS 쓰기는 응답 후 비동기"]
-
-        RD3 --> RD_OUT["→ 응답 생성"]
-        RD4 --> RD_OUT
-        RD6 --> RD_OUT
-        RD8 --> RD_OUT
-        RD9 --> RD_OUT
+    subgraph SEARCH["2. 검색"]
+        S1["검색어 생성<br/>+ 목표 / 부상 정보 보강"] --> S2["검색어 임베딩"]
+        S2 --> S3["병렬 검색<br/>기억 / 중요정보 / 외부지식 / 웹"]
+        S3 --> S4["결과 병합 + 중복 제거"]
+        S4 --> S5["LLM 검색 품질 평가"]
+        S5 -->|"점수 0.7 이상"| S6["검색 품질 = 정상"]
+        S5 -->|"재시도 가능"| S7["검색어 재작성 또는 재시도"]
+        S5 -->|"재시도 소진"| S8["검색 품질 = 낮음"]
     end
 
-    %% ============================================================
-    %% C. 검색 파이프라인 상세
-    %% ============================================================
-    subgraph SEARCH_DETAIL["검색 파이프라인 상세"]
-        direction TB
-        SF["🔀 검색 필터\nState.search_targets 기반\n검색 대상 VDB 선택"]
-        G1["병렬 검색\nvdb_memory · vdb_user_important\nvdb_external · Web"]
-        G2["🔗 결과 병합\n중복 제거 · 우선순위 정렬\n출처 태깅 (기억 · 참고정보)"]
-        H1{"결과 평가\nFlash-Lite\nscore 산출"}
-        I1["쿼리 재생성"]
-        I2["검색 재시도"]
-        RC{"재시도\nmax=3"}
-        GD{"💬 Graceful Degradation\nState.intent 확인"}
-        GD_CARE["공감_케어:\nrequires_past_memory → false 전환\n→ 즉각 위로 모드로 응답 생성"]
-        GD_OTHER["그 외:\nState.search_quality = degraded\n→ 부분 결과로 응답 생성"]
-        I3["데이터 통합\n→ 응답 생성"]
-
-        SF --> G1 --> G2 --> H1
-        H1 -->|"< 0.4"| I1 --> RC
-        H1 -->|"0.4~0.7"| I2 --> RC
-        H1 -->|"> 0.7"| I3
-        RC -->|"가능"| SF
-        RC -->|"초과"| GD
-        GD -->|"공감_케어"| GD_CARE --> I3
-        GD -->|"그 외"| GD_OTHER --> I3
+    subgraph MODIFY["2.5 수정 컨텍스트 로드"]
+        M1["수정 대상 확인"] --> M2{"운동인가 식단인가?"}
+        M2 -->|"운동"| M3["운동 전체 플랜 조회"]
+        M2 -->|"식단"| M4["식단 전체 플랜 조회"]
+        M3 --> M5["수정용 플랜 컨텍스트 저장"]
+        M4 --> M5
+        M5 --> M6["검색 / 생성 노드로 컨텍스트 전달"]
     end
 
-    %% ============================================================
-    %% D. 공감_케어 상세
-    %% ============================================================
-    subgraph CARE_DETAIL["공감_케어 상세"]
-        direction TB
-        CA1{"requires_past_memory?"}
-        CA1 -->|"false\n즉각 위로"| CA2["→ 응답 생성\n감정 기반 톤 조절"]
-        CA1 -->|"true\n기억 검색"| CA3["→ 검색 파이프라인\nsearch_targets:\nvdb_memory 우선"]
+    subgraph GENERATE["3. 초안 생성"]
+        G1["프롬프트 조합<br/>(공통 + 의도별)"] --> G2["LLM 초안 생성"]
+        G2 --> G3["초안 구성요소 정규화"]
+        G3 --> G4["초안 미리보기 생성"]
+        G4 --> G5{"자기 평가 필요?"}
+        G5 -->|"예, 그리고 실패"| G6["부분 보정 / 재시도"]
+        G5 -->|"통과"| G7["페르소나 단계로 전달 준비"]
     end
 
-    %% ============================================================
-    %% E. 안전 경고 상세
-    %% ============================================================
-    subgraph SAFETY_DETAIL["안전 경고 상세"]
-        direction TB
-        SA1["🚨 즉시 차단"]
-        SA2["⚠️ 로그 기록\n사유 · 타임스탬프"]
-        SA3{"에스컬레이션?"}
-        SA4["🔔 외부 알림"]
-        SA5["안전 가이드 응답"]
-        SA1 --> SA2 --> SA3
-        SA3 -->|"Yes"| SA4 --> SA5
-        SA3 -->|"No"| SA5
+    subgraph PERSONA["4. 페르소나"]
+        R1["선택된 페르소나 해석<br/>registry.json 기준"] --> R2["페르소나 프롬프트 파일 로드"]
+        R2 --> R3["초안 구성요소 기반<br/>스타일 전용 재작성"]
+        R3 --> R4["최종 응답 생성<br/>+ 최종 페르소나 ID"]
     end
 
-    %% ============================================================
-    %% F. 수정 의도 — 플랜 조회
-    %% ============================================================
-    subgraph MODIFY_DETAIL["수정 의도 — 플랜 조회"]
-        direction TB
-        MD1["수정 의도 진입"]
-        MD2{"modify_target?"}
-        MD3["WAS 동기 호출\nGET /api/workout-plan/full\n전체 운동 플랜 조회"]
-        MD4["WAS 동기 호출\nGET /api/diet-plan/full\n전체 식단 플랜 조회"]
-        MD5["조회 결과를 실행 컨텍스트에 보관\n※ State에 저장하지 않음\n→ 검색 파이프라인 + 응답 생성에 전달"]
-
-        MD1 --> MD2
-        MD2 -->|"workout"| MD3 --> MD5
-        MD2 -->|"diet"| MD4 --> MD5
+    subgraph BG["5. 백그라운드 작업"]
+        B1["기록 / 프로필 쓰기"] --> B4["사용자 프로필 업데이트"]
+        B2["플랜 체크 쓰기"] --> B5["플랜 체크 완료 반영"]
+        B3["계획 승인 쓰기"] --> B6{"생성인가 수정인가?"}
+        B6 -->|"생성"| B7["새 플랜 생성 API 호출"]
+        B6 -->|"수정"| B8["기존 플랜 수정 API 호출"]
     end
-
-    %% ============================================================
-    %% G. Fallback 상세
-    %% ============================================================
-    subgraph FALLBACK_DETAIL["Fallback 상세"]
-        direction TB
-        FB1{"이전 대화\n맥락 존재?"}
-        FB2["맥락 기반 재추론\n→ 의도 분석 재실행"]
-        FB3["Clarification 요청\n→ 사용자 입력 대기"]
-        FB1 -->|"있음"| FB2
-        FB1 -->|"없음"| FB3
-    end
-
-    %% ============================================================
-    %% G. 응답 생성 + 자기 평가 상세
-    %% ============================================================
-    subgraph GENERATE_DETAIL["응답 생성 + 자기 평가 상세"]
-        direction TB
-        GEN["📝 응답 생성\nFlash + Persona DB\n\n참조:\n• State.emotion → 톤 조절\n• State.profile_changes → 변경 확인 문구\n• State.today_plan → 기록 검증\n• 실행 컨텍스트 전체 플랜 → 수정 반영\n• State.search_quality → degraded 안내\n• 출처 태그 → 기억·정보 구분"]
-
-        GEN --> SE{"🔎 자기 평가\n톤 · 할루시네이션 · 제약사항\n※ 안전경고 · 공감_케어만 실행"}
-        SE -->|"✅ 통과"| GEN_OUT["→ 최종 출력"]
-        SE -->|"❌ 실패"| SE_RC{"재생성\nmax=2"}
-        SE_RC -->|"가능\n+ failure_reason"| GEN
-        SE_RC -->|"초과"| SE_P["🩹 부분 패치"] --> GEN_OUT
-    end
-
-    %% ============================================================
-    %% H. 비동기 WAS 쓰기
-    %% ============================================================
-    subgraph WAS_WRITE["비동기 WAS 쓰기"]
-        direction TB
-        WW_CHECK{"State에\n쓰기 작업 존재?"}
-        WW_CHECK -->|"없음"| WW_SKIP["스킵"]
-        WW_CHECK -->|"있음"| WW_CALL["WAS API 비동기 호출\n• profile 변경 → /api/user/profile\n• plan_check 완료 → /api/plan/check\n• 새 플랜 → /api/plan/create\n• 플랜 수정 → /api/plan/update"]
-        WW_CALL --> WW_RESULT{"응답?"}
-        WW_RESULT -->|"성공"| WW_TYPE{"쓰기 유형?"}
-        WW_TYPE -->|"plan_check"| WW_CACHE["State.today_plan\n캐시 갱신\n※ is_today 통과 보장됨"]
-        WW_TYPE -->|"계획 · 수정"| WW_DATE{"날짜 범위에\n오늘 포함?"}
-        WW_TYPE -->|"profile"| WW_OK["pending_writes 삭제"]
-        WW_DATE -->|"Yes"| WW_CACHE
-        WW_DATE -->|"No"| WW_OK
-        WW_CACHE --> WW_OK
-        WW_RESULT -->|"실패"| WW_FAIL["State.pending_writes에 기록\n→ 다음 턴 전처리에서 재시도"]
-    end
-
-    %% ============================================================
-    %% I. 피드백 루프 상세
-    %% ============================================================
-    subgraph FEEDBACK_DETAIL["피드백 루프 상세"]
-        direction TB
-        OUT["💬 최종 응답 출력"]
-        R1["반응 분석\n친밀도 · 페르소나 진화 업데이트"]
-        EP{"should_save\n_episode?"}
-        EP_S["📌 vdb_memory 저장\n날짜 · 감정 · 핵심 사건 요약"]
-        EM_S["감정 이력 저장\nemotion 추이 누적"]
-
-        OUT --> R1 --> EP
-        EP -->|"true"| EP_S --> EM_S
-        EP -->|"false"| EM_S
-    end
-
-    %% ===== 스타일 =====
-    classDef startEnd fill:#4fc3f7,stroke:#0288d1,color:#000,stroke-width:2px
-    classDef process fill:#1a1a2e,stroke:#4fc3f7,color:#e0e0e0,stroke-width:1px
-    classDef decision fill:#263238,stroke:#4fc3f7,color:#e0e0e0,stroke-width:2px
-    classDef error fill:#b71c1c,stroke:#ef5350,color:#fff,stroke-width:2px
-    classDef safety fill:#e65100,stroke:#ff9800,color:#fff,stroke-width:2px
-    classDef db fill:#4a148c,stroke:#ce93d8,color:#e0e0e0,stroke-width:2px
-    classDef success fill:#1b5e20,stroke:#66bb6a,color:#e0e0e0,stroke-width:2px
-    classDef async fill:#1565c0,stroke:#42a5f5,color:#e0e0e0,stroke-width:2px
-
-    class OUT startEnd
-    class P0,P1,P4,RD1,RD2,RD5,RD7,CA1,SA3,FB1,H1,RC,SE,SE_RC,EP,WW_CHECK,WW_RESULT decision
-    class SF,G1,G2,I1,I2,I3,GD,GEN,SE_P process
-    class SA1,SA2,SA4,SA5 safety
-    class P2,P5,RD3,RD9,EP_S,EM_S db
-    class RD4,RD6,RD8 error
-    class RD_OUT,CA2,CA3,GEN_OUT,P6 success
-    class WW_CALL,WW_OK,WW_FAIL,WW_SKIP,P0R async

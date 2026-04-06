@@ -1,0 +1,17 @@
+*.tar.gz
+*.tar
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.local
+.git
+.gitignore
+.ruff_cache
+.pytest_cache
+.mypy_cache
+tests
+conftest.py
+simulation_*.json
+simulation_output.txt
+ruff_result.txt

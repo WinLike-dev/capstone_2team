@@ -8,6 +8,8 @@ class ChatRequest(BaseModel):
     user_id: str
     user_message: str
     session_id: Optional[str] = None  # LangGraph checkpointer thread_id
+    # -- Debug Overrides (개발/테스트용) --
+    user_profile_override: Optional[dict[str, Any]] = None
 
 
 class ChatResponse(BaseModel):
@@ -16,3 +18,5 @@ class ChatResponse(BaseModel):
     response: str
     intent: Optional[str] = None
     emotion: Optional[dict[str, Any]] = None
+    draft_response: Optional[str] = None
+    debug_state: Optional[dict[str, Any]] = None

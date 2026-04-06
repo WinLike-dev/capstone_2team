@@ -8,7 +8,7 @@
 """
 from __future__ import annotations
 
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
 from app.graph.deps import NodeDeps
@@ -21,6 +21,7 @@ from app.graph.nodes.preprocess import make_preprocess_node
 from app.graph.nodes.record import make_record_node
 from app.graph.nodes.safety import make_safety_node
 from app.graph.nodes.search import make_search_node
+from app.graph.nodes.persona import make_persona_node
 from app.schemas.state import GraphState
 
 
@@ -37,6 +38,7 @@ def route_intent(state: GraphState) -> str:
         "계획": "search",
         "수정": "modify_load",
         "정보": "search",
+        "계획_승인": "generate",
     }
     return mapping.get(intent, "fallback")
 
@@ -68,14 +70,16 @@ def route_search_retry(state: GraphState) -> str:
 
 
 def route_generate_self_eval(state: GraphState) -> str:
-    if state.get("response"):
-        return END
-    return "generate"
+    if state.get("response"): # 이미 에러 등으로 response가 할당된 경우
+        return "persona"
+    if state.get("self_eval_failure_reason"):
+        return "generate"
+    return "persona"
 
 
 # ── 그래프 빌드 ────────────────────────────────────────────────────────────────
 
-def build_graph(deps: NodeDeps):
+def build_graph(deps: NodeDeps, checkpointer: BaseCheckpointSaver):
     """LangGraph StateGraph를 빌드하고 컴파일하여 반환."""
     builder = StateGraph(GraphState)
 
@@ -88,6 +92,7 @@ def build_graph(deps: NodeDeps):
     builder.add_node("modify_load", make_modify_node(deps))
     builder.add_node("fallback", make_fallback_node(deps))
     builder.add_node("generate", make_generate_node(deps))
+    builder.add_node("persona", make_persona_node(deps))
 
     builder.add_edge(START, "preprocess")
     builder.add_edge("preprocess", "analyze_intent")
@@ -130,10 +135,10 @@ def build_graph(deps: NodeDeps):
     builder.add_conditional_edges(
         "generate",
         route_generate_self_eval,
-        {"generate": "generate", END: END},
+        {"generate": "generate", "persona": "persona"},
     )
 
+    builder.add_edge("persona", END)
     builder.add_edge("safety", END)
 
-    checkpointer = MemorySaver()
     return builder.compile(checkpointer=checkpointer)

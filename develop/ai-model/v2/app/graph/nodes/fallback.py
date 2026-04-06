@@ -1,9 +1,7 @@
 """Fallback 노드 — Layer 3 Fallback 상세 구현.
 
-이전 대화 맥락 존재 시: 맥락 기반 재추론 → 의도 분석 재실행
-맥락 없음:             Clarification 요청 → 사용자 입력 대기
-
-무한 루프 방지를 위해 fallback_count >= 2 이면 Clarification으로 강제 전환.
+속도와 예측 가능성을 위해 fallback 재추론을 제거하고,
+항상 clarification 응답으로 종료한다.
 """
 from __future__ import annotations
 
@@ -13,8 +11,6 @@ from app.graph.deps import NodeDeps
 from app.schemas.state import GraphState
 
 logger = logging.getLogger(__name__)
-
-MAX_FALLBACK = 2
 
 _CLARIFICATION_RESPONSE = (
     "죄송해요, 질문을 정확히 이해하지 못했어요. "
@@ -26,22 +22,15 @@ _CLARIFICATION_RESPONSE = (
 def make_fallback_node(deps: NodeDeps):
     async def fallback_node(state: GraphState) -> dict:
         count = state.get("fallback_count", 0)
-        messages = state.get("messages", [])
-        has_context = len(messages) >= 2 and count < MAX_FALLBACK
-
-        if has_context:
-            logger.info("Fallback 재추론 시도: fallback_count=%d", count)
-            return {
-                "fallback_count": count + 1,
-                "needs_clarification": False,
-            }
-        else:
-            logger.info("Fallback Clarification 요청: fallback_count=%d", count)
-            return {
-                "response": _CLARIFICATION_RESPONSE,
-                "fallback_count": count + 1,
-                "needs_clarification": True,
-                "messages": {"role": "assistant", "content": _CLARIFICATION_RESPONSE},
-            }
+        logger.info("Fallback Clarification 요청: fallback_count=%d", count)
+        return {
+            "response": _CLARIFICATION_RESPONSE,
+            "fallback_count": count + 1,
+            "needs_clarification": True,
+            "messages": [
+                {"role": "user", "content": state["user_message"]},
+                {"role": "assistant", "content": _CLARIFICATION_RESPONSE},
+            ],
+        }
 
     return fallback_node

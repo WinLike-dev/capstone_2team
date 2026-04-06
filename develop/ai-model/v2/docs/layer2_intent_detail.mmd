@@ -1,54 +1,27 @@
-%% ============================================================
-%% 레이어 2: 의도 분석 상세
-%% ============================================================
+flowchart TD
+    MSG["사용자 메시지"] --> RULES{"규칙 기반<br/>빠른 분기"}
+    PREV["이전 상태<br/>의도 / 감정 / 요약"] --> LLM["의도 분류기"]
+    HINTS["전처리 힌트<br/>세션 컨텍스트"] --> LLM
 
-%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a1a2e', 'primaryTextColor': '#e0e0e0', 'lineColor': '#4fc3f7', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460'}}}%%
+    RULES -->|"위험 키워드 감지"| SAFETY["의도 = 안전경고"]
+    RULES -->|"짧은 일반 대화"| CASUAL["의도 = 일반 대화"]
+    RULES -->|"그 외"| LLM
 
-graph TD
-    subgraph INTENT_DETAIL["레이어 2 — 의도 분석 상세"]
+    LLM --> OUT["의도 분석 결과"]
 
-        IN["사용자 입력 수신"] --> S1{"1단계\n규칙 기반 사전 필터"}
+    OUT --> I1["의도"]
+    OUT --> I2["신뢰도"]
+    OUT --> I3["감정<br/>라벨 + 강도"]
+    OUT --> I4["과거 기억 필요 여부"]
+    OUT --> I5["검색 대상"]
+    OUT --> I6["기록 유형 / 프로필 변경"]
+    OUT --> I7["수정 대상"]
 
-        S1 -->|"is_safety = true\n(금칙어 매칭)"| ROUTE_SAFETY["→ 안전 경고 경로"]
-        S1 -->|"is_casual = true\n(인사 패턴 매칭)\n※ previous_intent가\n공감_케어면 스킵"| ROUTE_CASUAL["→ 응답 생성 직행"]
-        S1 -->|"통과"| S2
-
-        S2["2단계\nFlash-Lite 정밀 분석\n\n입력:\n• 현재 메시지\n• previous_intent\n• previous_emotion\n• rule_hints"]
-
-        S2 --> OUTPUT["State 기록"]
-
-        subgraph COMMON["공통 속성"]
-            direction LR
-            C1["intent\n공감_케어 · 기록 · 계획\n수정 · 정보 · 안전경고 · fallback"]
-            C2["confidence\n0.0 ~ 1.0"]
-            C3["emotion\nlabel + intensity"]
-        end
-
-        subgraph JUDGE["판단 기반 속성"]
-            direction LR
-            J3["has_fact_change\n프로필 변경 감지?"]
-            J4["requires_past_memory\n과거 에피소드 참조 필요?"]
-        end
-
-        subgraph COND["의도별 조건부 속성"]
-            direction LR
-            D1["공감_케어\n→ requires_past_memory\n→ should_save_episode"]
-            D2["기록\n→ record_type\n   (profile · plan_check)\n→ profile_changes\n→ is_today (plan_check 시)"]
-            D3["수정\n→ modify_target\n   (workout · diet)\n→ search_targets"]
-            D4["계획 · 정보\n→ search_targets"]
-        end
-
-        OUTPUT --> COMMON
-        OUTPUT --> JUDGE
-        OUTPUT --> COND
-
-        COND --> ROUTER{"의도 라우터\n→ 각 경로로 분기"}
-    end
-
-    classDef process fill:#1a1a2e,stroke:#4fc3f7,color:#e0e0e0,stroke-width:1px
-    classDef decision fill:#263238,stroke:#4fc3f7,color:#e0e0e0,stroke-width:2px
-    classDef output fill:#1b5e20,stroke:#66bb6a,color:#e0e0e0,stroke-width:2px
-
-    class IN,S2,OUTPUT,ROUTE_SAFETY,ROUTE_CASUAL process
-    class S1,ROUTER decision
-    class C1,C2,C3,J3,J4,D1,D2,D3,D4 output
+    I1 --> ROUTE{"그래프 라우팅"}
+    ROUTE -->|"일반 대화 / 계획 승인"| GEN["응답 초안 생성"]
+    ROUTE -->|"안전경고"| SAFETY2["안전 응답"]
+    ROUTE -->|"재질문"| FB["보충 질문"]
+    ROUTE -->|"공감_케어"| CARE["공감/케어"]
+    ROUTE -->|"기록"| REC["기록 처리"]
+    ROUTE -->|"계획 / 정보"| SEARCH["검색"]
+    ROUTE -->|"수정"| MODIFY["수정 컨텍스트 로드"]

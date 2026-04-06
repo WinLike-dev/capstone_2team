@@ -1,175 +1,192 @@
-"""검색 파이프라인 노드 — Layer 3 검색 파이프라인 상세 구현.
-
-1. search_targets 기반 VDB 병렬 검색
-2. 결과 병합 (중복 제거 · 우선순위 정렬 · 출처 태깅)
-3. Flash-Lite 결과 평가 (score 산출)
-4. score < 0.4: 쿼리 재생성 → 재시도
-   score 0.4~0.7: 검색 재시도
-   score > 0.7: 통과
-5. max_retry=3 초과 시 Graceful Degradation
-"""
+"""Search pipeline node for vector and web retrieval."""
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-from typing import Any
 
+from app.core.prompt_loader import load_prompt
 from app.graph.deps import NodeDeps
+from app.schemas.llm_responses import QueryRegenResponse, SearchEvalResponse
 from app.schemas.state import GraphState
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRY = 3
-TOP_K = 5
+INTENT_CARE = "공감_케어"
+INTENT_PLAN = "계획"
+INTENT_MODIFY = "수정"
+INTENT_INFO = "정보"
 
-_EVAL_SYSTEM_PROMPT = """
-당신은 검색 결과 품질 평가 전문가입니다.
-사용자 질문에 대한 검색 결과의 관련성을 0.0~1.0 점수로 평가하세요.
-JSON: {"score": 0.0~1.0, "reason": "한 줄 이유"}
-"""
+MAX_RETRY = 1
+TOP_K = 15
+_WEB_ENABLED_INTENTS = {INTENT_PLAN, INTENT_MODIFY, INTENT_INFO}
 
-_QUERY_REGEN_PROMPT = """
-검색 결과가 부족합니다. 사용자 질문에 더 적합한 검색 쿼리를 한 문장으로 재생성하세요.
-JSON: {"query": "재생성된 검색 쿼리"}
-"""
+_EVAL_SYSTEM_PROMPT = load_prompt("nodes/search/eval.md")
+_QUERY_REGEN_PROMPT = load_prompt("nodes/search/query_regen.md")
 
 
 def make_search_node(deps: NodeDeps):
     async def search_node(state: GraphState) -> dict:
         query = state.get("search_query") or state["user_message"]
-        targets = state.get("search_targets") or []
+        targets = list(state.get("search_targets") or [])
         retry_count = state.get("search_retry_count", 0)
         intent = state.get("intent", "")
+
+        query = _augment_query(query, state)
+
+        if intent in _WEB_ENABLED_INTENTS and "vdb_external" in targets and "web" not in targets:
+            targets.append("web")
 
         if not targets:
             return {"search_results": [], "search_quality": "ok"}
 
-        # ── 벡터 임베딩 ──────────────────────────────────────────────────────
         try:
             query_vec = await deps.embed.embed(query)
-        except Exception as e:
-            logger.error("임베딩 생성 실패: %s", e)
+        except Exception as exc:
+            logger.error("Embedding failed: %s", exc)
             return _degraded(state, intent)
 
-        # ── 병렬 검색 ────────────────────────────────────────────────────────
-        raw_results = await _parallel_search(deps, state["user_id"], query_vec, targets)
+        raw_results = await _parallel_search(deps, state["user_id"], query, query_vec, targets)
+        merged_results = _merge_results(raw_results)
 
-        # ── 결과 병합 ────────────────────────────────────────────────────────
-        merged = _merge_results(raw_results)
-
-        # ── Flash-Lite 품질 평가 ─────────────────────────────────────────────
-        score = await _evaluate(deps, query, merged)
-        logger.info("검색 품질 평가: score=%.2f, retry=%d", score, retry_count)
+        score = await _evaluate(deps, query, merged_results)
+        logger.info("Search quality score=%.2f retry=%d", score, retry_count)
 
         if score >= 0.7:
-            return {"search_results": merged, "search_quality": "ok", "search_retry_count": retry_count}
+            return {
+                "search_results": merged_results,
+                "search_quality": "ok",
+                "search_retry_count": retry_count,
+            }
 
         if retry_count >= MAX_RETRY:
             return _degraded(state, intent)
 
         if score < 0.4:
-            # 쿼리 재생성 후 재시도
-            new_query = await _regenerate_query(deps, state["user_message"], merged)
+            new_query = await _regenerate_query(deps, state["user_message"], merged_results)
             return {
                 "search_query": new_query,
                 "search_retry_count": retry_count + 1,
             }
-        else:
-            # 검색 재시도 (동일 쿼리)
-            return {"search_retry_count": retry_count + 1}
+
+        return {"search_retry_count": retry_count + 1}
 
     return search_node
 
 
-# ── 병렬 검색 ─────────────────────────────────────────────────────────────────
+def _augment_query(query: str, state: GraphState) -> str:
+    if state.get("search_query"):
+        return query
+
+    profile = state.get("user_profile") or {}
+    additions: list[str] = []
+
+    if profile.get("goal"):
+        additions.append(f"목표:{profile['goal']}")
+    if profile.get("injury_history"):
+        additions.append(f"부상:{profile['injury_history']}")
+
+    if not additions:
+        return query
+    return f"{query} [{', '.join(additions)}]"
+
 
 async def _parallel_search(
-    deps: NodeDeps, user_id: str, vec: list[float], targets: list[str]
+    deps: NodeDeps,
+    user_id: str,
+    query: str,
+    vector: list[float],
+    targets: list[str],
 ) -> list[dict]:
     tasks = []
     for target in targets:
         if target == "vdb_memory":
-            tasks.append(deps.pinecone.search_memory(user_id, vec, TOP_K))
+            tasks.append(deps.pinecone.search_memory(user_id, vector, TOP_K))
         elif target == "vdb_user_important":
-            tasks.append(deps.pinecone.search_important(user_id, vec, TOP_K))
+            tasks.append(deps.pinecone.search_important(user_id, vector, TOP_K))
         elif target == "vdb_external":
-            tasks.append(deps.pinecone.search_external(vec, TOP_K))
+            tasks.append(deps.pinecone.search_external(vector, TOP_K))
         elif target == "web":
-            tasks.append(_web_search_stub(vec))
+            tasks.append(_web_search(deps, query))
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
+
     combined: list[dict] = []
-    for r in results:
-        if isinstance(r, list):
-            combined.extend(r)
+    for result in results:
+        if isinstance(result, list):
+            combined.extend(result)
         else:
-            logger.warning("검색 일부 실패 (무시): %s", r)
+            logger.warning("Search target failed and was ignored: %s", result)
     return combined
 
 
-async def _web_search_stub(_vec: list[float]) -> list[dict]:
-    """웹 검색 플레이스홀더 — 향후 Google Search API 연동."""
-    return []
+async def _web_search(deps: NodeDeps, query: str) -> list[dict]:
+    try:
+        return await deps.router.search_web(query, max_results=min(TOP_K, 5))
+    except Exception as exc:
+        logger.warning("Web search failed and was ignored: %s", exc)
+        return []
 
-
-# ── 결과 병합 ─────────────────────────────────────────────────────────────────
 
 def _merge_results(results: list[dict]) -> list[dict]:
     seen: set[str] = set()
     unique: list[dict] = []
-    for r in sorted(results, key=lambda x: x.get("score", 0.0), reverse=True):
-        text = r.get("text", "")
+
+    for result in sorted(results, key=lambda item: item.get("score", 0.0), reverse=True):
+        text = result.get("text", "")
         if text and text not in seen:
             seen.add(text)
-            unique.append(r)
-    return unique[:10]
+            unique.append(result)
 
+    return unique[:5]
 
-# ── Flash-Lite 품질 평가 ──────────────────────────────────────────────────────
 
 async def _evaluate(deps: NodeDeps, query: str, results: list[dict]) -> float:
     if not results:
         return 0.0
-    snippets = "\n".join(f"[{r.get('source', 'unknown')}] {r.get('text', '')[:200]}" for r in results[:5])
+
+    snippets = "\n".join(
+        f"[{result.get('source', 'unknown')}] {result.get('text', '')[:200]}"
+        for result in results[:5]
+    )
     user_content = f"질문: {query}\n\n검색 결과:\n{snippets}"
+
     try:
         raw = await deps.router.generate(
             system_prompt=_EVAL_SYSTEM_PROMPT,
             user_content=user_content,
-            response_schema=dict,
+            response_schema=SearchEvalResponse,
         )
-        return float(json.loads(raw).get("score", 0.5))
-    except Exception as e:
-        logger.warning("품질 평가 실패, 기본값 0.5 사용: %s", e)
+        evaluation = SearchEvalResponse.model_validate_json(raw)
+        return evaluation.score
+    except Exception as exc:
+        logger.warning("Search evaluation failed, defaulting to 0.5: %s", exc)
         return 0.5
 
 
-# ── 쿼리 재생성 ────────────────────────────────────────────────────────────────
-
 async def _regenerate_query(deps: NodeDeps, original: str, results: list[dict]) -> str:
-    snippets = "\n".join(r.get("text", "")[:100] for r in results[:3])
-    user_content = f"원래 질문: {original}\n\n기존 검색 결과(불충분):\n{snippets}"
+    snippets = "\n".join(result.get("text", "")[:100] for result in results[:3])
+    user_content = f"원래 질문: {original}\n\n부실했던 검색 결과:\n{snippets}"
+
     try:
         raw = await deps.router.generate(
             system_prompt=_QUERY_REGEN_PROMPT,
             user_content=user_content,
-            response_schema=dict,
+            response_schema=QueryRegenResponse,
         )
-        return json.loads(raw).get("query", original)
+        regenerated = QueryRegenResponse.model_validate_json(raw)
+        return regenerated.query
     except Exception:
         return original
 
 
-# ── Graceful Degradation ──────────────────────────────────────────────────────
-
 def _degraded(state: GraphState, intent: str) -> dict:
-    if intent == "공감_케어":
+    if intent == INTENT_CARE:
         return {
             "search_results": [],
             "search_quality": "degraded",
             "requires_past_memory": False,
         }
+
     return {
         "search_results": state.get("search_results") or [],
         "search_quality": "degraded",
