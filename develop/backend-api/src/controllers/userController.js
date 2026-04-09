@@ -31,11 +31,20 @@ exports.getProfile = async (req, res) => {
 exports.saveProfile = async (req, res) => {
   try {
     const userId = req.user.user_id;
-    // 범용 정보만 받음 (목표 칼로리는 사용하지 않음)
+    // 범용 정보 및 닉네임 받기
     const {
       mbti, gender, age, height, weight,
-      goal, activity_level, medical_history, allergies
+      goal, activity_level, medical_history, allergies, nickname
     } = req.body;
+
+    // 닉네임이 입력되었다면 users 테이블 업데이트
+    if (nickname) {
+      const { error: nickErr } = await supabase
+        .from('users')
+        .update({ nickname })
+        .eq('user_id', userId);
+      if (nickErr) throw nickErr;
+    }
 
     let calculatedBmi = null;
 
@@ -68,73 +77,6 @@ exports.saveProfile = async (req, res) => {
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
-
-// @route   PUT /api/v1/users/profile
-// @desc    마이페이지 등에서 건강/목표 부분 수정 시 자동 재계산 업데이트
-// @access  Public (프로토타입)
-exports.updateProfile = async (req, res) => {
-  try {
-    const userId = req.user.user_id;
-    // user_id는 body에서 받지 않지만, 만약 섞여 들어왔다면 제외 (updateFields 방어)
-    const { user_id, ...updateFields } = req.body;
-
-    // 만약 넘어온 데이터 중에 닉네임이 있다면 users 테이블 먼저 업데이트 수행
-    if (updateFields.nickname) {
-      const { error: nickErr } = await supabase
-        .from('users')
-        .update({ nickname: updateFields.nickname })
-        .eq('user_id', userId);
-
-      if (nickErr) throw nickErr;
-      
-      // user_health_profiles 테이블에는 nickname 컬럼이 없으므로 객체에서 지워줌
-      delete updateFields.nickname;  
-    }
-
-    // 1. 기존 정보 조회
-    const { data: existingProfile, error: fetchErr } = await supabase
-      .from('user_health_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (fetchErr) throw fetchErr;
-
-    // 2. 수정값과 기존 데이터 병합
-    const mergedProfile = { ...existingProfile, ...updateFields };
-
-    // 3. 재계산 로직 수행 (BMI)
-
-    // BMI 재계산
-    let calculatedBmi = mergedProfile.bmi;
-    if (mergedProfile.height && mergedProfile.weight) {
-      const heightInMeters = mergedProfile.height / 100;
-      calculatedBmi = parseFloat((mergedProfile.weight / (heightInMeters * heightInMeters)).toFixed(1));
-    }
-
-    // 4. 재계산(BMI) 데이터를 합쳐서 최종 업데이트
-    const finalData = { ...updateFields, bmi: calculatedBmi };
-
-    const { data: updatedProfile, error: updateErr } = await supabase
-      .from('user_health_profiles')
-      .update(finalData)
-      .eq('user_id', userId)
-      .select()
-      .single();
-
-    if (updateErr) throw updateErr;
-
-    // AI 서버에 프로필 변경 이벤트 push (fire-and-forget)
-    const changedFields = Object.keys(finalData);
-    aiEventService.notifyProfileUpdated(userId, changedFields);
-
-    res.json({ message: '프로필 업데이트 및 타겟 수치 조율 성공', profile: updatedProfile });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
-  }
-};
-
 
 // @route   PUT /api/v1/users/exercises/items/:item_id
 // @desc    개별 운동 항목 완료(체크) 토글 및 부모 상태(0,1,2) 자동 계산

@@ -9,7 +9,6 @@ router.use(authMiddleware);
 // 1. 건강 프로필 (user_health_profiles)
 router.get('/profile', userController.getProfile);
 router.post('/profile', userController.saveProfile);
-router.put('/profile', userController.updateProfile);
 
 // 1-1. 캘린더 통합 조회 (user_exercise_plans, user_meal_plans)
 router.get('/calendar', userController.getCalendar);
