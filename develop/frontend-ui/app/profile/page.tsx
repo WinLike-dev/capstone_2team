@@ -3,74 +3,20 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Edit3, Target, Bell, LogOut, ChevronRight, CheckCircle2, HeadphonesIcon, Info, X } from 'lucide-react';
+import { Edit3, Target, Bell, LogOut, ChevronRight, CheckCircle2, HeadphonesIcon, Info, X, User } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-interface UserProfile {
-  user_id?: string;
-  email?: string;
-  nickname?: string;
-  name?: string;
-  age?: string | number;
-  gender?: string;
-  height?: string | number;
-  weight?: string | number;
-  bmi?: number;
-  goal?: string;
-  activityLevel?: string;
-  mbti?: string;
-  conditions?: string[];
-  allergies?: string[];
-  otherAllergy?: string;
-  user_instruction?: string;
-}
+import { usePlan, UserData } from '../context/PlanContext';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [userData, setUserData] = useState<UserProfile | null>(null);
+  const { userData, updateUserData } = usePlan();
   
   // Modals state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<UserProfile>>({});
+  const [editForm, setEditForm] = useState<Partial<UserData & { otherAllergy?: string }>>({});
   const [editGoal, setEditGoal] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('healthAppUser');
-    if (stored) {
-      let parsed: any = {};
-      try {
-        parsed = JSON.parse(stored);
-      } catch (e) {
-        console.error("Failed to parse user data", e);
-      }
-      
-      if (!parsed.email) parsed.email = 'user@example.com';
-      if (!parsed.user_id) parsed.user_id = parsed.email; // Ensure user_id exists
-
-      // Safe Parser: 문자열(string)이고 '['로 시작한다면 JSON.parse()를 실행해 배열로 변환
-      const safeParseArray = (val: any) => {
-        if (!val) return [];
-        if (Array.isArray(val)) return val;
-        if (typeof val === 'string' && val.trim().startsWith('[')) {
-          try {
-            const parsedArray = JSON.parse(val);
-            return Array.isArray(parsedArray) ? parsedArray : [];
-          } catch (error) {
-            return [];
-          }
-        }
-        return [];
-      };
-
-      parsed.allergies = safeParseArray(parsed.allergies);
-      // DB 스키마 명세에 따라 medical_history가 들어올 수도 있으므로 OR 처리
-      parsed.conditions = safeParseArray(parsed.conditions || parsed.medical_history);
-      
-      setUserData(parsed);
-    }
-  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('healthAppToken');
@@ -83,7 +29,7 @@ export default function ProfilePage() {
       ...userData,
       conditions: userData?.conditions || [],
       allergies: userData?.allergies || [],
-      otherAllergy: userData?.otherAllergy || '',
+      otherAllergy: (userData as any)?.otherAllergy || '',
     });
     setIsEditModalOpen(true);
   };
@@ -93,7 +39,7 @@ export default function ProfilePage() {
     setIsGoalModalOpen(true);
   };
 
-  const saveProfileToAPI = async (data: Partial<UserProfile>) => {
+  const saveProfileToAPI = async (data: Partial<UserData & { otherAllergy?: string }>) => {
     setIsSaving(true);
     let finalData = { ...data };
     try {
@@ -141,8 +87,7 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('API Error:', error);
     } finally {
-      setUserData(finalData);
-      localStorage.setItem('healthAppUser', JSON.stringify(finalData));
+      updateUserData(finalData);
       setIsEditModalOpen(false);
       setIsGoalModalOpen(false);
       setIsSaving(false);
@@ -158,7 +103,7 @@ export default function ProfilePage() {
   const allergyOptions = ['유제품', '견과류', '갑각류', '밀', '대두', '달걀', '해당 없음'];
 
   const handleCheckboxChange = (condition: string) => {
-    setEditForm((prev: Partial<UserProfile>) => {
+    setEditForm((prev: Partial<UserData & { otherAllergy?: string }>) => {
       let newConditions: string[] = [...(prev.conditions || [])];
       if (condition === '없음') {
         newConditions = newConditions.includes('없음') ? [] : ['없음'];
@@ -175,7 +120,7 @@ export default function ProfilePage() {
   };
 
   const handleAllergyChange = (allergy: string) => {
-    setEditForm((prev: Partial<UserProfile>) => {
+    setEditForm((prev: Partial<UserData & { otherAllergy?: string }>) => {
       let newAllergies: string[] = [...(prev.allergies || [])];
       if (allergy === '해당 없음') {
         newAllergies = newAllergies.includes('해당 없음') ? [] : ['해당 없음'];

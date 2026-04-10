@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { HeartPulse, Loader2, ArrowRight } from 'lucide-react';
+import { usePlan } from '../context/PlanContext';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const { fetchUserProfile } = usePlan();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +61,8 @@ export default function LoginPage() {
           email: data.user.email,
         }));
       }
+
+      await fetchUserProfile(); // Fetch the full profile to global context before navigating
 
       // Successfully logged in, bypass loop safely
       if (data.user && data.user.has_health_profile === false) {
