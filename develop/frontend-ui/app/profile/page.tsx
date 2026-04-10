@@ -39,11 +39,35 @@ export default function ProfilePage() {
   useEffect(() => {
     const stored = localStorage.getItem('healthAppUser');
     if (stored) {
-      const parsed = JSON.parse(stored);
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(stored);
+      } catch (e) {
+        console.error("Failed to parse user data", e);
+      }
+      
       if (!parsed.email) parsed.email = 'user@example.com';
       if (!parsed.user_id) parsed.user_id = parsed.email; // Ensure user_id exists
-      if (!parsed.allergies) parsed.allergies = [];
-      if (!parsed.conditions) parsed.conditions = [];
+
+      // Safe Parser: 문자열(string)이고 '['로 시작한다면 JSON.parse()를 실행해 배열로 변환
+      const safeParseArray = (val: any) => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string' && val.trim().startsWith('[')) {
+          try {
+            const parsedArray = JSON.parse(val);
+            return Array.isArray(parsedArray) ? parsedArray : [];
+          } catch (error) {
+            return [];
+          }
+        }
+        return [];
+      };
+
+      parsed.allergies = safeParseArray(parsed.allergies);
+      // DB 스키마 명세에 따라 medical_history가 들어올 수도 있으므로 OR 처리
+      parsed.conditions = safeParseArray(parsed.conditions || parsed.medical_history);
+      
       setUserData(parsed);
     }
   }, []);
@@ -221,12 +245,13 @@ export default function ProfilePage() {
               </div>
               <div className="inline-flex items-center bg-orange-50 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full border border-orange-100 shadow-sm mt-1 md:mt-0">
                 <span className="text-[10px] md:text-[11px] font-bold text-orange-600 tracking-wide whitespace-normal">
-                  알레르기: {userData && userData.allergies ? (
-                    userData.allergies.includes('해당 없음') || (userData.allergies.length === 0 && !userData.otherAllergy)
+                  알레르기: {userData ? (
+                    (Array.isArray(userData.allergies) ? userData.allergies : []).includes('해당 없음') || 
+                    ((Array.isArray(userData.allergies) ? userData.allergies : []).length === 0 && !userData.otherAllergy)
                       ? '없음'
                       : [
-                          ...userData.allergies.filter((a: string) => a !== '기타(직접 입력)' && a !== '해당 없음'),
-                          ...(userData.allergies.includes('기타(직접 입력)') && userData.otherAllergy ? [userData.otherAllergy] : [])
+                          ...(Array.isArray(userData.allergies) ? userData.allergies : []).filter((a: string) => a !== '기타(직접 입력)' && a !== '해당 없음'),
+                          ...((Array.isArray(userData.allergies) ? userData.allergies : []).includes('기타(직접 입력)') && userData.otherAllergy ? [userData.otherAllergy] : [])
                         ].join(', ')
                   ) : '없음'}
                 </span>
