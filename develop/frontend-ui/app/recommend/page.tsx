@@ -29,13 +29,11 @@ const mapWorkoutType = (typeRaw: string) => {
 };
 
 export default function RecommendPage() {
-  const { plans, completedTasks, completeWorkout, completeDiet, getPlanByDate } = usePlan();
+  const { plans, completedTasks, completeWorkout, completeDiet, getPlanByDate, userData, isUserLoading } = usePlan();
   
   const [currentDate, setCurrentDate] = useState(new Date('2026-03-01'));
   const [today, setToday] = useState<Date | null>(null);
   const [todayPlan, setTodayPlan] = useState<DailyPlan | null>(null);
-
-  const [userData, setUserData] = useState<{name: string, goal: string, allergies?: string[], conditions?: string[]} | null>(null);
 
   const [confirmPopup, setConfirmPopup] = useState<{isOpen: boolean, target: {type: 'workout'|'diet', dateStr: string, name: string, index: number} | null}>({isOpen: false, target: null});
 
@@ -63,11 +61,7 @@ export default function RecommendPage() {
     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
     setTodayPlan(getPlanByDate(now));
 
-    const stored = localStorage.getItem('healthAppUser');
-    if (stored) {
-      setUserData(JSON.parse(stored));
-    }
-  }, [plans]);
+  }, [plans, getPlanByDate]);
 
   const [selectedPlan, setSelectedPlan] = useState<DailyPlan | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -93,16 +87,22 @@ export default function RecommendPage() {
   let headerMessage = "꾸준한 식단 관리가<br />성공의 가장 빠른 지름길이에요!";
   let subMessage = "사용자님의 다이어트 목표 달성을 응원합니다.";
 
-  if (userData) {
+  if (isUserLoading) {
+    headerMessage = `<div class="h-8 bg-gray-200/50 rounded-md w-64 animate-pulse mb-2 inline-block"></div><br/><div class="h-8 bg-gray-200/50 rounded-md w-48 animate-pulse inline-block"></div>`;
+    subMessage = "";
+  } else if (userData) {
+    const displayName = userData.name || userData.nickname || '사용자';
     if (userData.goal === '다이어트') {
-      headerMessage = `${userData.name} 님의 다이어트 목표 달성을<br/>AI가 끝까지 응원합니다!`;
+      headerMessage = `${displayName} 님의 다이어트 목표 달성을<br/>AI가 끝까지 응원합니다!`;
       subMessage = '꾸준한 식단과 유산소로 목표를 이루어봐요!';
     } else if (userData.goal === '건강 유지') {
-      headerMessage = `오늘도 건강한 밸런스를 유지하는<br/>${userData.name} 님이 멋져요!`;
+      headerMessage = `오늘도 건강한 밸런스를 유지하는<br/>${displayName} 님이 멋져요!`;
       subMessage = '규칙적인 생활로 활기찬 하루를 보내세요.';
     } else if (userData.goal === '근력 향상') {
       headerMessage = `강력한 근력을 위해 오늘 추천된<br/>운동을 완료해 보세요!`;
-      subMessage = `${userData.name} 님의 한계 돌파를 응원합니다.`;
+      subMessage = `${displayName} 님의 한계 돌파를 응원합니다.`;
+    } else {
+      headerMessage = `${displayName} 님의 목표 달성을<br/>AI가 끝까지 응원합니다!`;
     }
   }
 

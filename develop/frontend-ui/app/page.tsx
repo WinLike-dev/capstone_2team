@@ -33,10 +33,10 @@ const getFoodEmoji = (name: string) => {
 
 export default function Home() {
   const router = useRouter();
-  const { addWorkout, replaceDiet, getPlanByDate } = usePlan();
-  const [userData, setUserData] = useState<{ nickname?: string, name?: string, goal?: string, allergies?: string[], conditions?: string[], gender?: string, age?: number | string, bmi?: number | string, weight?: string, height?: string, user_instruction?: string } | null>(null);
+  const { addWorkout, replaceDiet, getPlanByDate, userData, isUserLoading } = usePlan();
   const [isClient, setIsClient] = useState(false);
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
+  const [currentDate, setCurrentDate] = useState('');
 
   // Calorie & Nutrient Modals state
   const [isCalorieModalOpen, setIsCalorieModalOpen] = useState(false);
@@ -390,33 +390,6 @@ export default function Home() {
     if (!token || !stored) {
       router.push('/login'); 
     } else {
-      const parsedData = JSON.parse(stored);
-      setUserData(parsedData);
-
-      const fetchProfile = async () => {
-        if (!token) return;
-        try {
-          const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
-          const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
-          const endpoint = baseUrl ? `${baseUrl}/api/v1/users/profile` : '/api/v1/users/profile';
-          const res = await fetch(endpoint, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'ngrok-skip-browser-warning': 'true'
-            }
-          });
-          if (res.ok) {
-            const freshData = await res.json();
-            const newData = { ...parsedData, ...freshData };
-            setUserData(newData);
-            localStorage.setItem('healthAppUser', JSON.stringify(newData));
-          }
-        } catch (e) {
-          console.error('Failed to sync profile', e);
-        }
-      };
-      fetchProfile();
-
       // Load persisted nutrition data for today
       const savedNutrition = localStorage.getItem('healthAppNutrition');
       if (savedNutrition) {
@@ -431,43 +404,49 @@ export default function Home() {
           });
         }
       }
-
-      if (parsedData.weight && parsedData.height && parsedData.age && parsedData.gender) {
-        const w = parseFloat(parsedData.weight);
-        const h = parseFloat(parsedData.height); // in cm
-        const age = parseInt(parsedData.age, 10);
-        const genderDelta = (parsedData.gender === '남성' || parsedData.gender === 'male') ? 5 : -161;
-
-        // Mifflin-St Jeor Equation
-        const bmr = 10 * w + 6.25 * h - 5 * age + genderDelta;
-        const recCals = Math.round(bmr * 1.375); // Light activity multiplier
-
-        setRecommendedCalories(recCals);
-
-        const initialTargets = {
-          calories: recCals,
-          carbs: Math.round((recCals * 0.5) / 4),
-          protein: Math.round((recCals * 0.3) / 4),
-          fat: Math.round((recCals * 0.2) / 9)
-        };
-
-        setTargets(initialTargets);
-        setGoalInput({
-          calories: String(initialTargets.calories),
-          carbs: String(initialTargets.carbs),
-          protein: String(initialTargets.protein),
-          fat: String(initialTargets.fat)
-        });
-      }
     }
   }, []);
 
-const currentDate = new Date('2026-03-16').toLocaleDateString('ko-KR', {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-  weekday: 'long',
-});
+  useEffect(() => {
+    if (userData && userData.weight && userData.height && userData.age && userData.gender) {
+      const w = parseFloat(userData.weight);
+      const h = parseFloat(userData.height); // in cm
+      const age = parseInt(userData.age as string, 10);
+      const genderDelta = (userData.gender === '남성' || userData.gender === 'male') ? 5 : -161;
+
+      // Mifflin-St Jeor Equation
+      const bmr = 10 * w + 6.25 * h - 5 * age + genderDelta;
+      const recCals = Math.round(bmr * 1.375); // Light activity multiplier
+
+      setRecommendedCalories(recCals);
+
+      const initialTargets = {
+        calories: recCals,
+        carbs: Math.round((recCals * 0.5) / 4),
+        protein: Math.round((recCals * 0.3) / 4),
+        fat: Math.round((recCals * 0.2) / 9)
+      };
+
+      setTargets(initialTargets);
+      setGoalInput({
+        calories: String(initialTargets.calories),
+        carbs: String(initialTargets.carbs),
+        protein: String(initialTargets.protein),
+        fat: String(initialTargets.fat)
+      });
+    }
+  }, [userData]);
+
+  useEffect(() => {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long',
+    });
+    setCurrentDate(formatter.format(now));
+  }, []);
 
 const allergies = userData?.allergies || [];
 const conditions = userData?.conditions || [];
@@ -479,7 +458,7 @@ return (
       <header className="flex justify-between items-start pt-4">
         <div className="flex flex-col space-y-2">
           <p className="text-sm font-semibold text-gray-500 tracking-wide">{currentDate}</p>
-          {isClient && userData ? (
+          {isClient && !isUserLoading && userData ? (
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
               <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
                 <span className="text-[#2563eb]">{userData?.nickname || userData?.name || '사용자'}</span> 님,
@@ -488,8 +467,8 @@ return (
             </motion.div>
           ) : (
             <div className="flex flex-col justify-center h-[76px] space-y-2 animate-pulse">
-              <div className="h-8 bg-gray-200 rounded-md w-48"></div>
-              <div className="h-4 bg-gray-200 rounded-md w-64"></div>
+              <div className="h-8 bg-gray-200/50 rounded-md w-48"></div>
+              <div className="h-4 bg-gray-200/50 rounded-md w-64"></div>
             </div>
           )}
         </div>

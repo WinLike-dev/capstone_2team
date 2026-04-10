@@ -27,6 +27,28 @@ export type DailyPlan = {
   diets: DietItem[];
 };
 
+export type UserData = {
+  user_id?: string;
+  login_id?: string;
+  name?: string;
+  nickname?: string;
+  email?: string;
+  goal?: string;
+  allergies?: string[];
+  conditions?: string[];
+  gender?: string;
+  age?: number | string;
+  bmi?: number | string;
+  weight?: string;
+  height?: string;
+  user_instruction?: string;
+  activityLevel?: string;
+  activity_level?: string;
+  has_health_profile?: boolean;
+  mbti?: string;
+  otherAllergy?: string;
+};
+
 type CompletedTasksType = Record<string, { workouts: number[], diets: number[] }>;
 
 interface PlanContextType {
@@ -37,6 +59,10 @@ interface PlanContextType {
   completeWorkout: (dateStr: string, idx: number) => void;
   completeDiet: (dateStr: string, idx: number) => void;
   getPlanByDate: (date: Date | string) => DailyPlan | null;
+  userData: UserData | null;
+  isUserLoading: boolean;
+  fetchUserProfile: () => Promise<void>;
+  updateUserData: (data: Partial<UserData>) => void;
 }
 
 const PlanContext = createContext<PlanContextType | undefined>(undefined);
@@ -121,6 +147,81 @@ const generateMockPlans = (): DailyPlan[] => {
 export const PlanProvider = ({ children }: { children: ReactNode }) => {
   const [plans, setPlans] = useState<DailyPlan[]>([]);
   const [completedTasks, setCompletedTasks] = useState<CompletedTasksType>({});
+  
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(true);
+
+  const safeParseArray = (val: any) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string' && val.trim().startsWith('[')) {
+      try {
+        const parsedArray = JSON.parse(val);
+        return Array.isArray(parsedArray) ? parsedArray : [];
+      } catch (error) {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const fetchUserProfile = async () => {
+    setIsUserLoading(true);
+    const token = localStorage.getItem('healthAppToken');
+    const stored = localStorage.getItem('healthAppUser');
+    
+    if (stored) {
+      try {
+        const parsedStored = JSON.parse(stored);
+        parsedStored.allergies = safeParseArray(parsedStored.allergies);
+        parsedStored.conditions = safeParseArray(parsedStored.conditions || parsedStored.medical_history);
+        setUserData(parsedStored);
+      } catch(e) {}
+    }
+    
+    if (!token) {
+      setIsUserLoading(false);
+      return;
+    }
+    
+    try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      const endpoint = baseUrl ? `${baseUrl}/api/v1/users/profile` : '/api/v1/users/profile';
+      const res = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true'
+        }
+      });
+      if (res.ok) {
+        const freshData = await res.json();
+        const prevData = stored ? JSON.parse(stored) : {};
+        const newData = { ...prevData, ...freshData };
+        // activity_level mapping to match UI keys if needed, UI uses both activityLevel and activity_level
+        if (newData.activity_level && !newData.activityLevel) newData.activityLevel = newData.activity_level;
+        if (newData.medical_history && !newData.conditions) newData.conditions = newData.medical_history;
+        
+        newData.allergies = safeParseArray(newData.allergies);
+        newData.conditions = safeParseArray(newData.conditions);
+
+        setUserData(newData);
+        localStorage.setItem('healthAppUser', JSON.stringify(newData));
+      }
+    } catch (e) {
+      console.error('Failed to sync profile', e);
+    } finally {
+      setIsUserLoading(false);
+    }
+  };
+
+  const updateUserData = (data: Partial<UserData>) => {
+    setUserData(prev => {
+      const newData = { ...prev, ...data };
+      localStorage.setItem('healthAppUser', JSON.stringify(newData));
+      return newData;
+    });
+  };
 
   useEffect(() => {
     // 앱 진입 시 한 번만 mock 데이터 로드 (실제라면 API Fetch)
@@ -138,6 +239,8 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
     if (storedCompleted) {
       setCompletedTasks(JSON.parse(storedCompleted));
     }
+
+    fetchUserProfile();
   }, []);
 
   // 상태 변경될 때마다 localStorage 갱신 (선택적 영속화)
@@ -233,7 +336,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <PlanContext.Provider value={{ plans, completedTasks, addWorkout, replaceDiet, completeWorkout, completeDiet, getPlanByDate }}>
+    <PlanContext.Provider value={{ plans, completedTasks, addWorkout, replaceDiet, completeWorkout, completeDiet, getPlanByDate, userData, isUserLoading, fetchUserProfile, updateUserData }}>
       {children}
     </PlanContext.Provider>
   );
