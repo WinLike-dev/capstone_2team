@@ -4,14 +4,15 @@
 import { Info, Clock, Flame, ChevronRight, Apple, Calendar as CalendarIcon, ChevronLeft, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePlan, DailyPlan } from '../context/PlanContext';
 
 const getFoodEmoji = (name: string) => {
   if (name.includes('샐러드') || name.includes('야채')) return '🥗';
   if (name.includes('스테이크') || name.includes('고기') || name.includes('장조림')) return '🍖';
   if (name.includes('쉐이크') || name.includes('우유')) return '🥛';
-  if (name.includes('밥') || name.includes('국') || name.includes('찌개')) return '🍚';
+  if (name.includes('밥') || name.includes('국') || name.includes('찌개') || name.includes('된장')) return '🍚';
   if (name.includes('파스타') || name.includes('면') || name.includes('소바') || name.includes('우동')) return '🍝';
-  if (name.includes('샌드위치') || name.includes('빵')) return '🥪';
+  if (name.includes('샌드위치') || name.includes('빵') || name.includes('오트밀')) return '🥪';
   if (name.includes('계란') || name.includes('에그') || name.includes('낫토')) return '🍳';
   if (name.includes('연어') || name.includes('초밥')) return '🍣';
   if (name.includes('요거트') || name.includes('보울')) return '🥣';
@@ -19,113 +20,50 @@ const getFoodEmoji = (name: string) => {
   return '🥗'; // 기본 음식 아이콘
 };
 
-const generateMockPlans = () => {
-  const plans = [];
-  const start = new Date('2026-03-01');
-  const end = new Date('2026-04-30');
-  
-  const workoutTemplates = [
-    [
-      { title: "모닝 조깅 & 워밍업", time: "20분", level: "초급", calories: "150 kcal", color: "from-sky-400 to-blue-500" },
-      { title: "전신 근력 데드리프트", time: "40분", level: "중급", calories: "350 kcal", color: "from-indigo-500 to-purple-600" },
-      { title: "수면 전 릴렉스 요가", time: "15분", level: "초급", calories: "50 kcal", color: "from-teal-400 to-emerald-500" }
-    ],
-    [
-      { title: "공복 실내 자전거", time: "30분", level: "초급", calories: "200 kcal", color: "from-blue-500 to-indigo-600" },
-      { title: "맨몸 코어 트레이닝", time: "20분", level: "중급", calories: "150 kcal", color: "from-orange-400 to-red-500" },
-      { title: "폼롤러 하체 스트레칭", time: "10분", level: "초급", calories: "40 kcal", color: "from-pink-400 to-rose-500" }
-    ],
-    [
-      { title: "경사로 걷기 (인클라인)", time: "40분", level: "초급", calories: "250 kcal", color: "from-sky-400 to-blue-500" },
-      { title: "상체 덤벨 웨이트", time: "35분", level: "중급", calories: "280 kcal", color: "from-indigo-500 to-purple-600" },
-      { title: "어깨/목 뭉침 해소 스트레칭", time: "15분", level: "초급", calories: "60 kcal", color: "from-green-400 to-emerald-500" }
-    ],
-    [
-      { title: "HIIT 인터벌 트레이닝", time: "20분", level: "상급", calories: "300 kcal", color: "from-red-500 to-orange-600" },
-      { title: "하체 중심 맨몸 스쿼트", time: "25분", level: "중급", calories: "200 kcal", color: "from-purple-500 to-indigo-600" },
-      { title: "정적인 전신 요가", time: "20분", level: "초급", calories: "80 kcal", color: "from-teal-400 to-emerald-500" }
-    ],
-  ];
-
-  const dietTemplates = [
-    {
-      breakfast: { name: "두부 된장국 & 소고기 장조림", desc: "속이 편안한 한식 아침", kcal: "350 kcal" },
-      lunch: { name: "닭가슴살 볶음밥", desc: "단백질 풍부한 든든한 점심", kcal: "450 kcal" },
-      dinner: { name: "소고기 무국", desc: "따뜻하고 담백한 저녁", kcal: "300 kcal" }
-    },
-    {
-      breakfast: { name: "통밀 샌드위치 & 우유", desc: "가벼운 서양식 조식", kcal: "320 kcal" },
-      lunch: { name: "연어 아보카도 포케 보울", desc: "건강한 지방 충전", kcal: "420 kcal" },
-      dinner: { name: "안심 스테이크 & 구운 야채", desc: "풍미 가득한 단백질", kcal: "500 kcal" }
-    },
-    {
-      breakfast: { name: "낫토 & 계란말이 밥", desc: "건강한 발효 한 끼", kcal: "380 kcal" },
-      lunch: { name: "메밀 소바 & 닭가슴살 토핑", desc: "깔끔하고 시원한 점심", kcal: "400 kcal" },
-      dinner: { name: "연어 초밥 & 미니 우동", desc: "부담 없는 저녁", kcal: "450 kcal" }
-    },
-    {
-      breakfast: { name: "그릭 요거트 & 그래놀라", desc: "가볍게 시작하는 하루", kcal: "250 kcal" },
-      lunch: { name: "닭가슴살 샐러드 파스타", desc: "식이섬유 & 단백질 조합", kcal: "350 kcal" },
-      dinner: { name: "단백질 쉐이크 & 고구마", desc: "칼로리 조절 저녁", kcal: "280 kcal" }
-    }
-  ];
-
-  let current = new Date(start);
-  let dayCount = 0;
-  while (current <= end) {
-    const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
-    const wT = workoutTemplates[dayCount % workoutTemplates.length];
-    const dT = dietTemplates[dayCount % dietTemplates.length];
-    
-    plans.push({
-      date: dateStr,
-      task: '맞춤형 복합 밸런스 플랜',
-      workout: { type: '유산소 + 근력 + 스트레칭', sets: '총 3가지 운동 코스 진행' },
-      diet: { breakfast: dT.breakfast.name, lunch: dT.lunch.name, dinner: dT.dinner.name },
-      exercises: wT,
-      diets: [
-        { type: "아침", ...dT.breakfast },
-        { type: "점심", ...dT.lunch },
-        { type: "저녁", ...dT.dinner }
-      ]
-    });
-    
-    current.setDate(current.getDate() + 1);
-    dayCount++;
-  }
-  return plans;
-}
-
-const mockPlans = generateMockPlans();
-
-export const getTodayPlan = (date: Date) => {
-  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  return mockPlans.find(plan => plan.date === dateStr) || null;
+const mapWorkoutType = (typeRaw: string) => {
+  if (!typeRaw) return '상체 운동';
+  if (typeRaw.includes('하체') || typeRaw.includes('스쿼트')) return '하체 운동';
+  if (typeRaw.includes('유산소') || typeRaw.includes('조깅') || typeRaw.includes('고강도') || typeRaw.includes('자전거') || typeRaw.includes('걷는') || typeRaw.includes('걷기')) return '유산소';
+  if (typeRaw.includes('스트레칭') || typeRaw.includes('요가') || typeRaw.includes('이완')) return '스트레칭';
+  return '상체 운동'; // 전신, 코어, 기타 모든 운동을 상체 운동으로 매핑
 };
 
 export default function RecommendPage() {
+  const { plans, completedTasks, completeWorkout, completeDiet, getPlanByDate, userData, isUserLoading } = usePlan();
+  
   const [currentDate, setCurrentDate] = useState(new Date('2026-03-01'));
   const [today, setToday] = useState<Date | null>(null);
-  const [todayPlan, setTodayPlan] = useState<typeof mockPlans[0] | null>(null);
+  const [todayPlan, setTodayPlan] = useState<DailyPlan | null>(null);
 
-  const [userData, setUserData] = useState<{name: string, goal: string, allergies?: string[], conditions?: string[]} | null>(null);
+  const [confirmPopup, setConfirmPopup] = useState<{isOpen: boolean, target: {type: 'workout'|'diet', dateStr: string, name: string, index: number} | null}>({isOpen: false, target: null});
 
-  // const allergies = userData?.allergies || [];
-  // const conditions = userData?.conditions || [];
+  const handleWorkoutComplete = (dateStr: string, name: string, index: number) => {
+    setConfirmPopup({isOpen: true, target: {type: 'workout', dateStr, name, index}});
+  };
+
+  const handleDietComplete = (dateStr: string, name: string, index: number) => {
+    setConfirmPopup({isOpen: true, target: {type: 'diet', dateStr, name, index}});
+  };
+
+  const executeConfirm = () => {
+    if (!confirmPopup.target) return;
+    if (confirmPopup.target.type === 'workout') {
+      completeWorkout(confirmPopup.target.dateStr, confirmPopup.target.index);
+    } else {
+      completeDiet(confirmPopup.target.dateStr, confirmPopup.target.index);
+    }
+    setConfirmPopup({isOpen: false, target: null});
+  };
 
   useEffect(() => {
     const now = new Date();
     setToday(now);
     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    setTodayPlan(getTodayPlan(now));
+    setTodayPlan(getPlanByDate(now));
 
-    const stored = localStorage.getItem('healthAppUser');
-    if (stored) {
-      setUserData(JSON.parse(stored));
-    }
-  }, []);
+  }, [plans, getPlanByDate]);
 
-  const [selectedPlan, setSelectedPlan] = useState<typeof mockPlans[0] | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<DailyPlan | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -149,16 +87,22 @@ export default function RecommendPage() {
   let headerMessage = "꾸준한 식단 관리가<br />성공의 가장 빠른 지름길이에요!";
   let subMessage = "사용자님의 다이어트 목표 달성을 응원합니다.";
 
-  if (userData) {
+  if (isUserLoading) {
+    headerMessage = `<div class="h-8 bg-gray-200/50 rounded-md w-64 animate-pulse mb-2 inline-block"></div><br/><div class="h-8 bg-gray-200/50 rounded-md w-48 animate-pulse inline-block"></div>`;
+    subMessage = "";
+  } else if (userData) {
+    const displayName = userData.name || userData.nickname || '사용자';
     if (userData.goal === '다이어트') {
-      headerMessage = `${userData.name} 님의 다이어트 목표 달성을<br/>AI가 끝까지 응원합니다!`;
+      headerMessage = `${displayName} 님의 다이어트 목표 달성을<br/>AI가 끝까지 응원합니다!`;
       subMessage = '꾸준한 식단과 유산소로 목표를 이루어봐요!';
     } else if (userData.goal === '건강 유지') {
-      headerMessage = `오늘도 건강한 밸런스를 유지하는<br/>${userData.name} 님이 멋져요!`;
+      headerMessage = `오늘도 건강한 밸런스를 유지하는<br/>${displayName} 님이 멋져요!`;
       subMessage = '규칙적인 생활로 활기찬 하루를 보내세요.';
     } else if (userData.goal === '근력 향상') {
       headerMessage = `강력한 근력을 위해 오늘 추천된<br/>운동을 완료해 보세요!`;
-      subMessage = `${userData.name} 님의 한계 돌파를 응원합니다.`;
+      subMessage = `${displayName} 님의 한계 돌파를 응원합니다.`;
+    } else {
+      headerMessage = `${displayName} 님의 목표 달성을<br/>AI가 끝까지 응원합니다!`;
     }
   }
 
@@ -234,10 +178,47 @@ export default function RecommendPage() {
                 if (day === null) return <div key={`empty-${idx}`} className="h-16 md:h-20 lg:h-24 bg-transparent rounded-xl"></div>;
 
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const planForDay = mockPlans.find(p => p.date === dateStr);
+                const planForDay = getPlanByDate(dateStr);
 
                 const isToday = today && day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
                 const isWeekend = idx % 7 === 0 || idx % 7 === 6;
+
+                const dayStatus = completedTasks[dateStr] || { workouts: [], diets: [] };
+                let cellBgColor = 'hover:bg-gray-50 bg-white border-transparent';
+
+                let workoutRatio = 0;
+                let dietRatio = 0;
+
+                let isAllWorkoutDone = false;
+                let isAllDietDone = false;
+                let isEverythingDone = false;
+
+                if (planForDay) {
+                  const totalWorkouts = planForDay.exercises.length;
+                  const totalDiets = planForDay.diets.length;
+                  const totalTasks = totalWorkouts + totalDiets;
+                  
+                  workoutRatio = totalWorkouts > 0 ? (dayStatus.workouts.length / totalWorkouts) * 100 : 0;
+                  dietRatio = totalDiets > 0 ? (dayStatus.diets.length / totalDiets) * 100 : 0;
+
+                  isAllWorkoutDone = dayStatus.workouts.length === totalWorkouts && totalWorkouts > 0;
+                  isAllDietDone = dayStatus.diets.length === totalDiets && totalDiets > 0;
+                  
+                  const completedCount = dayStatus.workouts.length + dayStatus.diets.length;
+                  isEverythingDone = completedCount === totalTasks && totalTasks > 0;
+                  
+                  if (completedCount === totalTasks && totalTasks > 0) {
+                    cellBgColor = 'bg-green-100/60 border-green-200 hover:bg-green-100/80';
+                  } else if (completedCount > 0) {
+                    cellBgColor = 'bg-orange-50/70 border-orange-200 hover:bg-orange-100/80';
+                  } else {
+                    const cellDate = new Date(currentYear, currentMonth, day);
+                    // Check if date is in the past compared to today (without time)
+                    if (today && cellDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                      cellBgColor = 'bg-red-50 border-red-100 hover:bg-red-100/70';
+                    }
+                  }
+                }
 
                 return (
                   <div
@@ -248,18 +229,56 @@ export default function RecommendPage() {
                         setIsModalOpen(true);
                       }
                     }}
-                    className={`h-16 md:h-20 lg:h-24 p-1 md:p-2 rounded-xl flex flex-col items-center md:items-start border border-transparent transition-all hover:bg-gray-50 cursor-pointer ${isToday ? 'bg-blue-50/50 border-blue-100' : ''
-                      }`}
+                    className={`relative h-[110px] md:h-32 p-1.5 md:p-2.5 rounded-2xl flex flex-col items-center md:items-start border transition-all cursor-pointer ${cellBgColor} ${isToday && cellBgColor.includes('bg-white') ? '!bg-blue-50/50 !border-blue-100' : ''}`}
                   >
-                    <span className={`text-sm font-semibold ${isToday ? 'text-white bg-[#2563eb] w-6 h-6 rounded-full flex items-center justify-center mb-1' : isWeekend ? 'text-gray-400' : 'text-gray-700'}`}>
-                      {day}
-                    </span>
+                    <div className="flex justify-between w-full items-start">
+                      <span className={`text-sm md:text-base font-bold relative z-10 ${isToday ? 'text-white bg-[#2563eb] w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center -ml-1 -mt-1 shadow-sm' : isWeekend ? 'text-gray-400' : 'text-gray-700'} pl-1 pt-0.5`}>
+                        {day}
+                      </span>
+                      {/* Checkmark or Sparkles if 100% complete for the day */}
+                      {isEverythingDone && (
+                        <motion.div initial={{scale:0, rotate:-180}} animate={{scale:1, rotate:0}} transition={{type:'spring', stiffness:200}} className="text-yellow-500 drop-shadow-sm text-sm md:text-base">
+                          ✨
+                        </motion.div>
+                      )}
+                    </div>
                     {planForDay && (
-                      <div className="mt-auto md:mt-1 w-full flex justify-center md:justify-start">
-                        <span className="md:hidden w-1.5 h-1.5 bg-blue-500 rounded-full mt-1"></span>
-                        <div className="hidden md:block w-full bg-blue-50 text-blue-600 border border-blue-100 text-[10px] md:text-xs font-semibold px-1.5 py-1 rounded-md truncate shadow-sm" title={planForDay.exercises[0].title}>
-                          {planForDay.exercises[0].title.length > 10 ? `${planForDay.exercises[0].title.substring(0, 10)}...` : planForDay.exercises[0].title}
-                        </div>
+                      <div className="mt-auto w-full flex flex-col space-y-1.5 md:space-y-2 pb-1">
+
+                        {/* Workout Progress Pill */}
+                        <motion.div 
+                          layout
+                          className={`flex items-center w-full rounded-lg md:rounded-full transition-all duration-300 ${
+                            isAllWorkoutDone ? 'bg-orange-500 px-1.5 md:px-2 py-0.5 md:py-1 justify-center shadow-md shadow-orange-500/20' : 'bg-white/80 border border-orange-100 px-1.5 md:px-2 py-1 md:py-1 space-x-1.5 md:space-x-2'
+                          }`}
+                        >
+                          <Flame className={`w-3 h-3 md:w-3.5 md:h-3.5 flex-shrink-0 transition-colors ${isAllWorkoutDone ? 'text-white fill-white' : 'text-orange-500 fill-orange-500'}`} />
+                          {isAllWorkoutDone ? (
+                            <motion.span initial={{scale:0}} animate={{scale:1}} className="text-[9px] md:text-[10px] font-bold text-white ml-1 hidden md:block tracking-wide">완료</motion.span>
+                          ) : (
+                            <div className="flex-1 h-1 md:h-1.5 bg-orange-100 rounded-full overflow-hidden">
+                              <motion.div className="h-full bg-orange-500 rounded-full" initial={{width:0}} animate={{ width: `${workoutRatio}%` }} transition={{duration:0.4, ease: "easeOut"}}/>
+                            </div>
+                          )}
+                        </motion.div>
+
+                        {/* Diet Progress Pill */}
+                        <motion.div 
+                          layout
+                          className={`flex items-center w-full rounded-lg md:rounded-full transition-all duration-300 ${
+                            isAllDietDone ? 'bg-green-500 px-1.5 md:px-2 py-0.5 md:py-1 justify-center shadow-md shadow-green-500/20' : 'bg-white/80 border border-green-100 px-1.5 md:px-2 py-1 md:py-1 space-x-1.5 md:space-x-2'
+                          }`}
+                        >
+                          <Apple className={`w-3 h-3 md:w-3.5 md:h-3.5 flex-shrink-0 transition-colors ${isAllDietDone ? 'text-white fill-white' : 'text-green-500 fill-green-500'}`} />
+                          {isAllDietDone ? (
+                            <motion.span initial={{scale:0}} animate={{scale:1}} className="text-[9px] md:text-[10px] font-bold text-white ml-1 hidden md:block tracking-wide">완료</motion.span>
+                          ) : (
+                            <div className="flex-1 h-1 md:h-1.5 bg-green-100 rounded-full overflow-hidden">
+                              <motion.div className="h-full bg-green-500 rounded-full" initial={{width:0}} animate={{ width: `${dietRatio}%` }} transition={{duration:0.4, ease: "easeOut"}}/>
+                            </div>
+                          )}
+                        </motion.div>
+
                       </div>
                     )}
                   </div>
@@ -279,27 +298,41 @@ export default function RecommendPage() {
           </div>
           {todayPlan && todayPlan.exercises && todayPlan.exercises.length > 0 ? (
             <div className="space-y-4">
-              {todayPlan.exercises.map((ex, idx) => (
-                <div key={idx} className="bg-white rounded-2xl p-5 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100 flex items-center hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
-                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${ex.color} flex items-center justify-center text-white shadow-inner flex-shrink-0`}>
-                    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4 flex-1">
-                    <h3 className="font-bold text-gray-900 text-[17px] mb-1">{ex.title}</h3>
-                    <div className="flex items-center space-x-3 text-xs font-semibold text-gray-500">
-                      <span className="flex items-center"><Clock className="w-3.5 h-3.5 mr-1" />{ex.time}</span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                      <span className="text-[#2563eb]">{ex.level}</span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                      <span>{ex.calories}</span>
+              {todayPlan.exercises.map((ex, idx) => {
+                const todayDateStr = todayPlan.date;
+                const isCompleted = (completedTasks[todayDateStr]?.workouts || []).includes(idx);
+
+                return (
+                  <div key={idx} className={`bg-white rounded-2xl p-5 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100 flex items-center hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] hover:-translate-y-1 transition-all duration-300 group`}>
+                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${ex.color} flex items-center justify-center text-white shadow-inner flex-shrink-0`}>
+                      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                     </div>
+                    <div className={`ml-4 flex-1`}>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full shadow-sm">{mapWorkoutType(ex.type || '')}</span>
+                        <h3 className="font-bold text-gray-900 text-[17px]">{ex.title}</h3>
+                      </div>
+                      <div className="flex items-center space-x-3 text-xs font-semibold text-gray-500">
+                        <span className="flex items-center"><Clock className="w-3.5 h-3.5 mr-1" />{ex.time}</span>
+                        <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                        <span className="text-[#2563eb]">{ex.level}</span>
+                        <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                        <span>{ex.calories}</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); if (!isCompleted) handleWorkoutComplete(todayDateStr, ex.title, idx); }}
+                      disabled={isCompleted}
+                      className={`ml-4 text-sm px-4 py-2 rounded-xl font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                    >
+                      {isCompleted ? '완료!' : '완료'}
+                    </button>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-[#2563eb] transition-colors" />
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="bg-white rounded-2xl p-8 text-center shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100">
@@ -318,21 +351,33 @@ export default function RecommendPage() {
           </div>
           {todayPlan && todayPlan.diets && todayPlan.diets.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {todayPlan.diets.map((diet, idx) => (
-                <div key={idx} className="bg-white rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100 hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] transition-all shrink-0">
-                  <div className="text-xs font-bold text-[#2563eb] bg-blue-50 px-3 py-1 rounded-full mb-3">
-                    {diet.type}
+              {todayPlan.diets.map((diet, idx) => {
+                const todayDateStr = todayPlan.date;
+                const isCompleted = (completedTasks[todayDateStr]?.diets || []).includes(idx);
+
+                return (
+                  <div key={idx} className={`bg-white rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100 hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] transition-all shrink-0 ${isCompleted ? 'opacity-50 grayscale bg-gray-50/50' : ''}`}>
+                    <div className="text-xs font-bold text-[#2563eb] bg-blue-50 px-3 py-1 rounded-full mb-3">
+                      {diet.type}
+                    </div>
+                    <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-3xl mb-4 shadow-sm">
+                      {getFoodEmoji(diet.name)}
+                    </div>
+                    <h3 className={`font-bold text-[15px] mb-1 ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{diet.name}</h3>
+                    <p className={`text-xs font-semibold mb-2 ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-500'}`}>{diet.desc}</p>
+                    <div className="mt-auto pt-3 pb-3 w-full border-t border-gray-50">
+                      <span className={`text-xs font-bold ${isCompleted ? 'text-gray-400' : 'text-[#2563eb]'}`}>{diet.kcal}</span>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); if(!isCompleted) handleDietComplete(todayDateStr, diet.name, idx); }}
+                      disabled={isCompleted}
+                      className={`w-full mt-2 text-sm py-2 rounded-xl font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                    >
+                      {isCompleted ? '완료!' : '완료'}
+                    </button>
                   </div>
-                  <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-3xl mb-4 shadow-sm">
-                    {getFoodEmoji(diet.name)}
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-[15px] mb-1">{diet.name}</h3>
-                  <p className="text-xs font-semibold text-gray-500 mb-2">{diet.desc}</p>
-                  <div className="mt-auto pt-2 w-full border-t border-gray-50">
-                    <span className="text-xs font-bold text-[#2563eb]">{diet.kcal}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="bg-white rounded-2xl p-8 text-center shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100">
@@ -376,14 +421,26 @@ export default function RecommendPage() {
                     <h4 className="font-bold text-gray-900">추천 운동</h4>
                   </div>
                   <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-4 space-y-3">
-                    {selectedPlan.exercises.map((ex, idx) => (
-                      <div key={idx} className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-orange-700 bg-white border border-orange-200 px-2.5 py-1 rounded-md shadow-sm whitespace-nowrap">
-                          {idx + 1}
-                        </span>
-                        <span className="text-sm font-bold text-gray-900 text-right ml-4">{ex.title}</span>
-                      </div>
-                    ))}
+                    {selectedPlan.exercises.map((ex, idx) => {
+                      const isCompleted = (completedTasks[selectedPlan.date]?.workouts || []).includes(idx);
+                      return (
+                        <div key={idx} className="flex justify-between items-center group">
+                          <div className="flex items-center flex-1 pr-3">
+                            <span className={`text-[10px] font-bold ${isCompleted ? 'text-gray-400 bg-gray-100 border-gray-200' : 'text-orange-700 bg-orange-50'} px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap transition-colors`}>
+                              {mapWorkoutType(ex.type || '')}
+                            </span>
+                            <span className={`text-sm font-bold text-left ml-4 transition-all ${isCompleted ? 'text-gray-400 line-through decoration-gray-400' : 'text-gray-900'}`}>{ex.title}</span>
+                          </div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); if(!isCompleted) handleWorkoutComplete(selectedPlan.date, ex.title, idx); }}
+                            disabled={isCompleted}
+                            className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                          >
+                            {isCompleted ? '완료!' : '완료'}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -393,20 +450,53 @@ export default function RecommendPage() {
                     <h4 className="font-bold text-gray-900">추천 식단</h4>
                   </div>
                   <div className="bg-green-50/50 border border-green-100 rounded-xl p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-green-700 bg-white border border-green-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">아침</span>
-                      <span className="text-sm font-bold text-gray-900 text-right ml-4">{selectedPlan.diet.breakfast}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-green-700 bg-white border border-green-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">점심</span>
-                      <span className="text-sm font-bold text-gray-900 text-right ml-4">{selectedPlan.diet.lunch}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-green-700 bg-white border border-green-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">저녁</span>
-                      <span className="text-sm font-bold text-gray-900 text-right ml-4">{selectedPlan.diet.dinner}</span>
-                    </div>
+                    {selectedPlan.diets.map((diet, idx) => {
+                      const isCompleted = (completedTasks[selectedPlan.date]?.diets || []).includes(idx);
+                      // selectedPlan uses diet.breakfast, diet.lunch, diet.dinner strings in plan.diets. Wait, no.
+                      // Checking structure... selectedPlan.diets is an array of objects
+                      return (
+                        <div key={idx} className="flex justify-between items-center group">
+                          <div className="flex items-center flex-1 pr-3">
+                            <span className={`text-[10px] font-bold ${isCompleted ? 'text-gray-400 bg-gray-100 border-gray-200' : 'text-green-700 bg-green-50'} px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap transition-colors`}>
+                              {diet.type}
+                            </span>
+                            <span className={`text-sm font-bold text-left ml-4 transition-all ${isCompleted ? 'text-gray-400 line-through decoration-gray-400' : 'text-gray-900'}`}>{diet.name}</span>
+                          </div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); if(!isCompleted) handleDietComplete(selectedPlan.date, diet.name, idx); }}
+                            disabled={isCompleted}
+                            className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm ${isCompleted ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                          >
+                            {isCompleted ? '완료!' : '완료'}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Popup */}
+      <AnimatePresence>
+        {confirmPopup.isOpen && confirmPopup.target && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setConfirmPopup({isOpen: false, target: null})} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl shadow-xl w-full max-w-sm overflow-hidden z-10 px-6 py-8 text-center">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${confirmPopup.target.type === 'workout' ? 'bg-orange-50 text-orange-500' : 'bg-green-50 text-green-500'}`}>
+                {confirmPopup.target.type === 'workout' ? <Flame className="w-7 h-7" /> : <Apple className="w-7 h-7" />}
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 mb-2">일정 완료</h3>
+              <p className="text-sm text-gray-600 mb-6 font-medium leading-relaxed">
+                오늘의 <strong className={confirmPopup.target.type === 'workout' ? 'text-orange-600' : 'text-green-600'}>{confirmPopup.target.name}</strong> 일정을<br />
+                완료하시나요? 한번 완료하면 다시 취소할 수 없습니다.
+              </p>
+              <div className="flex space-x-3">
+                <button onClick={() => setConfirmPopup({isOpen: false, target: null})} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">취소</button>
+                <button onClick={executeConfirm} className={`flex-1 py-3 text-white font-bold rounded-xl transition-colors shadow-md ${confirmPopup.target.type === 'workout' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-500 hover:bg-green-600'}`}>완료하기</button>
               </div>
             </motion.div>
           </div>

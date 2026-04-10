@@ -13,9 +13,9 @@
   "age": "number",              // 나이
   "height": "number",           // 키 (cm) - BMI 계산 참고용
   "weight": "number",           // 몸무게 (kg) - BMI 계산 참고용
-  "bmi": "number",              // [중요] 비만수치 (Front에서 직접 계산하여 전달)
-  "goal": "string",             // 건강/운동 목표 (예: "체중 감량")
-  "activity_level": "string",   // 평소 활동량 (예: "활동적")
+  "bmi": "number",              // [신규] 비만수치 (WAS에서 계산하여 반환)
+  "goal": "string",             // 건강/운동 목표 (예: "다이어트", "근력 향상", "건강 유지")
+  "activity_level": "string",   // 평소 활동량 (예: "거의 없음", "가벼운 활동", "보통", "격렬한 활동")
   "medical_history": ["string"], // 기저질환 목록 (배열 형태)
   "allergies": ["string"]       // 알러지 목록 (배열 형태)
 }
@@ -23,9 +23,8 @@
 
 > [!WARNING]
 > **BMI 계산 지침**
-> - 서버는 BMI를 별도로 계산하지 않습니다.
-> - **Front-end**에서 사용자가 입력한 `성별`, `키(cm)`, `몸무게(kg)`를 바탕으로 아래 공식을 사용하여 BMI를 계산한 후 `bmi` 필드에 담아 보내야 합니다.
-> - **계산식**: `BMI = 몸무게(kg) / (키(m) * 키(m))`
+> - 서버(WAS)가 BMI를 계산하여 응답으로 내려줍니다.
+> - **Front-end**는 직접 공식을 사용하지 않으며, 서버의 응답 값을 저장 및 노출하는 역할만 수행합니다.
 
 ---
 
@@ -39,7 +38,7 @@
 | **mbti** | CHAR(4) | NULLABLE | MBTI 유형 (4자) |
 | **gender** | VARCHAR(10) | NOT NULL | 성별 |
 | **age** | INTEGER | NOT NULL | 나이 |
-| **bmi** | DECIMAL(4,1) | NOT NULL | **[Front 계산값]** 비만수치 |
+| **bmi** | DECIMAL(4,1) | NOT NULL | **[Backend 계산값]** 비만수치 |
 | **goal** | VARCHAR(100) | NULLABLE | 건강 관리 목적 |
 | **activity_level** | VARCHAR(50) | NULLABLE | 평소 활동량 |
 | **medical_history** | TEXT | NULLABLE | 기저질환 정보 (목록) |
@@ -51,7 +50,7 @@
 
 ### 3. 처리 흐름 (Sequence)
 1. 사용자가 Front에서 건강 정보를 입력합니다.
-2. Front에서 키, 몸무게를 이용해 **BMI를 직접 계산**합니다.
+2. Front에서 키, 몸무게를 입력해 저장하면 **WAS가 BMI를 계산해 응답**합니다.
 3. `/api/user/profile` 엔드포인트로 JSON 데이터를 전송합니다.
 4. **WAS(Node.js)**는 **FastAPI 호출 없이** 직접 DB(`user_health_profiles`)를 업데이트합니다.
 5. 성공 시 사용자에게 저장 완료 알림을 표시합니다.

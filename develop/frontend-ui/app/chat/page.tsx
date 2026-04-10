@@ -27,6 +27,11 @@ export default function ChatPage() {
 
   const [userData, setUserData] = useState<{name: string, goal: string, allergies?: string[], conditions?: string[]} | null>(null);
 
+  // AI 지시사항 설정 모달 상태
+  const [userInstruction, setUserInstruction] = useState('');
+  const [isSettingModalOpen, setIsSettingModalOpen] = useState(false);
+  const [instructionInput, setInstructionInput] = useState('');
+
   const allergies = userData?.allergies || [];
   const conditions = userData?.conditions || [];
 
@@ -43,7 +48,20 @@ export default function ChatPage() {
     if (stored) {
       setUserData(JSON.parse(stored));
     }
+
+    // 저장된 AI 지시사항 불러오기
+    const savedInstruction = localStorage.getItem('user_instruction');
+    if (savedInstruction) {
+      setUserInstruction(savedInstruction);
+      setInstructionInput(savedInstruction);
+    }
   }, []);
+
+  const handleSaveInstruction = () => {
+    setUserInstruction(instructionInput);
+    localStorage.setItem('user_instruction', instructionInput);
+    setIsSettingModalOpen(false);
+  };
 
   // Simulate streaming response
   const simulateStreamingResponse = async (fullText: string) => {
@@ -85,22 +103,41 @@ export default function ChatPage() {
     // Show loading state
     setIsLoading(true);
     
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
-    
-    // Generate dummy contextual response based on keywords
-    let responseText = "어떤 말씀인지 잘 이해하지 못했어요. 운동이나 식단에 대해 물어보시면 더 자세히 답변해드릴 수 있습니다.";
-    if (userMsg.includes('운동') || userMsg.includes('유산소')) {
-      responseText = "오늘의 운동으로는 가벼운 조깅이나 걷기 30분을 추천해 드립니다. 처음부터 무리하지 마시고 점진적으로 강도를 높이는 것이 중요해요!";
-    } else if (userMsg.includes('식단') || userMsg.includes('칼로리') || userMsg.includes('먹')) {
-      responseText = "식단 관리는 단백질 위주의 식사와 수분 섭취가 핵심입니다. 오늘 저녁은 닭가슴살 샐러드나 탄수화물을 줄인 식단은 어떨까요?";
-    } else if (userMsg.includes('안녕')) {
-      responseText = "반갑습니다! 오늘 컨디션은 어떠신가요? 건강한 하루를 위해 제가 곁에서 도와드릴게요.";
-    }
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+      
+      // DataFormat_1_.md에 정의된 user_instruction 필드를 포함하여,
+      // AI가 개인화된 답변을 생성하는 핵심 지표로 활용됩니다.
+      const payload = {
+        user_id: userData?.name || 'unknown_user',
+        message: userMsg,
+        user_instruction: userInstruction
+      };
 
-    // Start streaming effect
-    await simulateStreamingResponse(responseText);
+      const response = await fetch(`${API_URL}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('API 응답에 문제가 발생했습니다.');
+      }
+
+      const data = await response.json();
+      const botText = data.response || data.answer || data.message || "답변을 가져올 수 없습니다.";
+      
+      setIsLoading(false);
+      await simulateStreamingResponse(botText);
+      
+    } catch (error) {
+      console.error('Chat API Error:', error);
+      setIsLoading(false);
+      await simulateStreamingResponse("죄송합니다. 오류가 발생하여 메시지를 전송하지 못했습니다.");
+    }
   };
 
   return (
@@ -132,6 +169,14 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
+          
+          <button 
+            onClick={() => setIsSettingModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full hover:bg-blue-100 transition-colors text-[13px] font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <span className="text-lg leading-none mt-[1px]">✨</span>
+            <span>AI 지시사항 설정</span>
+          </button>
         </div>
       </header>
 
@@ -230,6 +275,56 @@ export default function ChatPage() {
           </p>
         </div>
       </div>
+
+      {/* AI 지시사항 설정 모달 */}
+      <AnimatePresence>
+        {isSettingModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100"
+            >
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-xl">✨</span>
+                <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">AI 지시사항 설정</h2>
+              </div>
+              <p className="text-[13px] text-gray-500 mb-5 leading-relaxed bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
+                AI에게 요청할 식단, 운동 등에 대한 특별 지시사항을 자유롭게 입력하세요.<br/>
+                <strong className="text-blue-600 font-semibold mt-1 inline-block">작성 예시:</strong><br/>
+                "2000kcal 이하 식단만 짜줘"<br/>
+                "근육 생성을 위한 고단백질 간식 추천해줘"
+              </p>
+              
+              <textarea
+                value={instructionInput}
+                onChange={(e) => setInstructionInput(e.target.value)}
+                placeholder="지시사항을 자유롭게 입력해주세요..."
+                className="w-full h-32 p-4 border border-gray-200 bg-gray-50/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white resize-none mb-5 text-[15px] text-gray-800 transition-all font-medium placeholder:font-normal custom-scrollbar"
+              />
+              
+              <div className="flex justify-end gap-2.5">
+                <button
+                  onClick={() => {
+                    setInstructionInput(userInstruction); // 변경 전 저장된 상태로 복원
+                    setIsSettingModalOpen(false);
+                  }}
+                  className="px-4 py-2.5 text-[14px] font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300/50"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveInstruction}
+                  className="px-4 py-2.5 text-[14px] font-semibold text-white bg-[#2563eb] rounded-xl hover:bg-blue-700 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  저장
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
