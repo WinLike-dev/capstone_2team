@@ -31,10 +31,19 @@ class SelfEvalResponse(BaseModel):
     reason: str = Field(default="", description="Short failure reason when not passed")
 
 
+class ExerciseItem(BaseModel):
+    exercise_name: str = Field(description="Detailed exercise name")
+    sets: int = Field(description="Number of sets")
+
+
 class PlanExtractItem(BaseModel):
-    name: str = Field(description="Plan item title")
-    detail: str = Field(default="", description="Plan item details")
-    day: str = Field(default="", description="Day or schedule slot")
+    name: str = Field(description="Workout category or meal name")
+    detail: str = Field(default="", description="Workout session or meal description")
+    day: str = Field(default="", description="Date in YYYY-MM-DD format")
+    ex_list: list[ExerciseItem] = Field(
+        default_factory=list,
+        description="Detailed exercise list for workout plans; leave empty for diet plans",
+    )
 
 
 PlanType = Literal["workout", "diet"]

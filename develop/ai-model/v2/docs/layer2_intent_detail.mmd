@@ -1,9 +1,13 @@
 flowchart TD
-    MSG["사용자 메시지"] --> RULES{"규칙 기반<br/>빠른 분기"}
-    PREV["이전 상태<br/>의도 / 감정 / 요약"] --> LLM["의도 분류기"]
+    FRONT["Front / App"] -->|"사용자 메시지"| WAS["WAS"]
+    WAS -->|"POST /chat"| MSG["FastAPI 입력 메시지"]
+
+    STATE["이전 상태<br/>이전 의도 / 감정 / 요약"] --> LLM["의도 분류기"]
     HINTS["전처리 힌트<br/>세션 컨텍스트"] --> LLM
 
-    RULES -->|"위험 키워드 감지"| SAFETY["의도 = 안전경고"]
+    MSG --> RULES{"규칙 기반<br/>빠른 분기"}
+
+    RULES -->|"위험 단어 / 강한 자해 신호"| SAFETY["의도 = 안전경고"]
     RULES -->|"짧은 일반 대화"| CASUAL["의도 = 일반 대화"]
     RULES -->|"그 외"| LLM
 
@@ -18,10 +22,10 @@ flowchart TD
     OUT --> I7["수정 대상"]
 
     I1 --> ROUTE{"그래프 라우팅"}
-    ROUTE -->|"일반 대화 / 계획 승인"| GEN["응답 초안 생성"]
+    ROUTE -->|"일반 대화 / 계획_승인"| GEN["응답 초안 생성"]
     ROUTE -->|"안전경고"| SAFETY2["안전 응답"]
-    ROUTE -->|"재질문"| FB["보충 질문"]
-    ROUTE -->|"공감_케어"| CARE["공감/케어"]
+    ROUTE -->|"모호함"| FB["보충 질문"]
+    ROUTE -->|"공감_케어"| CARE["공감 / 케어"]
     ROUTE -->|"기록"| REC["기록 처리"]
     ROUTE -->|"계획 / 정보"| SEARCH["검색"]
     ROUTE -->|"수정"| MODIFY["수정 컨텍스트 로드"]

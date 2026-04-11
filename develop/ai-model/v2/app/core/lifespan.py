@@ -18,6 +18,7 @@ from app.clients.pinecone import PineconeClient
 from app.clients.was import WASClient
 from app.core.config import get_settings
 from app.core.profile_sync import ProfileSyncTracker
+from app.core.trace_store import TraceLogHandler, TraceStore
 from app.graph.builder import build_graph
 from app.graph.deps import NodeDeps
 
@@ -125,8 +126,19 @@ async def lifespan(app: FastAPI):
     )
     logger.info("RouterClient initialized (model=%s)", settings.ROUTER_MODEL_NAME)
 
+    trace_store = TraceStore()
+    trace_handler = TraceLogHandler(trace_store)
+    logging.getLogger().addHandler(trace_handler)
+    app.state.trace_store = trace_store
+    app.state._trace_log_handler = trace_handler
+    logger.info("TraceStore initialized")
+
     http_client = httpx.AsyncClient(timeout=httpx.Timeout(settings.WAS_TIMEOUT))
-    was_client = WASClient(base_url=settings.WAS_BASE_URL, client=http_client)
+    was_client = WASClient(
+        base_url=settings.WAS_BASE_URL,
+        client=http_client,
+        trace_store=trace_store,
+    )
     app.state._was_http_client = http_client
     logger.info("WASClient initialized (base_url=%s)", settings.WAS_BASE_URL)
 
@@ -149,6 +161,7 @@ async def lifespan(app: FastAPI):
         pinecone=pinecone_client,
         embed=embed_client,
         profile_sync=profile_sync,
+        trace=trace_store,
     )
     app.state.graph = build_graph(deps, checkpointer=checkpointer)
     app.state.deps = deps
@@ -167,6 +180,7 @@ async def lifespan(app: FastAPI):
         await app.state._checkpointer.conn.close()
     except Exception as exc:
         logger.warning("Failed to close checkpointer: %s", exc)
+    logging.getLogger().removeHandler(app.state._trace_log_handler)
     await app.state._pinecone_control.close()
     await app.state._was_http_client.aclose()
     logger.info("Shutdown complete")

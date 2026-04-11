@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 from app.core.draft_contract import normalize_draft_components, render_draft_preview
 from app.core.prompt_loader import compose_prompts, load_prompt
@@ -45,11 +46,24 @@ def make_generate_node(deps: NodeDeps):
         if state.get("response"):
             return {}
 
+        started_at = time.perf_counter()
         intent = state.get("intent", "")
         eval_count = state.get("self_eval_count", 0)
         failure_reason = state.get("self_eval_failure_reason")
+        deps.trace.record_current_event(
+            stage="generate",
+            status="info",
+            title="Draft generation started",
+            detail={"intent": intent, "self_eval_count": eval_count},
+        )
 
         if intent == INTENT_APPROVAL:
+            deps.trace.record_current_event(
+                stage="generate",
+                status="ok",
+                title="Approval draft shortcut used",
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
             return _build_approval_draft(state)
 
         context = _build_draft_context(state)
@@ -71,6 +85,11 @@ def make_generate_node(deps: NodeDeps):
             proposed_plan_action = _resolve_proposed_plan_action(state, proposed_plan)
         except Exception as exc:
             logger.error("Draft generation failed: %s", exc)
+            deps.trace.record_current_alert(
+                severity="error",
+                message="Draft generation failed",
+                detail={"intent": intent, "error": str(exc)},
+            )
             draft_components = normalize_draft_components(
                 None,
                 fallback_text="초안을 생성하는 중 오류가 발생했습니다. 다시 시도해 주세요.",
@@ -90,14 +109,36 @@ def make_generate_node(deps: NodeDeps):
             if not passed:
                 if eval_count < MAX_SELF_EVAL:
                     logger.info("Self-eval failed, retrying: count=%d reason=%s", eval_count, reason)
+                    deps.trace.record_current_alert(
+                        severity="warning",
+                        message="Self-eval requested another generation pass",
+                        detail={"reason": reason, "next_count": eval_count + 1},
+                    )
                     return {
                         "self_eval_count": eval_count + 1,
                         "self_eval_failure_reason": reason,
                     }
                 logger.warning("Self-eval retry limit reached, applying partial patch")
+                deps.trace.record_current_alert(
+                    severity="warning",
+                    message="Self-eval retry limit reached; partial patch applied",
+                    detail={"reason": reason},
+                )
                 draft_components = _apply_partial_patch(draft_components, reason)
                 draft_text = render_draft_preview(draft_components)
 
+        deps.trace.record_current_event(
+            stage="generate",
+            status="ok",
+            title="Draft generation completed",
+            detail={
+                "intent": intent,
+                "proposed_plan_count": len(proposed_plan or []),
+                "proposed_plan_type": proposed_plan_type,
+                "proposed_plan_action": proposed_plan_action,
+            },
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+        )
         return {
             "draft_response": draft_text,
             "draft_components": draft_components,

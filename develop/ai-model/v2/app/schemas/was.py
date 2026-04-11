@@ -1,21 +1,22 @@
-"""WAS API 요청/응답 스키마 — AI모델 ↔ WAS 간 계약(contract) 레이어.
-
-WAS 팀과 스키마 합의 후 이 파일만 수정하면 전체 연동이 맞춰진다.
-내부 State 형식과 WAS 형식 간 변환 함수도 여기서 관리.
-
-TODO: WAS 팀에서 실제 API 스키마 확정 시 아래 모델 필드를 맞출 것.
-"""
+"""WAS request/response schemas and payload normalization helpers."""
 from __future__ import annotations
 
+import logging
+import re
+from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+logger = logging.getLogger(__name__)
 
-# ── 읽기 응답 스키마 ─────────────────────────────────────────────────────────
+_DATE_INPUT_FORMATS = ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d")
+_SETS_PATTERN = re.compile(r"(\d+)")
+
 
 class WASUserProfile(BaseModel):
-    """GET /api/user/profile/{user_id} 응답."""
+    """GET /api/user/profile/{user_id} response."""
+
     user_id: Optional[str] = None
     weight: Optional[float] = None
     height: Optional[float] = None
@@ -28,30 +29,36 @@ class WASUserProfile(BaseModel):
     activity_level: Optional[str] = None
     selected_ai_persona: Optional[str] = None
 
-    model_config = {"extra": "allow"}  # WAS에서 추가 필드 오면 무시 않고 보존
+    model_config = {"extra": "allow"}
+
+
+class WASExerciseItem(BaseModel):
+    exercise_name: str
+    sets: int = 3
 
 
 class WASPlanItem(BaseModel):
-    """플랜 항목 하나."""
+    """A single workout/meal plan item."""
+
     id: Optional[str] = None
     name: str
     detail: Optional[str] = None
     day: Optional[str] = None
+    ex_list: list[WASExerciseItem] = Field(default_factory=list)
     completed: bool = False
 
     model_config = {"extra": "allow"}
 
 
 class WASTodayPlan(BaseModel):
-    """GET /api/plan/today/{user_id} 응답 래퍼."""
+    """GET /api/plan/today/{user_id} response wrapper."""
+
     items: list[WASPlanItem] = Field(default_factory=list)
 
 
-# ── 쓰기 요청 스키마 ─────────────────────────────────────────────────────────
-
 class WASProfileUpdateRequest(BaseModel):
-    """PUT /api/user/profile/{user_id} 요청 바디."""
-    # 변경할 필드만 포함 (partial update)
+    """PUT /api/user/profile/{user_id} request body."""
+
     weight: Optional[float] = None
     height: Optional[float] = None
     age: Optional[int] = None
@@ -67,84 +74,218 @@ class WASProfileUpdateRequest(BaseModel):
 
 
 class WASPlanCreateRequest(BaseModel):
-    """POST /api/plan/create/{user_id} 요청 바디."""
-    plan_type: str  # "workout" | "diet"
+    """POST /api/plan/create/{user_id} request body."""
+
+    plan_type: str
     items: list[WASPlanItem]
 
     model_config = {"extra": "forbid"}
 
 
 class WASPlanUpdateRequest(BaseModel):
-    """PUT /api/plan/update/{user_id} 요청 바디."""
-    plan_type: str  # "workout" | "diet"
+    """PUT /api/plan/update/{user_id} request body."""
+
+    plan_type: str
     items: list[WASPlanItem]
 
     model_config = {"extra": "forbid"}
 
 
 class WASPlanCheckRequest(BaseModel):
-    """PUT /api/plan/check/{user_id} 요청 바디."""
+    """PUT /api/plan/check/{user_id} request body."""
+
     item_id: str
 
     model_config = {"extra": "forbid"}
 
 
-# ── 변환 함수: 내부 State → WAS 요청 페이로드 ────────────────────────────────
-
 def to_profile_update(changes: dict[str, Any]) -> dict[str, Any]:
-    """profile_changes dict → WAS PUT 요청 바디.
+    """Convert profile_changes into a validated WAS payload."""
 
-    허용되지 않은 필드 자동 제거 + Pydantic 검증.
-    """
     req = WASProfileUpdateRequest.model_validate(changes)
     return req.model_dump(exclude_none=True)
 
 
 def to_plan_create(extracted: dict[str, Any]) -> dict[str, Any] | None:
-    """LLM 추출 결과 → WAS POST /plan/create 요청 바디.
+    """Convert a proposed new plan into the WAS create payload."""
 
-    has_plan 등 내부 필드를 제거하고 WAS 형식으로 변환.
-    """
     if not extracted.get("has_plan") or not extracted.get("items"):
         return None
-    items = [
-        WASPlanItem(
-            name=item.get("name", ""),
-            detail=item.get("detail"),
-            day=item.get("day"),
-        ).model_dump(exclude_none=True)
-        for item in extracted["items"]
-    ]
-    req = WASPlanCreateRequest(
-        plan_type=extracted.get("plan_type", "workout"),
-        items=items,
+
+    plan_type = _normalize_plan_type(extracted.get("plan_type"))
+    items = _normalize_plan_items(extracted.get("items"), plan_type)
+    if not items:
+        logger.warning("Plan create normalization produced no valid items")
+        return None
+
+    req = WASPlanCreateRequest(plan_type=plan_type, items=items)
+    return req.model_dump(
+        exclude_none=True,
+        exclude={"items": {"__all__": {"id", "completed"}}},
     )
-    return req.model_dump()
 
 
 def to_plan_update(extracted: dict[str, Any]) -> dict[str, Any] | None:
-    """LLM 수정 추출 결과 → WAS PUT /plan/update 요청 바디.
+    """Convert a proposed updated plan into the WAS update payload."""
 
-    has_changes 등 내부 필드를 제거.
-    """
     if not extracted.get("has_changes") or not extracted.get("items"):
         return None
-    items = [
-        WASPlanItem(
-            name=item.get("name", ""),
-            detail=item.get("detail"),
-            day=item.get("day"),
-        ).model_dump(exclude_none=True)
-        for item in extracted["items"]
-    ]
-    req = WASPlanUpdateRequest(
-        plan_type=extracted.get("plan_type", "workout"),
-        items=items,
+
+    plan_type = _normalize_plan_type(extracted.get("plan_type"))
+    items = _normalize_plan_items(extracted.get("items"), plan_type)
+    if not items:
+        logger.warning("Plan update normalization produced no valid items")
+        return None
+
+    req = WASPlanUpdateRequest(plan_type=plan_type, items=items)
+    return req.model_dump(
+        exclude_none=True,
+        exclude={"items": {"__all__": {"id", "completed"}}},
     )
-    return req.model_dump()
 
 
 def to_plan_check(item_id: str) -> dict[str, Any]:
-    """item_id → WAS PUT /plan/check 요청 바디."""
+    """Convert item_id into the WAS check payload."""
+
     req = WASPlanCheckRequest(item_id=item_id)
     return req.model_dump()
+
+
+def _normalize_plan_type(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if text == "diet":
+        return "diet"
+    return "workout"
+
+
+def _normalize_plan_items(items: Any, plan_type: str) -> list[dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        normalized_item = _normalize_plan_item(item, plan_type)
+        if normalized_item:
+            normalized.append(normalized_item)
+        else:
+            logger.warning("Dropped invalid proposed plan item at index=%d", index)
+    return normalized
+
+
+def _normalize_plan_item(item: Any, plan_type: str) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+
+    name = _first_non_empty(
+        item.get("name"),
+        item.get("title"),
+        item.get("meal_name"),
+        item.get("category"),
+        default="운동 계획" if plan_type == "workout" else "식단 계획",
+    )
+    detail = _first_non_empty(
+        item.get("detail"),
+        item.get("description"),
+        item.get("summary"),
+        default=None,
+    )
+    day = _normalize_day(item.get("day") or item.get("date"))
+
+    raw_ex_list = item.get("ex_list")
+    if raw_ex_list is None:
+        raw_ex_list = item.get("exercise_list")
+    if raw_ex_list is None:
+        raw_ex_list = item.get("exercises")
+
+    ex_list = [] if plan_type == "diet" else _normalize_exercises(raw_ex_list)
+
+    normalized = WASPlanItem(
+        name=name,
+        detail=detail,
+        day=day,
+        ex_list=ex_list,
+    )
+    return normalized.model_dump(exclude_none=True)
+
+
+def _normalize_exercises(raw_exercises: Any) -> list[dict[str, Any]]:
+    if raw_exercises is None:
+        return []
+
+    if isinstance(raw_exercises, dict):
+        raw_items = [raw_exercises]
+    elif isinstance(raw_exercises, list):
+        raw_items = raw_exercises
+    elif isinstance(raw_exercises, str):
+        raw_items = [{"exercise_name": raw_exercises, "sets": 3}]
+    else:
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for raw_item in raw_items:
+        if isinstance(raw_item, str):
+            exercise_name = raw_item.strip()
+            sets = 3
+        elif isinstance(raw_item, dict):
+            exercise_name = _first_non_empty(
+                raw_item.get("exercise_name"),
+                raw_item.get("name"),
+                raw_item.get("exercise"),
+                raw_item.get("title"),
+                default="",
+            )
+            sets = _normalize_sets(
+                raw_item.get("sets", raw_item.get("set", raw_item.get("count")))
+            )
+        else:
+            continue
+
+        if not exercise_name:
+            continue
+
+        normalized.append(
+            WASExerciseItem(exercise_name=exercise_name, sets=sets).model_dump()
+        )
+    return normalized
+
+
+def _normalize_day(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    for fmt in _DATE_INPUT_FORMATS:
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return text
+
+
+def _normalize_sets(value: Any) -> int:
+    if value is None:
+        return 3
+    if isinstance(value, bool):
+        return 3
+    if isinstance(value, int):
+        return max(1, value)
+    if isinstance(value, float):
+        return max(1, int(value))
+
+    match = _SETS_PATTERN.search(str(value))
+    if match:
+        return max(1, int(match.group(1)))
+    return 3
+
+
+def _first_non_empty(*values: Any, default: Optional[str] = None) -> Optional[str]:
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return default

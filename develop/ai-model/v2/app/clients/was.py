@@ -14,17 +14,25 @@
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
 
 from app.core.exceptions import ExternalServiceError
+from app.core.trace_store import TraceStore, get_current_trace_id
 
 
 class WASClient:
-    def __init__(self, base_url: str, client: httpx.AsyncClient) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        client: httpx.AsyncClient,
+        trace_store: TraceStore | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._client = client
+        self._trace_store = trace_store
 
     # ── 읽기 API ─────────────────────────────────────────────────────────────
 
@@ -57,29 +65,169 @@ class WASClient:
     # ── 내부 헬퍼 ─────────────────────────────────────────────────────────────
 
     async def _get(self, path: str) -> Any:
+        started_at = time.perf_counter()
+        trace_id = get_current_trace_id()
         try:
             resp = await self._client.get(f"{self._base_url}{path}")
             resp.raise_for_status()
+            payload = resp.json().get("data", resp.json())
+            self._record_trace(
+                trace_id,
+                method="GET",
+                path=path,
+                status="ok",
+                duration_ms=time.perf_counter() - started_at,
+                response_body=payload,
+            )
+            return payload
         except httpx.TimeoutException:
+            self._record_trace(
+                trace_id,
+                method="GET",
+                path=path,
+                status="timeout",
+                duration_ms=time.perf_counter() - started_at,
+                error="request timeout",
+            )
             raise ExternalServiceError(service="WAS", message="request timeout")
         except httpx.HTTPStatusError as exc:
+            self._record_trace(
+                trace_id,
+                method="GET",
+                path=path,
+                status=f"http_{exc.response.status_code}",
+                duration_ms=time.perf_counter() - started_at,
+                error=f"HTTP {exc.response.status_code}",
+            )
             raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
-        return resp.json().get("data", resp.json())
+        except httpx.RequestError as exc:
+            self._record_trace(
+                trace_id,
+                method="GET",
+                path=path,
+                status="request_error",
+                duration_ms=time.perf_counter() - started_at,
+                error=str(exc),
+            )
+            raise ExternalServiceError(service="WAS", message="request error")
 
     async def _post(self, path: str, body: dict) -> None:
+        started_at = time.perf_counter()
+        trace_id = get_current_trace_id()
         try:
             resp = await self._client.post(f"{self._base_url}{path}", json=body)
             resp.raise_for_status()
+            self._record_trace(
+                trace_id,
+                method="POST",
+                path=path,
+                status="ok",
+                duration_ms=time.perf_counter() - started_at,
+                request_body=body,
+            )
         except httpx.TimeoutException:
+            self._record_trace(
+                trace_id,
+                method="POST",
+                path=path,
+                status="timeout",
+                duration_ms=time.perf_counter() - started_at,
+                request_body=body,
+                error="request timeout",
+            )
             raise ExternalServiceError(service="WAS", message="request timeout")
         except httpx.HTTPStatusError as exc:
+            self._record_trace(
+                trace_id,
+                method="POST",
+                path=path,
+                status=f"http_{exc.response.status_code}",
+                duration_ms=time.perf_counter() - started_at,
+                request_body=body,
+                error=f"HTTP {exc.response.status_code}",
+            )
             raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
+        except httpx.RequestError as exc:
+            self._record_trace(
+                trace_id,
+                method="POST",
+                path=path,
+                status="request_error",
+                duration_ms=time.perf_counter() - started_at,
+                request_body=body,
+                error=str(exc),
+            )
+            raise ExternalServiceError(service="WAS", message="request error")
 
     async def _put(self, path: str, body: dict) -> None:
+        started_at = time.perf_counter()
+        trace_id = get_current_trace_id()
         try:
             resp = await self._client.put(f"{self._base_url}{path}", json=body)
             resp.raise_for_status()
+            self._record_trace(
+                trace_id,
+                method="PUT",
+                path=path,
+                status="ok",
+                duration_ms=time.perf_counter() - started_at,
+                request_body=body,
+            )
         except httpx.TimeoutException:
+            self._record_trace(
+                trace_id,
+                method="PUT",
+                path=path,
+                status="timeout",
+                duration_ms=time.perf_counter() - started_at,
+                request_body=body,
+                error="request timeout",
+            )
             raise ExternalServiceError(service="WAS", message="request timeout")
         except httpx.HTTPStatusError as exc:
+            self._record_trace(
+                trace_id,
+                method="PUT",
+                path=path,
+                status=f"http_{exc.response.status_code}",
+                duration_ms=time.perf_counter() - started_at,
+                request_body=body,
+                error=f"HTTP {exc.response.status_code}",
+            )
             raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
+        except httpx.RequestError as exc:
+            self._record_trace(
+                trace_id,
+                method="PUT",
+                path=path,
+                status="request_error",
+                duration_ms=time.perf_counter() - started_at,
+                request_body=body,
+                error=str(exc),
+            )
+            raise ExternalServiceError(service="WAS", message="request error")
+
+    def _record_trace(
+        self,
+        trace_id: str | None,
+        *,
+        method: str,
+        path: str,
+        status: str,
+        duration_ms: float,
+        request_body: dict[str, Any] | None = None,
+        response_body: Any = None,
+        error: str | None = None,
+    ) -> None:
+        if not trace_id or not self._trace_store:
+            return
+        self._trace_store.record_was_call(
+            trace_id,
+            method=method,
+            path=path,
+            status=status,
+            duration_ms=round(duration_ms * 1000, 2),
+            request_body=request_body,
+            response_body=response_body,
+            error=error,
+        )

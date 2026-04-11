@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,7 @@ def make_persona_node(deps: NodeDeps):
         if state.get("response"):
             return {}
 
+        started_at = time.perf_counter()
         draft_components = normalize_draft_components(
             state.get("draft_components"),
             fallback_text=state.get("draft_response"),
@@ -46,6 +48,16 @@ def make_persona_node(deps: NodeDeps):
         emotion_label = emotion.get("label", "neutral")
         emotion_intensity = float(emotion.get("intensity", 0))
         emotion_str = f"{emotion_label} (intensity {emotion_intensity:.1f})"
+        deps.trace.record_current_event(
+            stage="persona",
+            status="info",
+            title="Persona polishing started",
+            detail={
+                "selected_persona_id": selected_persona,
+                "resolved_persona_id": resolved_persona_id,
+                "emotion": emotion_label,
+            },
+        )
 
         try:
             template = persona_path.read_text(encoding="utf-8")
@@ -57,6 +69,11 @@ def make_persona_node(deps: NodeDeps):
             )
         except Exception as exc:
             logger.error("Failed to load persona prompt: %s", exc)
+            deps.trace.record_current_alert(
+                severity="warning",
+                message="Persona prompt load failed; using fallback prompt",
+                detail={"error": str(exc), "resolved_persona_id": resolved_persona_id},
+            )
             system_prompt = "Rewrite the structured draft naturally without changing facts."
 
         structured_payload = {
@@ -83,7 +100,20 @@ def make_persona_node(deps: NodeDeps):
             final_response = result.response
         except Exception as exc:
             logger.error("Persona generation failed: %s", exc)
+            deps.trace.record_current_alert(
+                severity="warning",
+                message="Persona generation failed; using draft preview",
+                detail={"error": str(exc), "resolved_persona_id": resolved_persona_id},
+            )
             final_response = draft_response
+
+        deps.trace.record_current_event(
+            stage="persona",
+            status="ok",
+            title="Persona polishing completed",
+            detail={"resolved_persona_id": resolved_persona_id},
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+        )
 
         return {
             "response": final_response,

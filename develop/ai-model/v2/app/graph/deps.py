@@ -6,6 +6,7 @@ from app.clients.gemini import GeminiClient
 from app.clients.pinecone import PineconeClient
 from app.clients.was import WASClient
 from app.core.profile_sync import ProfileSyncTracker
+from app.core.trace_store import TraceStore
 
 
 @dataclass
@@ -16,3 +17,4 @@ class NodeDeps:
     pinecone: PineconeClient
     embed: EmbeddingClient
     profile_sync: ProfileSyncTracker
+    trace: TraceStore

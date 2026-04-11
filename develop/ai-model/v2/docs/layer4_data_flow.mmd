@@ -1,37 +1,39 @@
 flowchart LR
-    USER["사용자 / 앱"] -->|"채팅 요청"| CHAT["FastAPI 채팅 라우터"]
-    DEV["개발자 브라우저"] -->|"디버그 요청"| DEBUG["디버그 UI"]
-    WAS["WAS"] -->|"프로필 변경 이벤트"| EVENTS["프로필 이벤트 라우터"]
+    FRONT["Front / App"] -->|"사용자 메시지"| WAS["WAS"]
+    WAS -->|"POST /chat"| CHAT["FastAPI chat router"]
+    DEV["Developer Browser"] -->|"GET /debug"| DEBUG["Debug UI"]
+    WAS -->|"POST /internal/events/profile-updated"| EVENTS["Profile event router"]
 
-    CHAT -->|"세션 ID"| SQLITE["SQLite 체크포인터"]
-    SQLITE -->|"상태 불러오기 / 저장"| GRAPH["LangGraph 엔진"]
+    CHAT -->|"session_id / thread_id"| SQLITE["SQLite checkpointer"]
+    SQLITE -->|"state load / save"| GRAPH["LangGraph engine"]
 
-    GRAPH --> PRE["전처리"]
-    GRAPH --> INTENT["의도 분석"]
-    GRAPH --> MODIFY["수정 컨텍스트 로드"]
-    GRAPH --> SEARCH["검색"]
-    GRAPH --> GEN["초안 생성"]
-    GRAPH --> PERSONA["페르소나"]
+    GRAPH --> PRE["Preprocess"]
+    GRAPH --> INTENT["Intent"]
+    GRAPH --> MODIFY["Modify load"]
+    GRAPH --> SEARCH["Search"]
+    GRAPH --> GEN["Generate Draft"]
+    GRAPH --> PERSONA["Persona"]
 
-    PRE -->|"프로필 / 오늘 플랜 조회"| WAS
-    MODIFY -->|"운동 / 식단 전체 플랜 조회"| WAS
-    PRE --> SYNC["프로필 동기화 추적기"]
+    PRE -->|"GET profile / today plan"| WAS
+    MODIFY -->|"GET full workout/diet plan"| WAS
+    PRE --> SYNC["Profile sync tracker"]
     EVENTS --> SYNC
 
-    SEARCH --> EMBED["임베딩 클라이언트"]
-    EMBED --> PINE["Pinecone<br/>기억 / 중요정보 / 외부지식"]
-    SEARCH --> ROUTER["Gemini 라우터 클라이언트"]
-    ROUTER -->|"웹 검색 / 평가 / 검색어 재작성"| SEARCH
+    SEARCH --> EMBED["Embedding client"]
+    EMBED --> PINE["Pinecone<br/>memory / important / external"]
+    SEARCH --> ROUTER["Gemini router client"]
+    ROUTER -->|"web search / 평가 / query regen"| SEARCH
 
-    GEN --> PROMPTS["프롬프트 자산<br/>app/prompts/nodes"]
-    PERSONA --> PERSONA_REG["페르소나 레지스트리<br/>registry.json"]
-    PERSONA_REG --> PERSONA_FILES["페르소나 프롬프트 파일"]
+    GEN --> PROMPTS["Prompt assets<br/>app/prompts/nodes"]
+    PERSONA --> PERSONA_REG["Persona registry<br/>registry.json"]
+    PERSONA_REG --> PERSONA_FILES["Persona prompt files"]
     PERSONA_FILES --> PERSONA
     ROUTER --> GEN
     ROUTER --> PERSONA
 
-    CHAT --> BG["백그라운드 작업"]
-    BG -->|"프로필 / 체크 / 생성 / 수정 쓰기"| WAS
+    CHAT --> BG["Background tasks"]
+    BG -->|"profile / check / create / update write"| WAS
 
-    PERSONA --> RESP["채팅 응답"]
-    RESP -->|"응답 반환"| USER
+    PERSONA --> RESP["Chat response"]
+    RESP -->|"ChatResponse"| WAS
+    WAS -->|"최종 응답"| FRONT

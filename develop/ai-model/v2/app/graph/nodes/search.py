@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from app.core.prompt_loader import load_prompt
 from app.graph.deps import NodeDeps
@@ -26,10 +27,17 @@ _QUERY_REGEN_PROMPT = load_prompt("nodes/search/query_regen.md")
 
 def make_search_node(deps: NodeDeps):
     async def search_node(state: GraphState) -> dict:
+        started_at = time.perf_counter()
         query = state.get("search_query") or state["user_message"]
         targets = list(state.get("search_targets") or [])
         retry_count = state.get("search_retry_count", 0)
         intent = state.get("intent", "")
+        deps.trace.record_current_event(
+            stage="search",
+            status="info",
+            title="Search started",
+            detail={"intent": intent, "targets": targets, "retry_count": retry_count},
+        )
 
         query = _augment_query(query, state)
 
@@ -37,12 +45,24 @@ def make_search_node(deps: NodeDeps):
             targets.append("web")
 
         if not targets:
+            deps.trace.record_current_event(
+                stage="search",
+                status="ok",
+                title="Search skipped",
+                detail={"reason": "no_targets"},
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
             return {"search_results": [], "search_quality": "ok"}
 
         try:
             query_vec = await deps.embed.embed(query)
         except Exception as exc:
             logger.error("Embedding failed: %s", exc)
+            deps.trace.record_current_alert(
+                severity="error",
+                message="Embedding failed before search",
+                detail={"error": str(exc)},
+            )
             return _degraded(state, intent)
 
         raw_results = await _parallel_search(deps, state["user_id"], query, query_vec, targets)
@@ -52,6 +72,13 @@ def make_search_node(deps: NodeDeps):
         logger.info("Search quality score=%.2f retry=%d", score, retry_count)
 
         if score >= 0.7:
+            deps.trace.record_current_event(
+                stage="search",
+                status="ok",
+                title="Search completed",
+                detail={"score": score, "results": len(merged_results)},
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
             return {
                 "search_results": merged_results,
                 "search_quality": "ok",
@@ -59,15 +86,34 @@ def make_search_node(deps: NodeDeps):
             }
 
         if retry_count >= MAX_RETRY:
+            deps.trace.record_current_alert(
+                severity="warning",
+                message="Search degraded after retry limit",
+                detail={"score": score, "retry_count": retry_count},
+            )
             return _degraded(state, intent)
 
         if score < 0.4:
             new_query = await _regenerate_query(deps, state["user_message"], merged_results)
+            deps.trace.record_current_event(
+                stage="search",
+                status="warn",
+                title="Search query regenerated",
+                detail={"score": score, "new_query": new_query},
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
             return {
                 "search_query": new_query,
                 "search_retry_count": retry_count + 1,
             }
 
+        deps.trace.record_current_event(
+            stage="search",
+            status="warn",
+            title="Search retry requested",
+            detail={"score": score, "retry_count": retry_count + 1},
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+        )
         return {"search_retry_count": retry_count + 1}
 
     return search_node

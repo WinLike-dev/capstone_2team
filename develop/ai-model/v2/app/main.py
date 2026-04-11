@@ -9,6 +9,7 @@ from app.core.exceptions import AppError
 from app.core.lifespan import lifespan
 from app.routers.chat import router as chat_router
 from app.routers.debug import router as debug_router
+from app.routers.observability import router as observability_router
 from app.routers.profile_events import router as profile_events_router
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ app = FastAPI(title="AI Hub v2 (LangGraph)", lifespan=lifespan)
 
 app.include_router(chat_router)
 app.include_router(debug_router)
+app.include_router(observability_router)
 app.include_router(profile_events_router)
 
 

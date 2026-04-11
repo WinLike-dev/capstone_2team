@@ -1,16 +1,19 @@
 flowchart TD
-    START((시작)) --> PRE["전처리<br/>- 대기 중 쓰기 재실행<br/>- 첫 턴 초기 적재<br/>- 프로필 동기화 확인"]
+    FRONT["Front / App"] -->|"사용자 메시지"| WAS["WAS"]
+    WAS -->|"POST /chat<br/>user_id, user_message, session_id"| ENTRY["FastAPI /chat"]
+
+    ENTRY --> PRE["전처리<br/>- 세션 상태 확인<br/>- 첫 턴 여부 판단<br/>- 프로필 sync 필요 여부 확인"]
     PRE --> INTENT["의도 분석"]
 
     INTENT -->|"일반 대화"| GEN["응답 초안 생성<br/>구조화된 Draft"]
     INTENT -->|"안전경고"| SAFETY["안전 응답<br/>즉시 안전 우선 응답"]
-    INTENT -->|"재질문"| FALLBACK["보충 질문<br/>명확화 응답"]
-    INTENT -->|"공감_케어"| CARE["공감/케어<br/>기억 조회 필요 여부 판단"]
+    INTENT -->|"모호함"| FALLBACK["보충 질문<br/>명확화 응답"]
+    INTENT -->|"공감_케어"| CARE["공감 / 케어<br/>기억 검색 필요 여부 판단"]
     INTENT -->|"기록"| RECORD["기록 처리<br/>프로필 / 플랜 체크"]
     INTENT -->|"계획"| SEARCH["검색<br/>벡터 + 웹 검색"]
     INTENT -->|"정보"| SEARCH
-    INTENT -->|"수정"| MODIFY["수정 컨텍스트 로드<br/>기존 플랜 불러오기"]
-    INTENT -->|"계획 승인"| GEN
+    INTENT -->|"수정"| MODIFY["수정 컨텍스트 로드<br/>기존 전체 플랜 조회"]
+    INTENT -->|"계획_승인"| GEN
 
     CARE -->|"과거 기억 필요"| SEARCH
     CARE -->|"즉시 응답 가능"| GEN
@@ -18,16 +21,19 @@ flowchart TD
     RECORD --> GEN
     MODIFY --> SEARCH
 
-    SEARCH -->|"결과 확보 또는 약화 허용"| GEN
-    SEARCH -->|"한 번 재시도"| SEARCH
+    SEARCH -->|"검색 결과 사용"| GEN
+    SEARCH -->|"재시도 가능"| SEARCH
 
     FALLBACK --> FINISH
 
     GEN -->|"자기 평가 실패"| GEN
-    GEN -->|"통과"| PERSONA["페르소나 렌더링<br/>말투 / 스타일 최종화"]
+    GEN -->|"통과"| PERSONA["페르소나 레이어<br/>말투 / 스타일 최종화"]
 
     PERSONA --> FINISH((종료))
     SAFETY --> FINISH
 
-    FINISH -. 백그라운드 .-> WASWRITE["WAS 쓰기<br/>백그라운드 작업"]
-    FINISH -. 백그라운드 .-> FEEDBACK["피드백 저장<br/>백그라운드 작업"]
+    FINISH -->|"ChatResponse"| WAS_RESP["WAS 응답 처리"]
+    WAS_RESP -->|"최종 응답"| FRONT
+
+    FINISH -. 배경 작업 .-> WASWRITE["WAS 쓰기<br/>background task"]
+    FINISH -. 배경 작업 .-> FEEDBACK["피드백 저장<br/>background task"]
