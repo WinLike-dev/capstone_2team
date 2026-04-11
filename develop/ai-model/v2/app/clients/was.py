@@ -28,10 +28,12 @@ class WASClient:
         self,
         base_url: str,
         client: httpx.AsyncClient,
+        api_key: str | None = None,
         trace_store: TraceStore | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._client = client
+        self._api_key = api_key
         self._trace_store = trace_store
 
     # ── 읽기 API ─────────────────────────────────────────────────────────────
@@ -68,7 +70,10 @@ class WASClient:
         started_at = time.perf_counter()
         trace_id = get_current_trace_id()
         try:
-            resp = await self._client.get(f"{self._base_url}{path}")
+            resp = await self._client.get(
+                f"{self._base_url}{path}",
+                headers=self._build_headers(),
+            )
             resp.raise_for_status()
             payload = resp.json().get("data", resp.json())
             self._record_trace(
@@ -115,7 +120,11 @@ class WASClient:
         started_at = time.perf_counter()
         trace_id = get_current_trace_id()
         try:
-            resp = await self._client.post(f"{self._base_url}{path}", json=body)
+            resp = await self._client.post(
+                f"{self._base_url}{path}",
+                json=body,
+                headers=self._build_headers(),
+            )
             resp.raise_for_status()
             self._record_trace(
                 trace_id,
@@ -163,7 +172,11 @@ class WASClient:
         started_at = time.perf_counter()
         trace_id = get_current_trace_id()
         try:
-            resp = await self._client.put(f"{self._base_url}{path}", json=body)
+            resp = await self._client.put(
+                f"{self._base_url}{path}",
+                json=body,
+                headers=self._build_headers(),
+            )
             resp.raise_for_status()
             self._record_trace(
                 trace_id,
@@ -231,3 +244,9 @@ class WASClient:
             response_body=response_body,
             error=error,
         )
+
+    def _build_headers(self) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        if self._api_key:
+            headers["x-api-key"] = self._api_key
+        return headers

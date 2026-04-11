@@ -137,6 +137,7 @@ async def lifespan(app: FastAPI):
     was_client = WASClient(
         base_url=settings.WAS_BASE_URL,
         client=http_client,
+        api_key=settings.INTERNAL_API_KEY,
         trace_store=trace_store,
     )
     app.state._was_http_client = http_client

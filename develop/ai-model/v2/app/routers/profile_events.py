@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.core.trace_store import bind_trace, reset_trace
+from app.core.internal_auth import require_internal_api_key
 from app.schemas.profile_events import (
     ProfileUpdatedEventRequest,
     ProfileUpdatedEventResponse,
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/internal/events", tags=["internal"])
 async def profile_updated(
     payload: ProfileUpdatedEventRequest,
     request: Request,
+    _: None = Depends(require_internal_api_key),
 ) -> ProfileUpdatedEventResponse:
     tracker = request.app.state.profile_sync
     trace_store = request.app.state.trace_store

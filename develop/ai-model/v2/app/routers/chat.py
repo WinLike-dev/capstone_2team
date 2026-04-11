@@ -8,8 +8,10 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import Depends
 
 from app.core.config import get_settings
+from app.core.internal_auth import require_internal_api_key
 from app.core.lifespan import update_session_activity
 from app.core.trace_store import bind_trace, reset_trace, timed_ms
 from app.graph.nodes.feedback import execute_feedback
@@ -27,6 +29,7 @@ def _build_initial_state(req: ChatRequest) -> GraphState:
     initial_state: GraphState = {
         "user_id": req.user_id,
         "user_message": req.user_message,
+        "request_kind": "chat",
         "user_profile": None,
         "today_plan": None,
         "turn_count": 0,
@@ -55,6 +58,8 @@ def _build_initial_state(req: ChatRequest) -> GraphState:
         "proposed_plan": None,
         "proposed_plan_type": None,
         "proposed_plan_action": None,
+        "home_recommendation_scope": None,
+        "home_recommendations": None,
         "intimacy_level": 1,
         "resolved_persona_id": None,
         "profile_sync_version": 0,
@@ -76,6 +81,7 @@ def _build_resumed_state(req: ChatRequest, saved_values: dict[str, Any]) -> Grap
         **saved_values,
         "user_id": req.user_id,
         "user_message": req.user_message,
+        "request_kind": "chat",
         "response": None,
         "is_session_start": False,
         "modify_plan_context": None,
@@ -85,6 +91,8 @@ def _build_resumed_state(req: ChatRequest, saved_values: dict[str, Any]) -> Grap
         "draft_response": None,
         "draft_components": None,
         "resolved_persona_id": None,
+        "home_recommendation_scope": None,
+        "home_recommendations": None,
     }
     if req.user_profile_override:
         resumed_state["user_profile"] = req.user_profile_override
@@ -132,6 +140,7 @@ async def chat(
     req: ChatRequest,
     background_tasks: BackgroundTasks,
     request: Request,
+    _: None = Depends(require_internal_api_key),
 ) -> ChatResponse:
     graph = request.app.state.graph
     deps = request.app.state.deps

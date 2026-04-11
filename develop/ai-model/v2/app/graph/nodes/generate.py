@@ -8,8 +8,16 @@ import time
 from app.core.draft_contract import normalize_draft_components, render_draft_preview
 from app.core.prompt_loader import compose_prompts, load_prompt
 from app.graph.deps import NodeDeps
+from app.schemas.home import HomeRecommendationResponse
 from app.schemas.llm_responses import DraftResponse, SelfEvalResponse
 from app.schemas.state import DraftComponents, GraphState
+from app.services.home_recommendations import (
+    PROMPT_PATH as _HOME_RECOMMENDATION_PROMPT,
+    build_home_recommendation_prompt_input,
+    empty_home_recommendations,
+    kst_today_iso,
+    normalize_home_recommendations,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +64,9 @@ def make_generate_node(deps: NodeDeps):
             title="Draft generation started",
             detail={"intent": intent, "self_eval_count": eval_count},
         )
+
+        if state.get("request_kind") == "home_recommendation":
+            return await _generate_home_recommendations(deps, state, started_at)
 
         if intent == INTENT_APPROVAL:
             deps.trace.record_current_event(
@@ -150,6 +161,66 @@ def make_generate_node(deps: NodeDeps):
         }
 
     return generate_node
+
+
+async def _generate_home_recommendations(
+    deps: NodeDeps,
+    state: GraphState,
+    started_at: float,
+) -> dict:
+    scope = state.get("home_recommendation_scope") or "all"
+    date = kst_today_iso()
+
+    try:
+        raw = await deps.router.generate(
+            system_prompt=load_prompt(_HOME_RECOMMENDATION_PROMPT),
+            user_content=build_home_recommendation_prompt_input(
+                date=date,
+                scope=scope,
+                user_profile=state.get("user_profile") or {},
+                today_plan=state.get("today_plan") or [],
+            ),
+            response_schema=HomeRecommendationResponse,
+        )
+        result = HomeRecommendationResponse.model_validate_json(raw)
+        normalized = normalize_home_recommendations(
+            result,
+            scope=scope,
+            date=date,
+        )
+    except Exception as exc:
+        logger.error("Home recommendation generation failed: %s", exc)
+        deps.trace.record_current_alert(
+            severity="error",
+            message="Home recommendation generation failed",
+            detail={"scope": scope, "error": str(exc)},
+        )
+        normalized = empty_home_recommendations(date=date, scope=scope)
+
+    deps.trace.record_current_event(
+        stage="generate",
+        status="ok",
+        title="Home recommendations generated",
+        detail={
+            "scope": scope,
+            "workout_slots": sum(
+                1
+                for item in normalized.workout.model_dump().values()
+                if item is not None
+            ),
+            "diet_slots": sum(
+                1
+                for item in normalized.diet.model_dump().values()
+                if item is not None
+            ),
+        },
+        duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+    )
+    return {
+        "home_recommendations": normalized.model_dump(),
+        "self_eval_count": 0,
+        "self_eval_failure_reason": None,
+    }
 
 
 def _build_draft_context(state: GraphState) -> str:

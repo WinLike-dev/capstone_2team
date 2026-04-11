@@ -1,7 +1,7 @@
 """Shared LangGraph state for the v2 model."""
 from __future__ import annotations
 
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Literal, Optional
 
 from typing_extensions import TypedDict
 
@@ -34,9 +34,14 @@ class DraftComponents(TypedDict):
     search_grounding_summary: str
 
 
+RequestKind = Literal["chat", "home_recommendation"]
+HomeRecommendationScope = Literal["all", "workout", "diet"]
+
+
 class GraphState(TypedDict):
     user_id: str
     user_message: str
+    request_kind: RequestKind
 
     user_profile: Optional[dict[str, Any]]
     today_plan: Optional[list[dict[str, Any]]]
@@ -72,6 +77,8 @@ class GraphState(TypedDict):
     proposed_plan: Optional[list[dict[str, Any]]]
     proposed_plan_type: Optional[str]
     proposed_plan_action: Optional[str]
+    home_recommendation_scope: Optional[HomeRecommendationScope]
+    home_recommendations: Optional[dict[str, Any]]
     intimacy_level: int
     resolved_persona_id: Optional[str]
     profile_sync_version: int

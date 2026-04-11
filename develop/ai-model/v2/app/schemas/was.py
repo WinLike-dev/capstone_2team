@@ -34,7 +34,9 @@ class WASUserProfile(BaseModel):
 
 class WASExerciseItem(BaseModel):
     exercise_name: str
-    sets: int = 3
+    sets: Optional[int] = None
+    duration_minutes: Optional[int] = None
+    calories: int = 0
 
 
 class WASPlanItem(BaseModel):
@@ -68,7 +70,6 @@ class WASProfileUpdateRequest(BaseModel):
     injury_history: Optional[list[str]] = None
     goal: Optional[str] = None
     activity_level: Optional[str] = None
-    selected_ai_persona: Optional[str] = None
 
     model_config = {"extra": "forbid"}
 
@@ -217,7 +218,7 @@ def _normalize_exercises(raw_exercises: Any) -> list[dict[str, Any]]:
     elif isinstance(raw_exercises, list):
         raw_items = raw_exercises
     elif isinstance(raw_exercises, str):
-        raw_items = [{"exercise_name": raw_exercises, "sets": 3}]
+        raw_items = [{"exercise_name": raw_exercises, "sets": 3, "calories": 0}]
     else:
         return []
 
@@ -226,6 +227,8 @@ def _normalize_exercises(raw_exercises: Any) -> list[dict[str, Any]]:
         if isinstance(raw_item, str):
             exercise_name = raw_item.strip()
             sets = 3
+            duration_minutes = None
+            calories = 0
         elif isinstance(raw_item, dict):
             exercise_name = _first_non_empty(
                 raw_item.get("exercise_name"),
@@ -237,14 +240,26 @@ def _normalize_exercises(raw_exercises: Any) -> list[dict[str, Any]]:
             sets = _normalize_sets(
                 raw_item.get("sets", raw_item.get("set", raw_item.get("count")))
             )
+            duration_minutes = _normalize_optional_int(
+                raw_item.get("duration_minutes", raw_item.get("duration", raw_item.get("minutes")))
+            )
+            calories = _normalize_optional_int(raw_item.get("calories")) or 0
         else:
             continue
 
         if not exercise_name:
             continue
 
+        if duration_minutes is not None:
+            sets = None
+
         normalized.append(
-            WASExerciseItem(exercise_name=exercise_name, sets=sets).model_dump()
+            WASExerciseItem(
+                exercise_name=exercise_name,
+                sets=sets,
+                duration_minutes=duration_minutes,
+                calories=calories,
+            ).model_dump(exclude_none=True)
         )
     return normalized
 
@@ -279,6 +294,22 @@ def _normalize_sets(value: Any) -> int:
     if match:
         return max(1, int(match.group(1)))
     return 3
+
+
+def _normalize_optional_int(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+
+    match = _SETS_PATTERN.search(str(value))
+    if match:
+        return int(match.group(1))
+    return None
 
 
 def _first_non_empty(*values: Any, default: Optional[str] = None) -> Optional[str]:

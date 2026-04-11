@@ -15,14 +15,15 @@ INTENT_CARE = "공감_케어"
 INTENT_FALLBACK = "fallback"
 INTENT_CASUAL = "casual"
 INTENT_SAFETY = "안전경고"
+INTENT_HOME_RECOMMENDATION = "home_recommendation"
 
 _SAFETY_PATTERNS = re.compile(
-    r"자살|자해|죽고싶|죽겠|극단적\s*선택|학대|폭행|마약|약물\s*남용",
+    r"자해|자살|죽고\s*싶|극단적\s*선택|위험|폭행|마약|과다\s*복용",
     re.IGNORECASE,
 )
 
 _CASUAL_PATTERNS = re.compile(
-    r"^(안녕|ㅎㅇ|하이|헬로|hi|hello|반가워|방가|ㅋ+|ㅎ+|감사|고마워|고맙|잘있어|잘가|바이|bye)[\s!?.]*$",
+    r"^(안녕|하이|헬로|hello|hi|반가워|고마워|감사|굿밤|잘자|바이|bye)[\s!?.]*$",
     re.IGNORECASE,
 )
 
@@ -31,6 +32,9 @@ _INTENT_SYSTEM_PROMPT = load_prompt("nodes/intent/system.md")
 
 def make_intent_node(deps: NodeDeps):
     async def analyze_intent_node(state: GraphState) -> dict:
+        if state.get("request_kind") == "home_recommendation":
+            return _build_result(INTENT_HOME_RECOMMENDATION, state)
+
         message = state["user_message"]
 
         if _SAFETY_PATTERNS.search(message):

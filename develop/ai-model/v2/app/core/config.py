@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # WAS
     WAS_BASE_URL: str
     WAS_TIMEOUT: float = 10.0
+    INTERNAL_API_KEY: Optional[str] = None
     # Summary
     SUMMARY_TURN_INTERVAL: int = 10  # 턴 카운터 임계값
     MAX_MESSAGES: int = 10            # State에 보관할 최대 메시지 수 (경량화)

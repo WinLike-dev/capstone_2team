@@ -1,11 +1,4 @@
-"""LangGraph 그래프 빌더 — Layer 1 메인 플로우 구현.
-
-노드 구성:
-  preprocess -> analyze_intent -> [route] ->
-    casual/fallback/safety/care/record/search/modify_load -> generate -> END
-
-비동기 WAS 쓰기 · 피드백 루프는 FastAPI BackgroundTasks로 처리.
-"""
+"""LangGraph builder for the v2 main flow."""
 from __future__ import annotations
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -17,15 +10,13 @@ from app.graph.nodes.fallback import make_fallback_node
 from app.graph.nodes.generate import make_generate_node
 from app.graph.nodes.intent import make_intent_node
 from app.graph.nodes.modify import make_modify_node
+from app.graph.nodes.persona import make_persona_node
 from app.graph.nodes.preprocess import make_preprocess_node
 from app.graph.nodes.record import make_record_node
 from app.graph.nodes.safety import make_safety_node
 from app.graph.nodes.search import make_search_node
-from app.graph.nodes.persona import make_persona_node
 from app.schemas.state import GraphState
 
-
-# ── 라우팅 함수 ────────────────────────────────────────────────────────────────
 
 def route_intent(state: GraphState) -> str:
     intent = state.get("intent", "fallback")
@@ -39,6 +30,7 @@ def route_intent(state: GraphState) -> str:
         "수정": "modify_load",
         "정보": "search",
         "계획_승인": "generate",
+        "home_recommendation": "generate",
     }
     return mapping.get(intent, "fallback")
 
@@ -69,18 +61,18 @@ def route_search_retry(state: GraphState) -> str:
     return "generate"
 
 
-def route_generate_self_eval(state: GraphState) -> str:
-    if state.get("response"): # 이미 에러 등으로 response가 할당된 경우
+def route_generate_self_eval(state: GraphState):
+    if state.get("request_kind") == "home_recommendation":
+        return END
+    if state.get("response"):
         return "persona"
     if state.get("self_eval_failure_reason"):
         return "generate"
     return "persona"
 
 
-# ── 그래프 빌드 ────────────────────────────────────────────────────────────────
-
 def build_graph(deps: NodeDeps, checkpointer: BaseCheckpointSaver):
-    """LangGraph StateGraph를 빌드하고 컴파일하여 반환."""
+    """Build and compile the LangGraph state machine."""
     builder = StateGraph(GraphState)
 
     builder.add_node("preprocess", make_preprocess_node(deps))
@@ -135,7 +127,7 @@ def build_graph(deps: NodeDeps, checkpointer: BaseCheckpointSaver):
     builder.add_conditional_edges(
         "generate",
         route_generate_self_eval,
-        {"generate": "generate", "persona": "persona"},
+        {"generate": "generate", "persona": "persona", END: END},
     )
 
     builder.add_edge("persona", END)

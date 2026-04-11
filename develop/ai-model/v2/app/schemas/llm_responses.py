@@ -33,7 +33,12 @@ class SelfEvalResponse(BaseModel):
 
 class ExerciseItem(BaseModel):
     exercise_name: str = Field(description="Detailed exercise name")
-    sets: int = Field(description="Number of sets")
+    sets: Optional[int] = Field(default=None, description="Number of sets")
+    duration_minutes: Optional[int] = Field(
+        default=None,
+        description="Duration in minutes for cardio exercises",
+    )
+    calories: int = Field(default=0, description="Estimated calories")
 
 
 class PlanExtractItem(BaseModel):
