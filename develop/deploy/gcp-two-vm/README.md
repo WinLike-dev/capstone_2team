@@ -10,6 +10,8 @@ Traffic flow:
 
 `Browser -> Vercel frontend -> HTTPS backend domain -> backend private call -> AI private IP`
 
+`AI -> HTTPS backend domain -> Caddy -> backend container`
+
 For the current project-specific manual checklist, see [`NEXT_STEPS.md`](./NEXT_STEPS.md).
 
 ## Why this shape
@@ -49,7 +51,9 @@ Recommended layout:
   - no public traffic if possible
   - open inbound `8000` only from the backend VM private IP or backend network tag
 
-Both VMs should live in the same VPC and region so `FASTAPI_URL` and `WAS_BASE_URL` can use private IPs.
+Both VMs should live in the same VPC and region so `FASTAPI_URL` can use a private IP.
+
+For this repository's current compose layout, `WAS_BASE_URL` should use the backend HTTPS domain, not the backend VM private `:8080`. The backend service is only exposed inside the backend compose network, and Caddy is the published entrypoint.
 
 ## Domain
 
@@ -105,7 +109,7 @@ docker compose up -d --build
 
 Set these values in `develop/deploy/gcp-two-vm/ai/.env.ai`:
 
-- `WAS_BASE_URL=http://<backend-private-ip>:8080`
+- `WAS_BASE_URL=https://<your-backend-domain>`
 - `PINECONE_API_KEY`
 - `PINECONE_INDEX_NAME`
 - `GEMINI_API_KEY`
@@ -157,10 +161,10 @@ Use the same `INTERNAL_API_KEY` value on both VMs:
 - backend sends it to FastAPI for `/internal/events/profile-updated`
 - AI sends it to backend for `/api/...` internal routes
 
-Private URLs should look like:
+Service URLs should look like:
 
 - backend `backend/.env.backend`: `FASTAPI_URL=http://10.0.0.5:8000`
-- AI `ai/.env.ai`: `WAS_BASE_URL=http://10.0.0.4:8080`
+- AI `ai/.env.ai`: `WAS_BASE_URL=https://api.example.com`
 
 ## Deploy updates
 

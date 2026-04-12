@@ -125,6 +125,12 @@ From backend VM:
 curl http://10.178.0.3:8000/health
 ```
 
+From AI VM:
+
+```bash
+curl https://34.50.45.68.nip.io/api/health
+```
+
 From the frontend:
 
 - open `https://capstone-2team-test-all.vercel.app`

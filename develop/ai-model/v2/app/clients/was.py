@@ -75,7 +75,7 @@ class WASClient:
                 headers=self._build_headers(),
             )
             resp.raise_for_status()
-            payload = resp.json().get("data", resp.json())
+            payload = self._extract_payload(resp.json())
             self._record_trace(
                 trace_id,
                 method="GET",
@@ -115,6 +115,11 @@ class WASClient:
                 error=str(exc),
             )
             raise ExternalServiceError(service="WAS", message="request error")
+
+    def _extract_payload(self, response_json: Any) -> Any:
+        if isinstance(response_json, dict):
+            return response_json.get("data", response_json)
+        return response_json
 
     async def _post(self, path: str, body: dict) -> None:
         started_at = time.perf_counter()
