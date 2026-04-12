@@ -1,7 +1,6 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, CheckSquare, Plus, Trash2, X, Droplets, Utensils, Activity, RefreshCw, Heart, Info, Dumbbell, PersonStanding } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,6 +30,44 @@ export type TodoItem = {
   mealType?: 'breakfast' | 'lunch' | 'dinner';
   calories?: number;
   img?: string;
+};
+
+type LegacyWorkoutCard = WorkoutRecommendation & {
+  id: string;
+  name: string;
+  desc: string;
+  duration: string;
+  slot: WorkoutSlot;
+};
+
+type LegacyDietCard = DietRecommendation & {
+  id: string;
+  name: string;
+  desc: string;
+  slot: DietSlot;
+};
+
+type LegacyRecommendations = {
+  workout: {
+    strength: {
+      upper: LegacyWorkoutCard | null;
+      lower: LegacyWorkoutCard | null;
+    };
+    cardio: LegacyWorkoutCard | null;
+    stretching: LegacyWorkoutCard | null;
+  };
+  diet: Record<DietSlot, LegacyDietCard | null>;
+};
+
+type WorkoutPopupState = {
+  isOpen: boolean;
+  target: LegacyWorkoutCard | null;
+};
+
+type DietPopupState = {
+  isOpen: boolean;
+  target: LegacyDietCard | null;
+  mealType: DietSlot | null;
 };
 
 const getFoodEmoji = (name: string) => {
@@ -82,21 +119,6 @@ const getWorkoutSlotLabel = (slot: WorkoutSlot) => {
   }
 };
 
-const getWorkoutSlotBadge = (slot: WorkoutSlot) => {
-  switch (slot) {
-    case 'upper_body':
-      return '근력 (상체)';
-    case 'lower_body':
-      return '근력 (하체)';
-    case 'cardio':
-      return '유산소';
-    case 'stretching':
-      return '스트레칭';
-    default:
-      return '운동';
-  }
-};
-
 const getWorkoutSlotColor = (slot: WorkoutSlot) => {
   switch (slot) {
     case 'upper_body':
@@ -124,6 +146,100 @@ const getMealSlotLabel = (mealType: DietSlot) => {
   if (mealType === 'lunch') return '점심';
   return '저녁';
 };
+
+const createLegacyRecommendations = (): LegacyRecommendations => ({
+  workout: {
+    strength: {
+      upper: { id: 's1', name: '푸시업', desc: '가슴/삼두근 강화', duration: '15분', exercise_name: '푸시업', summary: '가슴/삼두근 강화', calories: 150, slot: 'upper_body' },
+      lower: { id: 's2', name: '스쿼트', desc: '하체/코어 단련', duration: '20분', exercise_name: '스쿼트', summary: '하체/코어 단련', calories: 180, slot: 'lower_body' },
+    },
+    cardio: { id: 'c1', name: '가벼운 조깅', desc: '심폐지구력 향상', duration: '30분', exercise_name: '가벼운 조깅', summary: '심폐지구력 향상', calories: 220, slot: 'cardio', duration_minutes: 30 },
+    stretching: { id: 'st1', name: '전신 이완 요가', desc: '근육 긴장 완화', duration: '10분', exercise_name: '전신 이완 요가', summary: '근육 긴장 완화', calories: 80, slot: 'stretching' },
+  },
+  diet: {
+    breakfast: { id: 'd1', name: '오트밀과 과일', desc: '식이섬유 가득', calories: 350, food_name: '오트밀과 과일', summary: '식이섬유 가득', slot: 'breakfast' },
+    lunch: { id: 'd2', name: '닭가슴살 샐러드', desc: '단백질 보충', calories: 450, food_name: '닭가슴살 샐러드', summary: '단백질 보충', slot: 'lunch' },
+    dinner: { id: 'd3', name: '연어 스테이크', desc: '건강한 지방', calories: 500, food_name: '연어 스테이크', summary: '건강한 지방', slot: 'dinner' },
+  },
+});
+
+const mapRecommendationsToLegacyCards = (
+  recommendations: HomeRecommendations
+): LegacyRecommendations => ({
+  workout: {
+    strength: {
+      upper: recommendations.workout.upper_body
+        ? {
+            ...recommendations.workout.upper_body,
+            id: 'upper_body',
+            name: recommendations.workout.upper_body.exercise_name,
+            desc: recommendations.workout.upper_body.summary,
+            duration: formatWorkoutPrescription(recommendations.workout.upper_body),
+            slot: 'upper_body',
+          }
+        : null,
+      lower: recommendations.workout.lower_body
+        ? {
+            ...recommendations.workout.lower_body,
+            id: 'lower_body',
+            name: recommendations.workout.lower_body.exercise_name,
+            desc: recommendations.workout.lower_body.summary,
+            duration: formatWorkoutPrescription(recommendations.workout.lower_body),
+            slot: 'lower_body',
+          }
+        : null,
+    },
+    cardio: recommendations.workout.cardio
+      ? {
+          ...recommendations.workout.cardio,
+          id: 'cardio',
+          name: recommendations.workout.cardio.exercise_name,
+          desc: recommendations.workout.cardio.summary,
+          duration: formatWorkoutPrescription(recommendations.workout.cardio),
+          slot: 'cardio',
+        }
+      : null,
+    stretching: recommendations.workout.stretching
+      ? {
+          ...recommendations.workout.stretching,
+          id: 'stretching',
+          name: recommendations.workout.stretching.exercise_name,
+          desc: recommendations.workout.stretching.summary,
+          duration: formatWorkoutPrescription(recommendations.workout.stretching),
+          slot: 'stretching',
+        }
+      : null,
+  },
+  diet: {
+    breakfast: recommendations.diet.breakfast
+      ? {
+          ...recommendations.diet.breakfast,
+          id: 'breakfast',
+          name: recommendations.diet.breakfast.food_name,
+          desc: recommendations.diet.breakfast.summary,
+          slot: 'breakfast',
+        }
+      : null,
+    lunch: recommendations.diet.lunch
+      ? {
+          ...recommendations.diet.lunch,
+          id: 'lunch',
+          name: recommendations.diet.lunch.food_name,
+          desc: recommendations.diet.lunch.summary,
+          slot: 'lunch',
+        }
+      : null,
+    dinner: recommendations.diet.dinner
+      ? {
+          ...recommendations.diet.dinner,
+          id: 'dinner',
+          name: recommendations.diet.dinner.food_name,
+          desc: recommendations.diet.dinner.summary,
+          slot: 'dinner',
+        }
+      : null,
+  },
+});
 
 export default function Home() {
   const router = useRouter();
@@ -160,15 +276,6 @@ export default function Home() {
     protein: 0,
     fat: 0
   });
-
-  // Recommended Items Like State
-  const [likedItems, setLikedItems] = useState<Record<string, boolean>>({});
-
-  const handleLikeRecommendation = (e: React.MouseEvent, item: any) => {
-    e.stopPropagation();
-    // Toggle liked state locally
-    setLikedItems(prev => ({ ...prev, [item.id]: !prev[item.id] }));
-  };
 
   // Calculated Fallback
   const [recommendedCalories, setRecommendedCalories] = useState(2000);
@@ -247,22 +354,9 @@ export default function Home() {
   ]);
   const [newTodo, setNewTodo] = useState('');
 
-  // AI 추천 데이터 Mock
-  const [aiRecommendations, setAiRecommendations] = useState({
-    workout: {
-      strength: {
-        upper: { id: 's1', name: '푸시업', desc: '가슴/삼두근 강화', duration: '15분', icon: Activity },
-        lower: { id: 's2', name: '스쿼트', desc: '하체/코어 단련', duration: '20분', icon: Activity }
-      },
-      cardio: { id: 'c1', name: '가벼운 조깅', desc: '심폐지구력 향상', duration: '30분', icon: Heart },
-      stretching: { id: 'st1', name: '전신 이완 요가', desc: '근육 긴장 완화', duration: '10분', icon: Droplets }
-    },
-    diet: {
-      breakfast: { id: 'd1', name: '오트밀과 과일', desc: '식이섬유 가득', calories: 350, icon: Utensils },
-      lunch: { id: 'd2', name: '닭가슴살 샐러드', desc: '단백질 보충', calories: 450, icon: Utensils },
-      dinner: { id: 'd3', name: '연어 스테이크', desc: '건강한 지방', calories: 500, icon: Utensils }
-    }
-  });
+  const [aiRecommendations, setAiRecommendations] = useState<LegacyRecommendations>(
+    createLegacyRecommendations
+  );
 
   // 팝업 모달 상태
   const [homeRecommendationsRaw, setHomeRecommendationsRaw] = useState<HomeRecommendations>(
@@ -277,8 +371,8 @@ export default function Home() {
     diet: false,
   });
 
-  const [workoutPopup, setWorkoutPopup] = useState<{ isOpen: boolean, target: any }>({ isOpen: false, target: null });
-  const [dietPopup, setDietPopup] = useState<{ isOpen: boolean, target: any, mealType: 'breakfast' | 'lunch' | 'dinner' | null }>({ isOpen: false, target: null, mealType: null });
+  const [workoutPopup, setWorkoutPopup] = useState<WorkoutPopupState>({ isOpen: false, target: null });
+  const [dietPopup, setDietPopup] = useState<DietPopupState>({ isOpen: false, target: null, mealType: null });
   const [alertPopup, setAlertPopup] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
 
   const persistNutritionSnapshot = (
@@ -301,90 +395,7 @@ export default function Home() {
     }));
   };
 
-  const mapRecommendationsToLegacyCards = (recommendations: HomeRecommendations) => ({
-    workout: {
-      strength: {
-        upper: recommendations.workout.upper_body
-          ? {
-            ...recommendations.workout.upper_body,
-            id: 'upper_body',
-            name: recommendations.workout.upper_body.exercise_name,
-            desc: recommendations.workout.upper_body.summary,
-            duration: formatWorkoutPrescription(recommendations.workout.upper_body),
-            slot: 'upper_body',
-            icon: Dumbbell,
-          }
-          : null,
-        lower: recommendations.workout.lower_body
-          ? {
-            ...recommendations.workout.lower_body,
-            id: 'lower_body',
-            name: recommendations.workout.lower_body.exercise_name,
-            desc: recommendations.workout.lower_body.summary,
-            duration: formatWorkoutPrescription(recommendations.workout.lower_body),
-            slot: 'lower_body',
-            icon: PersonStanding,
-          }
-          : null,
-      },
-      cardio: recommendations.workout.cardio
-        ? {
-          ...recommendations.workout.cardio,
-          id: 'cardio',
-          name: recommendations.workout.cardio.exercise_name,
-          desc: recommendations.workout.cardio.summary,
-          duration: formatWorkoutPrescription(recommendations.workout.cardio),
-          slot: 'cardio',
-          icon: Heart,
-        }
-        : null,
-      stretching: recommendations.workout.stretching
-        ? {
-          ...recommendations.workout.stretching,
-          id: 'stretching',
-          name: recommendations.workout.stretching.exercise_name,
-          desc: recommendations.workout.stretching.summary,
-          duration: formatWorkoutPrescription(recommendations.workout.stretching),
-          slot: 'stretching',
-          icon: Droplets,
-        }
-        : null,
-    },
-    diet: {
-      breakfast: recommendations.diet.breakfast
-        ? {
-          ...recommendations.diet.breakfast,
-          id: 'breakfast',
-          name: recommendations.diet.breakfast.food_name,
-          desc: recommendations.diet.breakfast.summary,
-          slot: 'breakfast',
-          icon: Utensils,
-        }
-        : null,
-      lunch: recommendations.diet.lunch
-        ? {
-          ...recommendations.diet.lunch,
-          id: 'lunch',
-          name: recommendations.diet.lunch.food_name,
-          desc: recommendations.diet.lunch.summary,
-          slot: 'lunch',
-          icon: Utensils,
-        }
-        : null,
-      dinner: recommendations.diet.dinner
-        ? {
-          ...recommendations.diet.dinner,
-          id: 'dinner',
-          name: recommendations.diet.dinner.food_name,
-          desc: recommendations.diet.dinner.summary,
-          slot: 'dinner',
-          icon: Utensils,
-        }
-        : null,
-    },
-  });
-
-  const persistHomeRecommendationCache = (
+  const persistHomeRecommendationCache = useCallback((
     recommendations: HomeRecommendations,
     added: RecommendationAddedState
   ) => {
@@ -397,9 +408,9 @@ export default function Home() {
         added,
       })
     );
-  };
+  }, [userData?.user_id]);
 
-  const fetchHomeRecommendations = async (scope: RecommendationScope) => {
+  const fetchHomeRecommendations = useCallback(async (scope: RecommendationScope) => {
     if (!userData?.user_id) return;
 
     if (scope === 'all') {
@@ -432,7 +443,7 @@ export default function Home() {
         return nextRaw;
       });
 
-      setAiRecommendations(mapRecommendationsToLegacyCards(nextRaw) as any);
+      setAiRecommendations(mapRecommendationsToLegacyCards(nextRaw));
 
       setRecommendationAdded((prev) => {
         nextAdded = resetAddedStateForScope(prev, scope);
@@ -453,69 +464,9 @@ export default function Home() {
         setRecommendationRefresh((prev) => ({ ...prev, [scope]: false }));
       }
     }
-  };
+  }, [persistHomeRecommendationCache, userData?.user_id]);
 
-  const handleWorkoutAddClick = (workout: any) => {
-    setWorkoutPopup({ isOpen: true, target: workout });
-  };
-
-  const handleDietReplaceClick = (diet: any, mealType: 'breakfast' | 'lunch' | 'dinner') => {
-    setDietPopup({ isOpen: true, target: diet, mealType });
-  };
-
-  const confirmWorkoutAdd = () => {
-    if (workoutPopup.target) {
-      const todayStr = formatKstDate();
-      const todayPlan = getPlanByDate(todayStr);
-      const isDuplicate = todayPlan?.exercises.some((ex: any) => ex.title === workoutPopup.target.name);
-
-      if (isDuplicate) {
-        setWorkoutPopup({ isOpen: false, target: null });
-        setTimeout(() => setAlertPopup({ isOpen: true, message: '이미 캘린더에 추가된 운동입니다!' }), 100);
-        return;
-      }
-
-      let typeLabel = '상체 운동';
-      if (workoutPopup.target.desc.includes('가슴') || workoutPopup.target.desc.includes('상체')) typeLabel = '상체 운동';
-      else if (workoutPopup.target.desc.includes('하체')) typeLabel = '하체 운동';
-      else if (workoutPopup.target.desc.includes('심폐') || workoutPopup.target.desc.includes('조깅')) typeLabel = '유산소';
-      else if (workoutPopup.target.desc.includes('이완') || workoutPopup.target.desc.includes('요가') || workoutPopup.target.desc.includes('스트레칭')) typeLabel = '스트레칭';
-
-      addWorkout(todayStr, {
-        title: workoutPopup.target.name,
-        time: workoutPopup.target.duration || '15분',
-        level: '초급',
-        calories: '150 kcal',
-        color: 'from-blue-500 to-indigo-600',
-        type: typeLabel
-      });
-    }
-    setWorkoutPopup({ isOpen: false, target: null });
-  };
-
-  const confirmDietReplace = () => {
-    if (dietPopup.target && dietPopup.mealType) {
-      const todayStr = formatKstDate();
-      const todayPlan = getPlanByDate(todayStr);
-      const mealLabel = dietPopup.mealType === 'breakfast' ? '아침' : dietPopup.mealType === 'lunch' ? '점심' : '저녁';
-      const existingDiet = todayPlan?.diets.find((d: any) => d.type === mealLabel);
-
-      if (existingDiet && existingDiet.name === dietPopup.target.name) {
-        setDietPopup({ isOpen: false, target: null, mealType: null });
-        setTimeout(() => setAlertPopup({ isOpen: true, message: '이미 캘린더에 추가된 음식입니다!' }), 100);
-        return;
-      }
-
-      replaceDiet(todayStr, dietPopup.mealType, {
-        name: dietPopup.target.name,
-        desc: dietPopup.target.desc,
-        kcal: dietPopup.target.calories + ' kcal'
-      });
-    }
-    setDietPopup({ isOpen: false, target: null, mealType: null });
-  };
-
-  const openWorkoutRecommendationPopup = (slot: WorkoutSlot, workout: any) => {
+  const openWorkoutRecommendationPopup = (slot: WorkoutSlot, workout: LegacyWorkoutCard) => {
     setWorkoutPopup({
       isOpen: true,
       target: {
@@ -525,7 +476,7 @@ export default function Home() {
     });
   };
 
-  const openDietRecommendationPopup = (diet: any, mealType: DietSlot) => {
+  const openDietRecommendationPopup = (diet: LegacyDietCard, mealType: DietSlot) => {
     setDietPopup({
       isOpen: true,
       target: diet,
@@ -542,7 +493,7 @@ export default function Home() {
     const todayStr = formatKstDate();
     const todayPlan = getPlanByDate(todayStr);
     const isDuplicate = todayPlan?.exercises.some(
-      (ex: any) => ex.title === workoutPopup.target.name
+      (ex) => ex.title === workoutPopup.target.name
     );
 
     if (isDuplicate) {
@@ -592,7 +543,7 @@ export default function Home() {
     const todayStr = formatKstDate();
     const todayPlan = getPlanByDate(todayStr);
     const mealLabel = getMealSlotLabel(dietPopup.mealType);
-    const existingDiet = todayPlan?.diets.find((d: any) => d.type === mealLabel);
+    const existingDiet = todayPlan?.diets.find((d) => d.type === mealLabel);
 
     if (existingDiet && existingDiet.name === dietPopup.target.name) {
       setDietPopup({ isOpen: false, target: null, mealType: null });
@@ -643,7 +594,7 @@ export default function Home() {
     if (!resetConfirmModal.target) return;
 
     setIntakes(prev => {
-      let newIntakes = { ...prev };
+      const newIntakes = { ...prev };
       if (resetConfirmModal.target === 'calories') {
         newIntakes.calories = 0;
       } else if (resetConfirmModal.target === 'macros') {
@@ -764,7 +715,7 @@ export default function Home() {
         }
       }
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (userData && userData.weight && userData.height && userData.age && userData.gender) {
@@ -846,7 +797,7 @@ export default function Home() {
           const nextRecommendations = parsed.recommendations;
           const nextAdded = parsed.added || createEmptyAddedState();
           setHomeRecommendationsRaw(nextRecommendations);
-          setAiRecommendations(mapRecommendationsToLegacyCards(nextRecommendations) as any);
+          setAiRecommendations(mapRecommendationsToLegacyCards(nextRecommendations));
           setRecommendationAdded(nextAdded);
           return;
         }
@@ -857,13 +808,10 @@ export default function Home() {
 
     const emptyRecommendations = createEmptyRecommendations(todayStr);
     setHomeRecommendationsRaw(emptyRecommendations);
-    setAiRecommendations(mapRecommendationsToLegacyCards(emptyRecommendations) as any);
+    setAiRecommendations(mapRecommendationsToLegacyCards(emptyRecommendations));
     setRecommendationAdded(createEmptyAddedState());
     void fetchHomeRecommendations('all');
-  }, [isClient, isUserLoading, userData?.user_id]);
-
-const allergies = userData?.allergies || [];
-const conditions = userData?.conditions || [];
+  }, [fetchHomeRecommendations, isClient, isUserLoading, userData?.user_id]);
 
 return (
   <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans p-6 pb-32 md:p-8 lg:p-12 md:pb-36 lg:pb-40">

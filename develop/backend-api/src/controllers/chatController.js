@@ -28,12 +28,15 @@ exports.sendMessage = async (req, res) => {
       ? req.body.user_message
       : req.body.message;
     const userMessage = rawMessage ? rawMessage.trim() : '';
+    const requestedSessionId = typeof req.body.session_id === 'string'
+      ? req.body.session_id.trim()
+      : '';
 
     if (!userMessage) {
       return res.status(400).json({ error: 'message is required.' });
     }
 
-    const sessionId = buildDailySessionId(userId);
+    const sessionId = requestedSessionId || buildDailySessionId(userId);
     const payload = {
       user_id: userId,
       user_message: userMessage,

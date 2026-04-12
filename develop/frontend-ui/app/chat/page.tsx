@@ -12,6 +12,8 @@ type Message = {
   isStreaming?: boolean;
 };
 
+const CHAT_SESSION_STORAGE_KEY = "healthAppChatSessionId";
+
 function getApiBaseUrl() {
   const raw =
     process.env.NEXT_PUBLIC_BACKEND_URL ||
@@ -31,7 +33,17 @@ export default function ChatPage() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const storedSessionId = window.sessionStorage.getItem(
+      CHAT_SESSION_STORAGE_KEY
+    );
+    if (storedSessionId) {
+      setSessionId(storedSessionId);
+    }
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,6 +112,7 @@ export default function ChatPage() {
         },
         body: JSON.stringify({
           message: userMessage,
+          ...(sessionId ? { session_id: sessionId } : {}),
         }),
       });
 
@@ -108,6 +121,16 @@ export default function ChatPage() {
       }
 
       const data = await response.json();
+      const nextSessionId =
+        typeof data.session_id === "string" ? data.session_id : null;
+      if (nextSessionId) {
+        setSessionId(nextSessionId);
+        window.sessionStorage.setItem(
+          CHAT_SESSION_STORAGE_KEY,
+          nextSessionId
+        );
+      }
+
       const botText =
         data.response || data.answer || data.message || "응답을 불러오지 못했습니다.";
 
@@ -141,7 +164,9 @@ export default function ChatPage() {
               <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
                 AI 건강 비서
               </h1>
-              <p className="text-xs font-semibold text-emerald-600">backend-api 연결 중</p>
+              <p className="text-xs font-semibold text-emerald-600">
+                backend-api 연결 중
+              </p>
             </div>
           </div>
         </div>
