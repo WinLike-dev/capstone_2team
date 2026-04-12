@@ -285,7 +285,7 @@ def chat(token: str, message: str, session_id: str | None = None) -> dict[str, A
     return response.body
 
 
-def list_traces(limit: int = 200) -> list[dict[str, Any]]:
+def list_traces(limit: int = 120) -> list[dict[str, Any]]:
     response = _query_request(f"{AI_DEBUG_BASE_URL}/debug/api/traces?limit={limit}", timeout=HTTP_TIMEOUT)
     if response.status != 200:
         raise RuntimeError(f"trace list failed: status={response.status} body={response.body}")
@@ -432,7 +432,7 @@ def run_plan_state_checks(token: str, user_id: str) -> dict[str, Any]:
     empty_plan_prompt = run_chat_case(
         token=token,
         user_id=user_id,
-        message="이번 주 주 3회 운동 계획을 구체적으로 짜줘.",
+        message="체중 감량 목표로 이번 주 월수금 30분 홈트 운동 계획을 구체적으로 짜줘.",
         expected_intent="계획",
         session_id=empty_session_id,
     )
@@ -458,7 +458,7 @@ def run_plan_state_checks(token: str, user_id: str) -> dict[str, Any]:
     modify_prompt = run_chat_case(
         token=token,
         user_id=user_id,
-        message="이번 주 운동 계획 강도를 조금 낮춰서 다시 조정해줘.",
+        message="방금 만든 이번 주 운동 계획에서 무릎 부담 적게 강도를 낮춰서 다시 조정해줘.",
         expected_intent="수정",
         session_id=update_session_id,
     )

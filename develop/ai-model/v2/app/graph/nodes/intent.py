@@ -102,7 +102,7 @@ _APPROVAL_KEYWORDS = (
     "오케이",
     "좋아",
     "좋습니다",
-    "해줘",
+    "저장해",
 )
 _PLAN_REFERENCE_KEYWORDS = (
     "계획",
@@ -144,6 +144,17 @@ _PROFILE_UPDATE_KEYWORDS = (
     "업데이트",
     "입력",
 )
+_CONTEXT_DEPENDENT_REFERENCES = (
+    "그거",
+    "그걸",
+    "이거",
+    "이걸",
+    "아까 말한 거",
+    "그 방식",
+    "저 방식",
+    "방금 거",
+    "저거",
+)
 
 
 def make_intent_node(deps: NodeDeps):
@@ -159,6 +170,9 @@ def make_intent_node(deps: NodeDeps):
 
         if _CASUAL_PATTERNS.match(message.strip()) and previous_intent != INTENT_CARE:
             return _build_result(INTENT_CASUAL, state)
+
+        if _looks_like_context_dependent_fallback(message, state):
+            return _build_result(INTENT_FALLBACK, state, confidence=0.9)
 
         if _looks_like_plan_approval(message, state):
             return _build_result(INTENT_APPROVAL, state, confidence=0.94)
@@ -305,3 +319,16 @@ def _looks_like_profile_record(message: str) -> bool:
     has_update_keyword = any(keyword in normalized for keyword in _PROFILE_UPDATE_KEYWORDS)
     has_plan_domain = any(keyword in normalized for keyword in ("운동 계획", "식단 계획", "운동 루틴", "식단 루틴"))
     return has_profile_field and has_update_keyword and not has_plan_domain
+
+
+def _looks_like_context_dependent_fallback(message: str, state: GraphState) -> bool:
+    normalized = message.strip().lower()
+    has_reference = any(keyword in normalized for keyword in _CONTEXT_DEPENDENT_REFERENCES)
+    has_plan_context = bool(state.get("proposed_plan")) or state.get("previous_intent") in {
+        INTENT_PLAN,
+        INTENT_MODIFY,
+        INTENT_APPROVAL,
+        INTENT_INFO,
+        INTENT_RECORD,
+    }
+    return has_reference and not has_plan_context
