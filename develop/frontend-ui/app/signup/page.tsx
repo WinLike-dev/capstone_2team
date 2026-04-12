@@ -63,9 +63,9 @@ export default function SignupPage() {
         router.push('/login');
       }, 1500);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Signup error:', err);
-      setErrorMsg(err.message || '회원가입에 실패했습니다.');
+      setErrorMsg(err instanceof Error ? err.message : '회원가입에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }

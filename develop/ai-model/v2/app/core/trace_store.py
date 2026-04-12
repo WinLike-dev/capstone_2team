@@ -34,6 +34,41 @@ def timed_ms(started_at: float) -> float:
     return round((time.perf_counter() - started_at) * 1000, 2)
 
 
+def _build_list_summary(trace: dict[str, Any]) -> dict[str, Any]:
+    state_summary = trace.get("state_summary") or {}
+    slowest_label = None
+    slowest_duration_ms = None
+
+    for event in trace.get("events", []):
+        duration_ms = event.get("duration_ms")
+        if duration_ms is None:
+            continue
+        if slowest_duration_ms is None or duration_ms > slowest_duration_ms:
+            slowest_duration_ms = duration_ms
+            slowest_label = event.get("stage") or event.get("title")
+
+    for item in [*(trace.get("was_reads") or []), *(trace.get("was_writes") or [])]:
+        duration_ms = item.get("duration_ms")
+        if duration_ms is None:
+            continue
+        if slowest_duration_ms is None or duration_ms > slowest_duration_ms:
+            slowest_duration_ms = duration_ms
+            slowest_label = f'{item.get("method", "WAS")} {item.get("path", "")}'.strip()
+
+    return {
+        "intent": state_summary.get("intent"),
+        "search_quality": state_summary.get("search_quality"),
+        "modify_target": state_summary.get("modify_target"),
+        "resolved_persona_id": state_summary.get("resolved_persona_id"),
+        "proposed_plan_type": state_summary.get("proposed_plan_type"),
+        "proposed_plan_action": state_summary.get("proposed_plan_action"),
+        "proposed_plan_count": state_summary.get("proposed_plan_count"),
+        "pending_writes_count": state_summary.get("pending_writes_count"),
+        "slowest_label": slowest_label,
+        "slowest_duration_ms": slowest_duration_ms,
+    }
+
+
 class TraceStore:
     def __init__(self, max_traces: int = 120, max_logs: int = 1200) -> None:
         self._max_traces = max_traces
@@ -261,6 +296,7 @@ class TraceStore:
                     "message": trace["message"],
                     "alert_count": len(trace["alerts"]),
                     "event_count": len(trace["events"]),
+                    "summary": _build_list_summary(trace),
                 }
                 for trace in traces
             ]

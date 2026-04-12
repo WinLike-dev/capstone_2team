@@ -1,11 +1,12 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Edit3, Target, Bell, LogOut, ChevronRight, CheckCircle2, HeadphonesIcon, Info, X, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { usePlan, UserData } from '../context/PlanContext';
+
+type EditProfileForm = Partial<UserData> & { otherAllergy?: string };
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function ProfilePage() {
   // Modals state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<UserData & { otherAllergy?: string }>>({});
+  const [editForm, setEditForm] = useState<EditProfileForm>({});
   const [editGoal, setEditGoal] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -29,7 +30,7 @@ export default function ProfilePage() {
       ...userData,
       conditions: userData?.conditions || [],
       allergies: userData?.allergies || [],
-      otherAllergy: (userData as any)?.otherAllergy || '',
+      otherAllergy: userData?.otherAllergy || '',
     });
     setIsEditModalOpen(true);
   };
@@ -39,9 +40,9 @@ export default function ProfilePage() {
     setIsGoalModalOpen(true);
   };
 
-  const saveProfileToAPI = async (data: Partial<UserData & { otherAllergy?: string }>) => {
+  const saveProfileToAPI = async (data: EditProfileForm) => {
     setIsSaving(true);
-    let finalData = { ...data };
+    const finalData = { ...data };
     try {
       const payload = {
         user_id: data.user_id || data.email || 'unknown',
@@ -95,14 +96,14 @@ export default function ProfilePage() {
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setEditForm((prev: any) => ({ ...prev, [name]: value }));
+    setEditForm((prev: EditProfileForm) => ({ ...prev, [name]: value }));
   };
 
   const conditionOptions = ['고혈압', '당뇨', '관절염', '천식', '심혈관 질환', '없음'];
   const allergyOptions = ['유제품', '견과류', '갑각류', '밀', '대두', '달걀', '해당 없음'];
 
   const handleCheckboxChange = (condition: string) => {
-    setEditForm((prev: Partial<UserData & { otherAllergy?: string }>) => {
+    setEditForm((prev: EditProfileForm) => {
       let newConditions: string[] = [...(prev.conditions || [])];
       if (condition === '없음') {
         newConditions = newConditions.includes('없음') ? [] : ['없음'];
@@ -119,7 +120,7 @@ export default function ProfilePage() {
   };
 
   const handleAllergyChange = (allergy: string) => {
-    setEditForm((prev: Partial<UserData & { otherAllergy?: string }>) => {
+    setEditForm((prev: EditProfileForm) => {
       let newAllergies: string[] = [...(prev.allergies || [])];
       if (allergy === '해당 없음') {
         newAllergies = newAllergies.includes('해당 없음') ? [] : ['해당 없음'];

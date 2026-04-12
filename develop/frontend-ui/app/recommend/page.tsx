@@ -1,8 +1,7 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { Info, Clock, Flame, ChevronRight, Apple, Calendar as CalendarIcon, ChevronLeft, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePlan, DailyPlan } from '../context/PlanContext';
 
@@ -29,11 +28,13 @@ const mapWorkoutType = (typeRaw: string) => {
 };
 
 export default function RecommendPage() {
-  const { plans, completedTasks, completeWorkout, completeDiet, getPlanByDate, userData, isUserLoading } = usePlan();
+  const { completedTasks, completeWorkout, completeDiet, getPlanByDate, userData, isUserLoading } = usePlan();
+  const initialToday = new Date();
   
-  const [currentDate, setCurrentDate] = useState(new Date('2026-03-01'));
-  const [today, setToday] = useState<Date | null>(null);
-  const [todayPlan, setTodayPlan] = useState<DailyPlan | null>(null);
+  const [currentDate, setCurrentDate] = useState(
+    () => new Date(initialToday.getFullYear(), initialToday.getMonth(), 1)
+  );
+  const [today] = useState<Date>(initialToday);
 
   const [confirmPopup, setConfirmPopup] = useState<{isOpen: boolean, target: {type: 'workout'|'diet', dateStr: string, name: string, index: number} | null}>({isOpen: false, target: null});
 
@@ -55,16 +56,9 @@ export default function RecommendPage() {
     setConfirmPopup({isOpen: false, target: null});
   };
 
-  useEffect(() => {
-    const now = new Date();
-    setToday(now);
-    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    setTodayPlan(getPlanByDate(now));
-
-  }, [plans, getPlanByDate]);
-
   const [selectedPlan, setSelectedPlan] = useState<DailyPlan | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const todayPlan = getPlanByDate(today);
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const currentYear = currentDate.getFullYear();
