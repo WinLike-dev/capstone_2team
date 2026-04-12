@@ -225,6 +225,7 @@ async def _generate_home_recommendations(
 
 def _build_draft_context(state: GraphState) -> str:
     parts: list[str] = []
+    parts.append(f"[오늘 날짜]\n{kst_today_iso()}")
 
     messages = state.get("messages", [])
     if messages:

@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 const { buildDailySessionId } = require('../utils/kst');
 
 const FASTAPI_URL = (process.env.FASTAPI_URL || 'http://localhost:8000').replace(/\/$/, '');
-const AI_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT || '30000', 10);
+const AI_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT || '90000', 10);
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || '';
 
 function buildFastApiHeaders() {

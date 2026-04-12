@@ -2,7 +2,7 @@ const axios = require('axios');
 const supabase = require('../config/db');
 
 const FASTAPI_URL = process.env.FASTAPI_URL || 'http://localhost:8000';
-const AI_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT) || 30000;
+const AI_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT) || 90000;
 
 // @route   GET /api/v1/ai/plans
 // @desc    특정 기간의 운동/식단 플랜 조회

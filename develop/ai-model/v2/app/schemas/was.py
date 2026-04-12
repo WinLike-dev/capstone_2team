@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +13,16 @@ logger = logging.getLogger(__name__)
 
 _DATE_INPUT_FORMATS = ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d")
 _SETS_PATTERN = re.compile(r"(\d+)")
+_KST = ZoneInfo("Asia/Seoul")
+_WEEKDAY_KEYWORDS = {
+    "월요일": 0,
+    "화요일": 1,
+    "수요일": 2,
+    "목요일": 3,
+    "금요일": 4,
+    "토요일": 5,
+    "일요일": 6,
+}
 
 
 class WASUserProfile(BaseModel):
@@ -190,7 +201,11 @@ def _normalize_plan_item(item: Any, plan_type: str) -> dict[str, Any] | None:
         item.get("summary"),
         default=None,
     )
-    day = _normalize_day(item.get("day") or item.get("date"))
+    day = _normalize_day(
+        item.get("day") or item.get("date"),
+        name=name,
+        detail=detail,
+    )
 
     raw_ex_list = item.get("ex_list")
     if raw_ex_list is None:
@@ -264,20 +279,53 @@ def _normalize_exercises(raw_exercises: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-def _normalize_day(value: Any) -> Optional[str]:
+def _normalize_day(
+    value: Any,
+    *,
+    name: str | None = None,
+    detail: str | None = None,
+) -> Optional[str]:
     if value is None:
-        return None
+        return _infer_day_from_text(name, detail)
 
     text = str(value).strip()
     if not text:
-        return None
+        return _infer_day_from_text(name, detail)
 
     for fmt in _DATE_INPUT_FORMATS:
         try:
-            return datetime.strptime(text, fmt).date().isoformat()
+            parsed = datetime.strptime(text, fmt).date()
+            if parsed.year < datetime.now(_KST).year:
+                inferred = _infer_day_from_text(name, detail)
+                if inferred:
+                    return inferred
+            return parsed.isoformat()
         except ValueError:
             continue
-    return text
+    return _infer_day_from_text(name, detail) or text
+
+
+def _infer_day_from_text(name: str | None, detail: str | None) -> Optional[str]:
+    combined = " ".join(part for part in (name, detail) if part).strip()
+    if not combined:
+        return None
+
+    today = datetime.now(_KST).date()
+    week_start = today - timedelta(days=today.weekday())
+    next_week_start = week_start + timedelta(days=7)
+    use_next_week = "다음 주" in combined or "다음주" in combined
+    base_week = next_week_start if use_next_week else week_start
+
+    for keyword, weekday_index in _WEEKDAY_KEYWORDS.items():
+        if keyword in combined:
+            return (base_week + timedelta(days=weekday_index)).isoformat()
+
+    if "오늘" in combined:
+        return today.isoformat()
+    if "내일" in combined:
+        return (today + timedelta(days=1)).isoformat()
+
+    return None
 
 
 def _normalize_sets(value: Any) -> int:
