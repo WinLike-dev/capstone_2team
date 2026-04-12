@@ -1,0 +1,40 @@
+services:
+  backend:
+    build:
+      context: ../../../backend-api
+      dockerfile: Dockerfile
+    container_name: capstone-backend
+    env_file:
+      - ./.env.backend
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - ../../../backend-api/logs:/usr/src/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: capstone-backend-proxy
+    env_file:
+      - ./.env.backend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

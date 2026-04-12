@@ -1,0 +1,63 @@
+﻿commit c6dc8df4b19cb58508236928e3ac8426096abbdf
+Author: Hyunmin <hyxnminp@gmail.com>
+Date:   Mon Apr 6 23:15:12 2026 +0900
+
+    ai ?쒕쾭 ?듭떊
+
+ develop/backend-api/package-lock.json              |  22 +-
+ develop/backend-api/package.json                   |   2 +-
+ develop/backend-api/src/app.js                     |   6 +-
+ .../backend-api/src/controllers/chatController.js  |   2 +-
+ .../src/controllers/internalController.js          | 619 +++++++++++++++++++++
+ .../backend-api/src/controllers/userController.js  |  11 +
+ develop/backend-api/src/middleware/internalAuth.js |  26 +
+ develop/backend-api/src/routes/internal.js         |  35 ++
+ develop/backend-api/src/services/aiEventService.js |  46 ++
+ 9 files changed, 755 insertions(+), 14 deletions(-)
+
+commit 1d077ba00a4241a6f0b143d0254ebb039dfe0ba2
+Author: kchan08 <kchan02@kyonggi.ac.kr>
+Date:   Sun Apr 5 01:56:46 2026 +0900
+
+    updateProfile ?섏젙
+
+ develop/backend-api/src/controllers/userController.js | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+commit ec17595599fb3de4573aa65d49aaf21930adea62
+Author: kchan08 <kchan02@kyonggi.ac.kr>
+Date:   Sun Apr 5 01:41:02 2026 +0900
+
+    JWT ?몄쬆 泥닿퀎濡?蹂寃?
+ .../backend-api/src/controllers/chatController.js  | 18 ++++----
+ .../backend-api/src/controllers/userController.js  | 50 ++++++++++++----------
+ develop/backend-api/src/routes/chat.js             |  5 ++-
+ develop/backend-api/src/routes/users.js            |  5 ++-
+ 4 files changed, 42 insertions(+), 36 deletions(-)
+
+commit b774449cead1f4d3e1ae167a54fd40f4be632006
+Author: kchan08 <kchan02@kyonggi.ac.kr>
+Date:   Sun Apr 5 00:46:18 2026 +0900
+
+    has_health_profile ?꾩넚 湲곕뒫 異붽?
+
+ .../backend-api/src/controllers/authController.js    | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
+
+commit be01e09ff089cab3f6683efb5a017b070f0590ec
+Author: kchan08 <kchan02@kyonggi.ac.kr>
+Date:   Sat Apr 4 13:03:48 2026 +0900
+
+    ?寃잛뭡濡쒕━,?꾨떒吏 ?쒓굅 諛?濡쒓렇??援ы쁽
+
+ develop/backend-api/package-lock.json              |  37 +++++-
+ develop/backend-api/package.json                   |   3 +-
+ develop/backend-api/src/app.js                     |   2 +-
+ .../backend-api/src/controllers/authController.js  | 143 +++++++++++++++++++++
+ .../backend-api/src/controllers/chatController.js  |   4 -
+ .../backend-api/src/controllers/userController.js  |  57 +-------
+ develop/backend-api/src/middleware/auth.js         |  28 ++++
+ develop/backend-api/src/routes/auth.js             |  10 ++
+ develop/backend-api/src/routes/users.js            |   1 -
+ develop/backend-api/src/utils/calculator.js        |  69 ----------
+ 10 files changed, 226 insertions(+), 128 deletions(-)
