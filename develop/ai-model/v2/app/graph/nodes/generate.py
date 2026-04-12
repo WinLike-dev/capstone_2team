@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 
 from app.core.draft_contract import normalize_draft_components, render_draft_preview
@@ -27,6 +28,14 @@ INTENT_MODIFY = "수정"
 INTENT_APPROVAL = "계획_승인"
 INTENT_INFO = "정보"
 INTENT_SAFETY = "안전경고"
+
+_MENTAL_HEALTH_SAFETY_PATTERNS = re.compile(
+    r"자해|자살|죽고\s*싶|극단적\s*선택|충동|해치고\s*싶|살고\s*싶지",
+)
+_PHYSICAL_SAFETY_PATTERNS = re.compile(
+    r"가슴.*조여|숨이?\s*차|호흡.*힘들|어지럽|쓰러질\s*것\s*같|실신|기절|"
+    r"과다\s*복용|심한\s*통증|출혈|피가\s*멈추지",
+)
 
 MAX_SELF_EVAL = 1
 _SELF_EVAL_INTENTS = {INTENT_SAFETY, INTENT_CARE}
@@ -67,6 +76,15 @@ def make_generate_node(deps: NodeDeps):
 
         if state.get("request_kind") == "home_recommendation":
             return await _generate_home_recommendations(deps, state, started_at)
+
+        if intent == INTENT_SAFETY:
+            deps.trace.record_current_event(
+                stage="generate",
+                status="ok",
+                title="Safety draft shortcut used",
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
+            return _build_safety_draft(state)
 
         if intent == INTENT_APPROVAL:
             deps.trace.record_current_event(
@@ -341,6 +359,71 @@ def _build_approval_draft(state: GraphState) -> dict:
         "self_eval_count": 0,
         "self_eval_failure_reason": None,
     }
+
+
+def _build_safety_draft(state: GraphState) -> dict:
+    safety_kind = _classify_safety_kind(state["user_message"])
+
+    if safety_kind == "mental_health_crisis":
+        components = normalize_draft_components(
+            {
+                "core_message": "지금 혼자 버티지 말고 즉시 사람과 연결되는 것이 우선입니다.",
+                "reason_points": [
+                    "현재 메시지는 자해나 자살 위험처럼 즉각적인 도움 연결이 필요한 상황으로 보입니다.",
+                    "운동이나 식단 조언보다 안전 확보와 주변 도움 요청이 먼저입니다.",
+                ],
+                "suggested_action": (
+                    "가까운 사람에게 지금 상태를 바로 알리고, 자살예방상담전화 109 "
+                    "또는 정신건강상담전화 1577-0199에 즉시 연락하세요."
+                ),
+                "safety_notes": [
+                    "혼자 있지 말고 주변 사람이나 보호자와 함께 있으세요.",
+                    "위험한 물건이나 약물이 손에 닿지 않게 멀리하세요.",
+                    "당장 위험이 크면 119 또는 가까운 응급실로 바로 도움을 요청하세요.",
+                ],
+                "approval_question": None,
+                "search_grounding_summary": "",
+            }
+        )
+    else:
+        components = normalize_draft_components(
+            {
+                "core_message": "이건 운동 조언보다 즉시 응급 대응이 우선일 수 있는 증상입니다.",
+                "reason_points": [
+                    "가슴 통증, 호흡 곤란, 심한 어지럼, 실신감, 과다 복용 의심은 응급 평가가 필요할 수 있습니다.",
+                    "운동을 계속하거나 집에서 버티는 것보다 즉시 중단하고 상태를 확인받는 것이 안전합니다.",
+                ],
+                "suggested_action": (
+                    "지금 바로 운동을 멈추고 앉거나 누워 안정을 취한 뒤, 증상이 계속되면 119에 연락하거나 "
+                    "가까운 응급실로 가세요."
+                ),
+                "safety_notes": [
+                    "혼자 이동하지 말고 가능하면 주변 사람에게 도움을 요청하세요.",
+                    "가슴 통증, 숨참, 의식 저하, 경련, 심한 출혈이 있으면 지체하지 말고 119를 부르세요.",
+                    "증상이 가라앉더라도 원인 확인 전에는 운동을 다시 하지 마세요.",
+                ],
+                "approval_question": None,
+                "search_grounding_summary": "",
+            }
+        )
+
+    return {
+        "draft_response": render_draft_preview(components),
+        "draft_components": components,
+        "proposed_plan": None,
+        "proposed_plan_type": None,
+        "proposed_plan_action": None,
+        "self_eval_count": 0,
+        "self_eval_failure_reason": None,
+    }
+
+
+def _classify_safety_kind(message: str) -> str:
+    if _MENTAL_HEALTH_SAFETY_PATTERNS.search(message):
+        return "mental_health_crisis"
+    if _PHYSICAL_SAFETY_PATTERNS.search(message):
+        return "physical_emergency"
+    return "physical_emergency"
 
 
 def _resolve_proposed_plan_type(
