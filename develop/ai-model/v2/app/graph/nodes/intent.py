@@ -12,6 +12,7 @@ from app.schemas.state import GraphState
 logger = logging.getLogger(__name__)
 
 INTENT_CARE = "공감_케어"
+INTENT_PLAN = "계획"
 INTENT_FALLBACK = "fallback"
 INTENT_CASUAL = "casual"
 INTENT_SAFETY = "안전경고"
@@ -23,7 +24,7 @@ _SAFETY_PATTERNS = re.compile(
 )
 
 _CASUAL_PATTERNS = re.compile(
-    r"^(안녕|하이|헬로|hello|hi|반가워|고마워|감사|굿밤|잘자|바이|bye)[\s!?.]*$",
+    r"^(안녕|하이|헬로|hello|hi|반가워|고마워|감사|굿굿|수고|바이|bye)[\s!?.]*$",
     re.IGNORECASE,
 )
 
@@ -43,6 +44,16 @@ def make_intent_node(deps: NodeDeps):
         previous_intent = state.get("previous_intent")
         if _CASUAL_PATTERNS.match(message.strip()) and previous_intent != INTENT_CARE:
             return _build_result(INTENT_CASUAL, state)
+
+        # Generic workout and diet recommendation requests were frequently
+        # misclassified as fallback or record. Route them to plan/search first.
+        if _looks_like_plan_request(message):
+            return _build_result(
+                INTENT_PLAN,
+                state,
+                confidence=0.92,
+                search_targets=["vdb_external", "vdb_user_important", "web"],
+            )
 
         context = _build_context(state)
         user_content = f"{context}\n\n현재 메시지: {message}" if context else f"현재 메시지: {message}"
@@ -87,10 +98,16 @@ def make_intent_node(deps: NodeDeps):
     return analyze_intent_node
 
 
-def _build_result(intent: str, state: GraphState) -> dict:
+def _build_result(
+    intent: str,
+    state: GraphState,
+    *,
+    confidence: float = 1.0,
+    search_targets: list[str] | None = None,
+) -> dict:
     return {
         "intent": intent,
-        "confidence": 1.0,
+        "confidence": confidence,
         "emotion": state.get("emotion") or {"label": "중립", "intensity": 0.0},
         "previous_intent": state.get("intent"),
         "previous_emotion": state.get("emotion"),
@@ -101,7 +118,7 @@ def _build_result(intent: str, state: GraphState) -> dict:
         "profile_changes": None,
         "is_today": None,
         "modify_target": None,
-        "search_targets": [],
+        "search_targets": search_targets or [],
         "search_retry_count": 0,
         "fallback_count": state.get("fallback_count", 0),
         "self_eval_count": 0,
@@ -122,3 +139,48 @@ def _build_context(state: GraphState) -> str:
         parts.append(f"대화 요약: {state['summary']}")
 
     return "\n".join(parts)
+
+
+def _looks_like_plan_request(message: str) -> bool:
+    normalized = message.strip().lower()
+
+    domain_keywords = (
+        "운동",
+        "식단",
+        "식사",
+        "메뉴",
+        "루틴",
+        "플랜",
+        "계획",
+        "workout",
+        "diet",
+        "meal",
+    )
+    request_keywords = (
+        "추천",
+        "루틴",
+        "플랜",
+        "계획",
+        "짜줘",
+        "구성",
+        "알려줘",
+        "만들어",
+        "추천해줘",
+        "정리해줘",
+    )
+    exclude_keywords = (
+        "수정",
+        "바꿔",
+        "변경",
+        "교체",
+        "확정",
+        "승인",
+        "체크",
+        "기록",
+    )
+
+    has_domain_keyword = any(keyword in normalized for keyword in domain_keywords)
+    has_request_keyword = any(keyword in normalized for keyword in request_keywords)
+    has_excluded_keyword = any(keyword in normalized for keyword in exclude_keywords)
+
+    return has_domain_keyword and has_request_keyword and not has_excluded_keyword

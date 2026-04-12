@@ -141,7 +141,7 @@ export default function ChatPage() {
               <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
                 AI 건강 비서
               </h1>
-              <p className="text-xs font-semibold text-emerald-600">backend-api 경유 연결</p>
+              <p className="text-xs font-semibold text-emerald-600">backend-api 연결 중</p>
             </div>
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function ChatPage() {
                 type="text"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder="건강 관련 질문을 입력하세요"
+                placeholder="건강 관련 질문을 입력해주세요"
                 className="w-full rounded-2xl border border-gray-200 bg-gray-50/80 py-4 pl-5 pr-14 text-[15px] text-gray-900 shadow-inner transition-all placeholder:text-gray-400 focus:border-[#2563eb] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15"
                 disabled={isLoading}
               />
@@ -243,7 +243,7 @@ export default function ChatPage() {
             </div>
           </form>
           <p className="mt-3 text-center text-[11px] font-medium text-gray-400">
-            프론트는 직접 AI 서버가 아니라 backend-api를 통해 연결됩니다.
+            프론트는 backend-api를 통해 AI 서버와 통신합니다.
           </p>
         </div>
       </div>
