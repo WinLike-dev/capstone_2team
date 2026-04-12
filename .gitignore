@@ -1,1 +1,4 @@
 CLAUDE.md
+.deploy-package.tar.gz
+develop/deploy/gcp-two-vm/deploy_key
+develop/deploy/gcp-two-vm/deploy_key.pub

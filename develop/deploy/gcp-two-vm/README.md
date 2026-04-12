@@ -10,6 +10,8 @@ Traffic flow:
 
 `Browser -> Vercel frontend -> HTTPS backend domain -> backend private call -> AI private IP`
 
+For the current project-specific manual checklist, see [`NEXT_STEPS.md`](./NEXT_STEPS.md).
+
 ## Why this shape
 
 The current codebase already matches this split:
@@ -137,12 +139,14 @@ The frontend code already reads either variable, so one is enough.
 
 Backend VM:
 
+- allow `tcp:22` from GitHub Actions runner traffic if using hosted runners
 - allow `tcp:80` from the internet
 - allow `tcp:443` from the internet
-- do not expose `8080` publicly unless you are actively debugging
+- close public `tcp:8080`
 
 AI VM:
 
+- allow `tcp:22` from GitHub Actions runner traffic if using hosted runners
 - allow `tcp:8000` only from backend VM private IP, subnet, or backend network tag
 - do not expose `8000` to the public internet
 
@@ -175,6 +179,40 @@ AI VM:
 cd develop/deploy/gcp-two-vm/ai
 docker compose up -d --build
 ```
+
+## GitHub Actions
+
+The repository includes [`gcp-two-vm-deploy.yml`](../../../../.github/workflows/gcp-two-vm-deploy.yml) for VM deployment over SSH.
+
+Behavior:
+
+- manual trigger with `workflow_dispatch`
+- automatic deploy on push to `test/all`
+- deploys `backend` and `ai` in parallel
+- installs Docker on Ubuntu VMs if it is missing
+
+Firewall note:
+
+- if this workflow uses GitHub-hosted runners, SSH `tcp:22` must allow GitHub runner source IPs
+- for a fast capstone setup, teams often open `22` more broadly and rely on SSH key auth
+- a stricter alternative is a self-hosted runner inside GCP
+
+Required GitHub secrets:
+
+- `GCP_SSH_PRIVATE_KEY`
+- `GCP_BACKEND_HOST`
+- `GCP_AI_HOST`
+- `GCP_BACKEND_ENV`
+- `GCP_AI_ENV`
+
+Recommended values:
+
+- `GCP_BACKEND_HOST=34.50.45.68`
+- `GCP_AI_HOST=34.50.21.162`
+- `GCP_BACKEND_ENV`: full contents of `backend/.env.backend`
+- `GCP_AI_ENV`: full contents of `ai/.env.ai`
+
+This repository is currently configured to auto-deploy from `test/all`.
 
 ## Minimum verification
 
