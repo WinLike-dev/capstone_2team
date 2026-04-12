@@ -82,9 +82,9 @@ jobs:
       - name: Upload archive
         shell: bash
         run: |
-          scp .deploy-package.tar.gz "ubuntu@${DEPLOY_HOST}:/tmp/healthmate-deploy.tar.gz"
+          scp .deploy-package.tar.gz "kimseoungho0219@${DEPLOY_HOST}:/tmp/healthmate-deploy.tar.gz"
 
       - name: Bootstrap and deploy
         shell: bash
         run: |
-          ssh "ubuntu@${DEPLOY_HOST}" "bash -s -- ${{ matrix.service }} /tmp/healthmate-deploy.tar.gz" < develop/deploy/gcp-two-vm/scripts/bootstrap_and_deploy.sh
+          ssh "kimseoungho0219@${DEPLOY_HOST}" "bash -s -- ${{ matrix.service }} /tmp/healthmate-deploy.tar.gz" < develop/deploy/gcp-two-vm/scripts/bootstrap_and_deploy.sh
