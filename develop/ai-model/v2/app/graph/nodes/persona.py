@@ -26,6 +26,40 @@ def _selected_persona_id(profile: dict) -> str | None:
     return None
 
 
+def _persona_guardrails(state: GraphState, draft_components: dict) -> str:
+    intent = state.get("intent", "")
+    lines = [
+        "Global constraints:",
+        "- Preserve the draft's main conclusion and factual scope.",
+        "- Keep the response concise in the persona's style; do not expand into broader general advice.",
+        "- Do not weaken or generalize specific reasoning that is already present in reason_points.",
+        "- If approval_question exists, keep that approval flow in the final response.",
+    ]
+
+    if intent == "정보":
+        lines.extend(
+            [
+                "- For info answers, the first sentence must directly answer the user's question.",
+                "- Keep the answer focused on the asked point instead of widening into a generic wellness lecture.",
+            ]
+        )
+
+    if intent in {"계획", "수정"}:
+        lines.extend(
+            [
+                "- For plan or modify answers, preserve the plan direction and change axes already present in the draft.",
+                "- If the draft refers to frequency, intensity, sets, rest, calories, ingredient changes, or meal composition, do not blur those specifics.",
+            ]
+        )
+
+    if draft_components.get("core_message"):
+        lines.append(
+            f"- The final response must stay semantically aligned with this core message: {draft_components['core_message']}"
+        )
+
+    return "\n".join(lines)
+
+
 def make_persona_node(deps: NodeDeps):
     async def persona_node(state: GraphState) -> dict:
         if state.get("response"):
@@ -61,12 +95,13 @@ def make_persona_node(deps: NodeDeps):
 
         try:
             template = persona_path.read_text(encoding="utf-8")
-            system_prompt = template.format(
+            persona_prompt = template.format(
                 persona_id=resolved_persona_id,
                 emotion=emotion_str,
                 mbti=mbti,
                 intimacy_level=intimacy_level,
             )
+            system_prompt = persona_prompt + "\n\n" + _persona_guardrails(state, draft_components)
         except Exception as exc:
             logger.error("Failed to load persona prompt: %s", exc)
             deps.trace.record_current_alert(
@@ -74,7 +109,10 @@ def make_persona_node(deps: NodeDeps):
                 message="Persona prompt load failed; using fallback prompt",
                 detail={"error": str(exc), "resolved_persona_id": resolved_persona_id},
             )
-            system_prompt = "Rewrite the structured draft naturally without changing facts."
+            system_prompt = (
+                "Rewrite the structured draft naturally without changing facts.\n\n"
+                + _persona_guardrails(state, draft_components)
+            )
 
         structured_payload = {
             "core_message": draft_components["core_message"],
