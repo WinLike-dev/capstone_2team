@@ -110,7 +110,12 @@ def make_generate_node(deps: NodeDeps):
             proposed_plan_type = None
             proposed_plan_action = None
 
-        if not proposed_plan and intent not in {INTENT_PLAN, INTENT_MODIFY}:
+        if intent not in {INTENT_PLAN, INTENT_MODIFY}:
+            proposed_plan = []
+            proposed_plan_type = None
+            proposed_plan_action = None
+
+        if not proposed_plan and intent == INTENT_APPROVAL:
             proposed_plan = state.get("proposed_plan")
             proposed_plan_type = state.get("proposed_plan_type")
             proposed_plan_action = state.get("proposed_plan_action")
