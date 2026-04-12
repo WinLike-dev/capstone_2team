@@ -264,7 +264,7 @@ def _build_draft_context(state: GraphState) -> str:
     if results:
         snippets = "\n".join(
             f"[{result.get('source', 'unknown')}] {result.get('text', '')[:200]}"
-            for result in results[:3]
+            for result in results[: _search_snippet_limit(state)]
         )
         parts.append(f"[참고 정보]\n{snippets}")
 
@@ -283,6 +283,12 @@ def _build_draft_context(state: GraphState) -> str:
         parts.append(f"[프로필 변경 요청]\n{json.dumps(changes, ensure_ascii=False)}")
 
     return "\n\n".join(parts)
+
+
+def _search_snippet_limit(state: GraphState) -> int:
+    if state.get("intent") == INTENT_INFO:
+        return 2
+    return 3
 
 
 def _build_draft_system_prompt(state: GraphState, failure_reason: str | None) -> str:

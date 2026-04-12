@@ -34,6 +34,18 @@ _MAX_RETRY_BY_INTENT = {
     INTENT_PLAN: 0,
     INTENT_MODIFY: 0,
 }
+_INFO_WEB_KEYWORDS = (
+    "최신",
+    "최근",
+    "요즘",
+    "뉴스",
+    "연구",
+    "논문",
+    "업데이트",
+    "근거",
+    "가이드라인",
+    "권고",
+)
 
 _EVAL_SYSTEM_PROMPT = load_prompt("nodes/search/eval.md")
 _QUERY_REGEN_PROMPT = load_prompt("nodes/search/query_regen.md")
@@ -54,6 +66,7 @@ def make_search_node(deps: NodeDeps):
         )
 
         query = _augment_query(query, state)
+        targets = _normalize_targets(state, query, targets)
 
         if intent in _WEB_ENABLED_INTENTS and "vdb_external" in targets and "web" not in targets:
             targets.append("web")
@@ -86,8 +99,8 @@ def make_search_node(deps: NodeDeps):
             deps.trace.record_current_event(
                 stage="search",
                 status="ok",
-                title="Search completed with lightweight modify policy",
-                detail={"results": len(merged_results), "reason": "modify_context_present"},
+                title="Search completed with lightweight policy",
+                detail={"results": len(merged_results), "reason": _skip_eval_reason(state, merged_results)},
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
             return {
@@ -167,14 +180,58 @@ def _augment_query(query: str, state: GraphState) -> str:
     return f"{query} [{', '.join(additions)}]"
 
 
+def _normalize_targets(state: GraphState, query: str, targets: list[str]) -> list[str]:
+    normalized = list(dict.fromkeys(targets))
+    intent = state.get("intent")
+
+    if intent == INTENT_MODIFY:
+        return [target for target in normalized if target != "web"]
+
+    if intent == INTENT_INFO and "web" in normalized and not _info_needs_web(query):
+        return [target for target in normalized if target != "web"]
+
+    return normalized
+
+
+def _info_needs_web(query: str) -> bool:
+    normalized = query.strip().lower()
+    return any(keyword in normalized for keyword in _INFO_WEB_KEYWORDS)
+
+
 def _should_skip_eval(state: GraphState, results: list[dict]) -> bool:
     if not results:
         return False
-    if state.get("intent") != INTENT_MODIFY:
-        return False
-    modify_context = state.get("modify_plan_context") or {}
-    items = modify_context.get("items")
-    return isinstance(items, list) and len(items) > 0
+    intent = state.get("intent")
+
+    if intent == INTENT_MODIFY:
+        modify_context = state.get("modify_plan_context") or {}
+        items = modify_context.get("items")
+        return isinstance(items, list) and len(items) > 0
+
+    if intent == INTENT_INFO:
+        return _has_sufficient_info_results(results)
+
+    return False
+
+
+def _skip_eval_reason(state: GraphState, results: list[dict]) -> str:
+    intent = state.get("intent")
+    if intent == INTENT_MODIFY:
+        return "modify_context_present"
+    if intent == INTENT_INFO and _has_sufficient_info_results(results):
+        return "info_results_sufficient"
+    return "none"
+
+
+def _has_sufficient_info_results(results: list[dict]) -> bool:
+    strong_results = [
+        result
+        for result in results
+        if float(result.get("score", 0.0) or 0.0) >= 0.55
+        and len(str(result.get("text") or "")) >= 80
+        and result.get("source") in {"external", "web", "important"}
+    ]
+    return len(strong_results) >= 2
 
 
 def _accept_score_for_intent(intent: str) -> float:
