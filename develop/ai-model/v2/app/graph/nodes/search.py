@@ -17,9 +17,23 @@ INTENT_PLAN = "계획"
 INTENT_MODIFY = "수정"
 INTENT_INFO = "정보"
 
-MAX_RETRY = 1
-TOP_K = 15
-_WEB_ENABLED_INTENTS = {INTENT_PLAN, INTENT_MODIFY, INTENT_INFO}
+TOP_K = 8
+_WEB_ENABLED_INTENTS = {INTENT_PLAN, INTENT_INFO}
+_ACCEPT_SCORE_BY_INTENT = {
+    INTENT_INFO: 0.6,
+    INTENT_PLAN: 0.55,
+    INTENT_MODIFY: 0.5,
+}
+_RETRY_SCORE_BY_INTENT = {
+    INTENT_INFO: 0.25,
+    INTENT_PLAN: 0.25,
+    INTENT_MODIFY: 0.0,
+}
+_MAX_RETRY_BY_INTENT = {
+    INTENT_INFO: 0,
+    INTENT_PLAN: 0,
+    INTENT_MODIFY: 0,
+}
 
 _EVAL_SYSTEM_PROMPT = load_prompt("nodes/search/eval.md")
 _QUERY_REGEN_PROMPT = load_prompt("nodes/search/query_regen.md")
@@ -68,15 +82,30 @@ def make_search_node(deps: NodeDeps):
         raw_results = await _parallel_search(deps, state["user_id"], query, query_vec, targets)
         merged_results = _merge_results(raw_results)
 
+        if _should_skip_eval(state, merged_results):
+            deps.trace.record_current_event(
+                stage="search",
+                status="ok",
+                title="Search completed with lightweight modify policy",
+                detail={"results": len(merged_results), "reason": "modify_context_present"},
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
+            return {
+                "search_results": merged_results,
+                "search_quality": "ok" if merged_results else "degraded",
+                "search_retry_count": retry_count,
+            }
+
         score = await _evaluate(deps, query, merged_results)
         logger.info("Search quality score=%.2f retry=%d", score, retry_count)
 
-        if score >= 0.7:
+        accept_score = _accept_score_for_intent(intent)
+        if score >= accept_score:
             deps.trace.record_current_event(
                 stage="search",
                 status="ok",
                 title="Search completed",
-                detail={"score": score, "results": len(merged_results)},
+                detail={"score": score, "accept_score": accept_score, "results": len(merged_results)},
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
             return {
@@ -85,21 +114,23 @@ def make_search_node(deps: NodeDeps):
                 "search_retry_count": retry_count,
             }
 
-        if retry_count >= MAX_RETRY:
+        max_retry = _max_retry_for_intent(intent)
+        if retry_count >= max_retry:
             deps.trace.record_current_alert(
                 severity="warning",
                 message="Search degraded after retry limit",
-                detail={"score": score, "retry_count": retry_count},
+                detail={"score": score, "retry_count": retry_count, "max_retry": max_retry},
             )
             return _degraded(state, intent)
 
-        if score < 0.4:
+        retry_score = _retry_score_for_intent(intent)
+        if score < retry_score:
             new_query = await _regenerate_query(deps, state["user_message"], merged_results)
             deps.trace.record_current_event(
                 stage="search",
                 status="warn",
                 title="Search query regenerated",
-                detail={"score": score, "new_query": new_query},
+                detail={"score": score, "retry_score": retry_score, "new_query": new_query},
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
             return {
@@ -111,7 +142,7 @@ def make_search_node(deps: NodeDeps):
             stage="search",
             status="warn",
             title="Search retry requested",
-            detail={"score": score, "retry_count": retry_count + 1},
+            detail={"score": score, "retry_count": retry_count + 1, "accept_score": accept_score},
             duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
         )
         return {"search_retry_count": retry_count + 1}
@@ -134,6 +165,28 @@ def _augment_query(query: str, state: GraphState) -> str:
     if not additions:
         return query
     return f"{query} [{', '.join(additions)}]"
+
+
+def _should_skip_eval(state: GraphState, results: list[dict]) -> bool:
+    if not results:
+        return False
+    if state.get("intent") != INTENT_MODIFY:
+        return False
+    modify_context = state.get("modify_plan_context") or {}
+    items = modify_context.get("items")
+    return isinstance(items, list) and len(items) > 0
+
+
+def _accept_score_for_intent(intent: str) -> float:
+    return _ACCEPT_SCORE_BY_INTENT.get(intent, 0.6)
+
+
+def _retry_score_for_intent(intent: str) -> float:
+    return _RETRY_SCORE_BY_INTENT.get(intent, 0.25)
+
+
+def _max_retry_for_intent(intent: str) -> int:
+    return _MAX_RETRY_BY_INTENT.get(intent, 0)
 
 
 async def _parallel_search(
