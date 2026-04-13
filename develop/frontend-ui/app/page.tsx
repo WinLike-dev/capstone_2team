@@ -280,6 +280,15 @@ export default function Home() {
   // Calculated Fallback
   const [recommendedCalories, setRecommendedCalories] = useState(2000);
 
+  const closeAllModals = () => {
+    setIsPlannerOpen(false);
+    setIsCalorieModalOpen(false);
+    setIsNutrientModalOpen(false);
+    setIsDietModalOpen(false);
+    setWorkoutPopup({ isOpen: false, target: null });
+    setDietPopup({ isOpen: false, target: null, mealType: null });
+  };
+
   const handleCalorieSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGoalErrorMsg('');
@@ -467,6 +476,7 @@ export default function Home() {
   }, [persistHomeRecommendationCache, userData?.user_id]);
 
   const openWorkoutRecommendationPopup = (slot: WorkoutSlot, workout: LegacyWorkoutCard) => {
+    closeAllModals();
     setWorkoutPopup({
       isOpen: true,
       target: {
@@ -477,6 +487,7 @@ export default function Home() {
   };
 
   const openDietRecommendationPopup = (diet: LegacyDietCard, mealType: DietSlot) => {
+    closeAllModals();
     setDietPopup({
       isOpen: true,
       target: diet,
@@ -836,7 +847,7 @@ return (
           )}
         </div>
         <button
-          onClick={() => setIsPlannerOpen(true)}
+          onClick={() => { closeAllModals(); setIsPlannerOpen(true); }}
           className="px-3 py-3 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/80 text-[#2563eb] hover:bg-blue-50 hover:-translate-y-1 hover:shadow-[0_12px_40px_rgb(37,99,235,0.12)] transition-all duration-300 flex flex-col items-center justify-center min-w-[76px]"
         >
           <Calendar className="w-6 h-6 mb-1 drop-shadow-sm" />
@@ -848,7 +859,7 @@ return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Intake Calories Card */}
         <div
-          onClick={() => setIsCalorieModalOpen(true)}
+          onClick={() => { closeAllModals(); setIsCalorieModalOpen(true); }}
           className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 flex flex-col justify-between hover:shadow-[0_12px_40px_rgb(249,115,22,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
         >
           <div className="flex items-center justify-between mb-6">
@@ -875,7 +886,7 @@ return (
 
         {/* Nutrients Card */}
         <div
-          onClick={() => setIsNutrientModalOpen(true)}
+          onClick={() => { closeAllModals(); setIsNutrientModalOpen(true); }}
           className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 flex flex-col justify-between hover:shadow-[0_12px_40px_rgb(16,185,129,0.08)] hover:-translate-y-1 transition-all duration-300 md:col-span-2 lg:col-span-2 cursor-pointer"
         >
           <div className="flex items-center justify-between mb-4">
@@ -1010,7 +1021,7 @@ return (
             </div>
           </button>
           <button
-            onClick={() => setIsDietModalOpen(true)}
+            onClick={() => { closeAllModals(); setIsDietModalOpen(true); }}
             className="group bg-white p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/80 hover:shadow-[0_12px_40px_rgb(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-between text-left"
           >
             <div>

@@ -391,7 +391,12 @@ export default function ChatPage() {
       console.error("Chat API Error:", error);
       setIsLoading(false);
       await simulateStreamingResponse(
-        "메시지를 보내는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        "메시지를 보내는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        {
+          clientMessageId: createClientMessageId(),
+          sessionId: sessionId || undefined,
+          userMessage,
+        }
       );
     }
   };
