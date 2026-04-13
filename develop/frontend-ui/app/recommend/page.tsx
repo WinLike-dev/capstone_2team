@@ -21,10 +21,16 @@ const getFoodEmoji = (name: string) => {
 
 const mapWorkoutType = (typeRaw: string) => {
   if (!typeRaw) return '상체 운동';
+  const normalized = typeRaw.toLowerCase();
+  if (normalized.includes('upper_body')) return '상체 운동';
+  if (normalized.includes('lower_body')) return '하체 운동';
+  if (normalized.includes('cardio')) return '유산소';
+  if (normalized.includes('stretching')) return '스트레칭';
+  if (normalized.includes('core') || normalized.includes('full_body')) return '전신 운동';
   if (typeRaw.includes('하체') || typeRaw.includes('스쿼트')) return '하체 운동';
   if (typeRaw.includes('유산소') || typeRaw.includes('조깅') || typeRaw.includes('고강도') || typeRaw.includes('자전거') || typeRaw.includes('걷는') || typeRaw.includes('걷기')) return '유산소';
   if (typeRaw.includes('스트레칭') || typeRaw.includes('요가') || typeRaw.includes('이완')) return '스트레칭';
-  return '상체 운동'; // 전신, 코어, 기타 모든 운동을 상체 운동으로 매핑
+  return '전신 운동';
 };
 
 export default function RecommendPage() {

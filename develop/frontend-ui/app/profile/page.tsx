@@ -23,6 +23,7 @@ export default function ProfilePage() {
     localStorage.removeItem('healthAppToken');
     localStorage.removeItem('healthAppUser');
     sessionStorage.removeItem('healthAppChatSessionId');
+    sessionStorage.removeItem('healthAppChatMessages');
     router.push('/login');
   };
 

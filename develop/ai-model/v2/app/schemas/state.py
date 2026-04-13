@@ -57,6 +57,7 @@ class GraphState(TypedDict):
 
     requires_past_memory: bool
     should_save_episode: bool
+    short_term_memory_query: bool
     has_fact_change: bool
     record_type: Optional[str]
     profile_changes: Optional[dict[str, Any]]

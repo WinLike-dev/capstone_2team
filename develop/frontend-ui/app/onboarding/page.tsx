@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { usePlan } from '../context/PlanContext';
 
 const conditionOptions = ['고혈압', '당뇨', '관절염', '천식', '심혈관 질환', '없음'];
 const allergyOptions = ['유제품', '견과류', '갑각류', '밀', '대두', '계란', '해당 없음'];
@@ -23,6 +24,7 @@ type FormState = {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { updateUserData, fetchUserProfile } = usePlan();
   const [formData, setFormData] = useState<FormState>({
     age: '',
     gender: '남성',
@@ -119,14 +121,26 @@ export default function OnboardingPage() {
       }
 
       const responseData = await response.json();
+      const profileFromServer = responseData?.profile || {};
       const finalData = {
         ...formData,
         allergies: selectedAllergies,
         bmi: responseData?.data?.bmi ?? responseData?.bmi ?? 0,
       };
+      const mergedUser = {
+        ...storedUser,
+        ...finalData,
+        ...profileFromServer,
+        conditions: profileFromServer.conditions || finalData.conditions,
+        allergies: profileFromServer.allergies || finalData.allergies,
+        activityLevel: profileFromServer.activity_level || finalData.activityLevel,
+        has_health_profile: true,
+      };
 
       alert('등록이 완료되었습니다.');
-      localStorage.setItem('healthAppUser', JSON.stringify({ ...storedUser, ...finalData }));
+      localStorage.setItem('healthAppUser', JSON.stringify(mergedUser));
+      updateUserData(mergedUser);
+      await fetchUserProfile();
       router.push('/');
     } catch (error) {
       console.error(error);

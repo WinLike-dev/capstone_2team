@@ -211,7 +211,48 @@ _CONTEXT_DEPENDENT_REFERENCES = (
     "방금 거",
     "저거",
 )
+_MEMORY_SAVE_KEYWORDS = (
+    "기억해줘",
+    "기억해 줘",
+    "기억해",
+    "잊지마",
+    "잊지 마",
+    "앞으로 내 별명은",
+    "내 별명은",
+)
 
+_MEMORY_QUERY_KEYWORDS = (
+    "기억나",
+    "기억해?",
+    "내가 뭐라고 했",
+    "방금 내가 말한",
+    "아까 내가 말한",
+    "내 별명",
+    "이전에 말한",
+    "조금 전에 말한",
+)
+
+
+_MEMORY_SAVE_KEYWORDS = (
+    "\uae30\uc5b5\ud574\uc918",
+    "\uae30\uc5b5\ud574 \uc918",
+    "\uae30\uc5b5\ud574",
+    "\uc78a\uc9c0\ub9c8",
+    "\uc78a\uc9c0 \ub9c8",
+    "\uc55e\uc73c\ub85c \ub0b4 \ubcc4\uba85\uc740",
+    "\ub0b4 \ubcc4\uba85\uc740",
+)
+
+_MEMORY_QUERY_KEYWORDS = (
+    "\uae30\uc5b5\ub098",
+    "\uae30\uc5b5\ud574?",
+    "\ub0b4\uac00 \ubb50\ub77c\uace0 \ud588",
+    "\ubc29\uae08 \ub0b4\uac00 \ub9d0\ud55c",
+    "\uc544\uae4c \ub0b4\uac00 \ub9d0\ud55c",
+    "\ub0b4 \ubcc4\uba85",
+    "\uc774\uc804\uc5d0 \ub9d0\ud55c",
+    "\uc870\uae08 \uc804\uc5d0 \ub9d0\ud55c",
+)
 
 _PLAN_CONFIRMATION_REFERENCE_KEYWORDS = (
     "아까",
@@ -290,6 +331,24 @@ def make_intent_node(deps: NodeDeps):
 
         if _CASUAL_PATTERNS.match(message.strip()) and previous_intent != INTENT_CARE:
             return _build_result(INTENT_CASUAL, state)
+
+        if _looks_like_memory_save_request(message):
+            return _build_result(
+                INTENT_CASUAL,
+                state,
+                confidence=0.9,
+                should_save_episode=True,
+            )
+
+        if _looks_like_memory_query(message):
+            return _build_result(
+                INTENT_INFO,
+                state,
+                confidence=0.92,
+                search_targets=[],
+                requires_past_memory=False,
+                short_term_memory_query=True,
+            )
 
         if _looks_like_context_dependent_fallback(message, state):
             return _build_result(INTENT_FALLBACK, state, confidence=0.9)
@@ -395,6 +454,7 @@ def make_intent_node(deps: NodeDeps):
             "previous_emotion": state.get("emotion"),
             "requires_past_memory": output.requires_past_memory,
             "should_save_episode": output.should_save_episode,
+            "short_term_memory_query": False,
             "has_fact_change": output.has_fact_change,
             "record_type": output.record_type,
             "profile_changes": profile_changes_dict,
@@ -415,6 +475,9 @@ def _build_result(
     *,
     confidence: float = 1.0,
     search_targets: list[str] | None = None,
+    requires_past_memory: bool = False,
+    should_save_episode: bool = False,
+    short_term_memory_query: bool = False,
 ) -> dict:
     return {
         "intent": intent,
@@ -422,8 +485,9 @@ def _build_result(
         "emotion": state.get("emotion") or {"label": "중립", "intensity": 0.0},
         "previous_intent": state.get("intent"),
         "previous_emotion": state.get("emotion"),
-        "requires_past_memory": False,
-        "should_save_episode": False,
+        "requires_past_memory": requires_past_memory,
+        "should_save_episode": should_save_episode,
+        "short_term_memory_query": short_term_memory_query,
         "has_fact_change": False,
         "record_type": None,
         "profile_changes": None,
@@ -771,6 +835,40 @@ def _looks_like_profile_record(message: str) -> bool:
     has_update_keyword = any(keyword in normalized for keyword in _PROFILE_UPDATE_KEYWORDS)
     has_plan_domain = any(keyword in normalized for keyword in ("운동 계획", "식단 계획", "운동 루틴", "식단 루틴"))
     return has_profile_field and has_update_keyword and not has_plan_domain
+
+
+def _looks_like_memory_save_request(message: str) -> bool:
+    normalized = message.strip().lower()
+    return any(keyword in normalized for keyword in _MEMORY_SAVE_KEYWORDS)
+
+
+def _looks_like_memory_query(message: str) -> bool:
+    normalized = message.strip().lower()
+    has_memory_keyword = any(keyword in normalized for keyword in _MEMORY_QUERY_KEYWORDS)
+    has_question_shape = (
+        "?" in normalized
+        or normalized.endswith("뭐야")
+        or normalized.endswith("뭔지")
+        or normalized.endswith("기억나")
+    )
+    return has_memory_keyword and has_question_shape
+
+
+def _looks_like_memory_save_request(message: str) -> bool:
+    normalized = message.strip().lower()
+    return any(keyword in normalized for keyword in _MEMORY_SAVE_KEYWORDS)
+
+
+def _looks_like_memory_query(message: str) -> bool:
+    normalized = message.strip().lower()
+    has_memory_keyword = any(keyword in normalized for keyword in _MEMORY_QUERY_KEYWORDS)
+    has_question_shape = (
+        "?" in normalized
+        or normalized.endswith("\ubb50\uc57c")
+        or normalized.endswith("\ubb50\uc9c0")
+        or normalized.endswith("\uae30\uc5b5\ub098")
+    )
+    return has_memory_keyword and has_question_shape
 
 
 def _looks_like_context_dependent_fallback(message: str, state: GraphState) -> bool:

@@ -57,6 +57,23 @@ _DRAFT_PROMPTS_BY_INTENT = {
 
 _SELF_EVAL_PROMPT = load_prompt("nodes/generate/self_eval.md")
 
+_SHORT_TERM_MEMORY_PROMPT = """Short-term memory mode:
+- Answer from the recent chat history first.
+- Prefer the user's earlier statements over generic health advice.
+- Do not use search evidence, profile metadata, or plan context unless the recent chat itself mentions them.
+- If the answer is not present in the recent chat history, say that you cannot confirm it from the recent conversation.
+- Keep the answer direct and specific to the recall question.
+"""
+
+_ANTI_REPETITION_PROMPT = """Anti-repetition mode:
+- Do not repeat the previous assistant response in the same or slightly different wording.
+- If the user asks a follow-up, answer only the new or directly requested point.
+- Avoid re-listing the same reasons or plan summary unless the user explicitly asks for them again.
+"""
+
+_SHORT_TERM_MEMORY_RECENT_LIMIT = 8
+_REPETITION_OVERLAP_THRESHOLD = 0.8
+
 
 def make_generate_node(deps: NodeDeps):
     async def generate_node(state: GraphState) -> dict:
@@ -95,16 +112,28 @@ def make_generate_node(deps: NodeDeps):
             )
             return _build_approval_draft_v2(state)
 
+        direct_memory_draft = _build_direct_short_term_memory_draft(state)
+        if direct_memory_draft is not None:
+            deps.trace.record_current_event(
+                stage="generate",
+                status="ok",
+                title="Direct short-term memory draft used",
+                detail={"intent": intent},
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
+            return direct_memory_draft
+
         context = _build_draft_context(state)
         system_prompt = _build_draft_system_prompt(state, failure_reason)
 
         try:
-            raw = await deps.router.generate(
+            draft_result = await _request_draft_with_guardrails(
+                deps=deps,
+                state=state,
                 system_prompt=system_prompt,
                 user_content=context,
-                response_schema=DraftResponse,
+                failure_reason=failure_reason,
             )
-            draft_result = DraftResponse.model_validate_json(raw)
             draft_components = _build_components_from_result(draft_result, state)
             draft_text = render_draft_preview(draft_components)
             proposed_plan = [
@@ -249,7 +278,53 @@ async def _generate_home_recommendations(
     }
 
 
-def _build_draft_context(state: GraphState) -> str:
+async def _request_draft_with_guardrails(
+    deps: NodeDeps,
+    state: GraphState,
+    system_prompt: str,
+    user_content: str,
+    failure_reason: str | None,
+) -> DraftResponse:
+    raw = await deps.router.generate(
+        system_prompt=system_prompt,
+        user_content=user_content,
+        response_schema=DraftResponse,
+    )
+    draft_result = DraftResponse.model_validate_json(raw)
+
+    if not _needs_generate_retry(state, draft_result):
+        return draft_result
+
+    deps.trace.record_current_event(
+        stage="generate",
+        status="warning",
+        title="Draft regeneration requested",
+        detail={
+            "short_term_memory_query": bool(state.get("short_term_memory_query")),
+            "last_assistant_present": bool(state.get("last_assistant_message")),
+        },
+    )
+
+    retry_raw = await deps.router.generate(
+        system_prompt=_build_draft_system_prompt(
+            state,
+            failure_reason,
+            reinforce_short_term=True,
+            avoid_repetition=True,
+        ),
+        user_content=_build_draft_context(
+            state,
+            force_short_term=bool(state.get("short_term_memory_query")),
+        ),
+        response_schema=DraftResponse,
+    )
+    return DraftResponse.model_validate_json(retry_raw)
+
+
+def _build_draft_context(state: GraphState, *, force_short_term: bool = False) -> str:
+    if force_short_term or state.get("short_term_memory_query"):
+        return _build_short_term_memory_context(state)
+
     parts: list[str] = []
     parts.append(f"[오늘 날짜]\n{kst_today_iso()}")
 
@@ -288,13 +363,42 @@ def _build_draft_context(state: GraphState) -> str:
     return "\n\n".join(parts)
 
 
+def _build_short_term_memory_context(state: GraphState) -> str:
+    parts = [f"[Today]\n{kst_today_iso()}"]
+
+    recent_messages = (state.get("messages") or [])[-_SHORT_TERM_MEMORY_RECENT_LIMIT:]
+    if recent_messages:
+        history = "\n".join(
+            f"{message['role']}: {str(message.get('content') or '')[:240]}"
+            for message in recent_messages
+        )
+        parts.append(f"[Recent Chat History]\n{history}")
+
+    last_assistant_message = str(state.get("last_assistant_message") or "").strip()
+    if last_assistant_message:
+        parts.append(f"[Previous Assistant Response]\n{last_assistant_message[:400]}")
+
+    parts.append(f"[Current Recall Question]\n{state['user_message']}")
+    parts.append(
+        "[Instruction]\nUse only the recent chat history above. "
+        "If the answer is missing there, say you cannot confirm it from the recent conversation."
+    )
+    return "\n\n".join(parts)
+
+
 def _search_snippet_limit(state: GraphState) -> int:
     if state.get("intent") == INTENT_INFO:
         return 2
     return 3
 
 
-def _build_draft_system_prompt(state: GraphState, failure_reason: str | None) -> str:
+def _build_draft_system_prompt(
+    state: GraphState,
+    failure_reason: str | None,
+    *,
+    reinforce_short_term: bool = False,
+    avoid_repetition: bool = False,
+) -> str:
     intent = state.get("intent", "")
     intent_prompt = _DRAFT_PROMPTS_BY_INTENT.get(intent, _DRAFT_DEFAULT_PROMPT)
 
@@ -315,6 +419,17 @@ def _build_draft_system_prompt(state: GraphState, failure_reason: str | None) ->
             f"이전 Draft는 자기 평가를 통과하지 못했다. 실패 이유: {failure_reason}"
         )
 
+    if reinforce_short_term or state.get("short_term_memory_query"):
+        sections.append(_SHORT_TERM_MEMORY_PROMPT)
+
+    if avoid_repetition or state.get("last_assistant_message"):
+        sections.append(_ANTI_REPETITION_PROMPT)
+        last_assistant_message = str(state.get("last_assistant_message") or "").strip()
+        if last_assistant_message:
+            sections.append(
+                f"Previous assistant response to avoid repeating:\n{last_assistant_message[:400]}"
+            )
+
     return "\n\n".join(section for section in sections if section)
 
 
@@ -326,6 +441,121 @@ def _build_components_from_result(draft_result: DraftResponse, state: GraphState
         components["search_grounding_summary"] = "검색 결과를 참고해 핵심 근거만 정리했다."
 
     return components
+
+
+def _build_direct_short_term_memory_draft(state: GraphState) -> dict | None:
+    if not state.get("short_term_memory_query"):
+        return None
+
+    user_message = str(state.get("user_message") or "")
+    alias = _extract_recent_alias(state)
+    if alias and "\ubcc4\uba85" not in user_message:
+        alias = None
+
+    if alias:
+        components = normalize_draft_components(
+            {
+                "core_message": f"\ubc29\uae08 \ub9d0\ud55c \ubcc4\uba85\uc740 '{alias}'\uc774\uc5d0\uc694.",
+                "reason_points": [f"\ucd5c\uadfc \ub300\ud654\uc5d0\uc11c '{alias}'\ub77c\uace0 \ub9d0\ud588\uc5b4\uc694."],
+                "suggested_action": "",
+                "search_grounding_summary": "",
+            }
+        )
+        return {
+            "draft_response": render_draft_preview(components),
+            "draft_components": components,
+            "proposed_plan": [],
+            "proposed_plan_type": None,
+            "proposed_plan_action": None,
+            "self_eval_count": 0,
+            "self_eval_failure_reason": None,
+        }
+
+    recent_user_message = _latest_previous_user_message(state)
+    if recent_user_message and _looks_like_recent_utterance_query(user_message):
+        components = normalize_draft_components(
+            {
+                "core_message": f"\ubc29\uae08 \ub9d0\ud558\uc2e0 \ub0b4\uc6a9\uc740 \"{recent_user_message[:120]}\"\uc608\uc694.",
+                "reason_points": [],
+                "suggested_action": "",
+                "search_grounding_summary": "",
+            }
+        )
+        return {
+            "draft_response": render_draft_preview(components),
+            "draft_components": components,
+            "proposed_plan": [],
+            "proposed_plan_type": None,
+            "proposed_plan_action": None,
+            "self_eval_count": 0,
+            "self_eval_failure_reason": None,
+        }
+
+    return None
+
+
+def _extract_recent_alias(state: GraphState) -> str | None:
+    alias_pattern = re.compile(
+        r"(?:\ub0b4\s*\ubcc4\uba85(?:\uc740|\uc774)?|(?:\uc55e\uc73c\ub85c\s*)?\ub0b4\s*\ubcc4\uba85(?:\uc740|\uc774)?)\s*(?::|=)?\s*([^\n,.!?]+)"
+    )
+    for message in reversed(state.get("messages", [])):
+        if message.get("role") != "user":
+            continue
+        content = str(message.get("content") or "")
+        match = alias_pattern.search(content)
+        if match:
+            return match.group(1).strip(" \"'")
+    return None
+
+
+def _latest_previous_user_message(state: GraphState) -> str:
+    for message in reversed(state.get("messages", [])):
+        if message.get("role") == "user":
+            return str(message.get("content") or "").strip()
+    return ""
+
+
+def _looks_like_recent_utterance_query(user_message: str) -> bool:
+    normalized = re.sub(r"\s+", " ", user_message.strip().lower())
+    if not normalized:
+        return False
+    markers = (
+        "\ubc29\uae08",
+        "\uc544\uae4c",
+        "\uc870\uae08 \uc804",
+        "\ub0b4\uac00 \ub9d0\ud55c",
+        "\ubb50\ub77c\uace0 \ud588",
+        "\ubb50\ub77c\uace0 \ub9d0\ud588",
+    )
+    return any(marker in normalized for marker in markers)
+
+
+def _needs_generate_retry(state: GraphState, draft_result: DraftResponse) -> bool:
+    if state.get("short_term_memory_query") and draft_result.search_grounding_summary:
+        return True
+
+    last_assistant_message = str(state.get("last_assistant_message") or "").strip()
+    if not last_assistant_message:
+        return False
+
+    current_text = render_draft_preview(_build_components_from_result(draft_result, state))
+    return _is_too_similar(current_text, last_assistant_message)
+
+
+def _is_too_similar(current_text: str, previous_text: str) -> bool:
+    current_tokens = set(_normalized_overlap_tokens(current_text))
+    previous_tokens = set(_normalized_overlap_tokens(previous_text))
+    if not current_tokens or not previous_tokens:
+        return False
+    if current_tokens == previous_tokens:
+        return True
+    overlap = len(current_tokens & previous_tokens) / max(len(current_tokens), len(previous_tokens))
+    return overlap >= _REPETITION_OVERLAP_THRESHOLD
+
+
+def _normalized_overlap_tokens(text: str) -> list[str]:
+    normalized = re.sub(r"\s+", " ", text.strip().lower())
+    return re.findall(r"[0-9a-z\uac00-\ud7a3]+", normalized)
 
 
 def _build_approval_draft(state: GraphState) -> dict:

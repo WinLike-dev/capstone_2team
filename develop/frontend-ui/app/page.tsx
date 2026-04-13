@@ -825,6 +825,44 @@ export default function Home() {
     void fetchHomeRecommendations('all');
   }, [fetchHomeRecommendations, isClient, isUserLoading, userData?.user_id]);
 
+  const todayRecommendationPlan = getPlanByDate(formatKstDate());
+
+  const isWorkoutRecommendationAdded = (
+    slot: WorkoutSlot,
+    workout: LegacyWorkoutCard | null
+  ) => {
+    if (!workout) return false;
+    if (recommendationAdded.workout[slot]) return true;
+
+    return Boolean(
+      todayRecommendationPlan?.exercises.some((exercise) => {
+        const savedTitle = exercise.title.trim().toLowerCase();
+        const recommendationTitle = workout.name.trim().toLowerCase();
+        return savedTitle === recommendationTitle;
+      })
+    );
+  };
+
+  const isDietRecommendationAdded = (
+    mealType: DietSlot,
+    diet: LegacyDietCard | null
+  ) => {
+    if (!diet) return false;
+    if (recommendationAdded.diet[mealType]) return true;
+
+    const mealLabel = getMealSlotLabel(mealType);
+    return Boolean(
+      todayRecommendationPlan?.diets.some((savedDiet) => {
+        const savedName = savedDiet.name.trim().toLowerCase();
+        const recommendationName = diet.name.trim().toLowerCase();
+        return (
+          savedDiet.type === mealLabel &&
+          savedName === recommendationName
+        );
+      })
+    );
+  };
+
 return (
   <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans p-6 pb-32 md:p-8 lg:p-12 md:pb-36 lg:pb-40">
     <div className="max-w-4xl mx-auto space-y-8">
@@ -1058,7 +1096,7 @@ return (
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-600 rounded-full text-xs font-bold shadow-sm">근력 (상체)</span>
                 {aiRecommendations.workout?.strength?.upper && (
-                  <button onClick={() => openWorkoutRecommendationPopup('upper_body', aiRecommendations.workout.strength.upper!)} disabled={recommendationAdded.workout.upper_body} className="p-1.5 bg-blue-500 shadow-md text-white hover:bg-blue-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button onClick={() => openWorkoutRecommendationPopup('upper_body', aiRecommendations.workout.strength.upper!)} disabled={isWorkoutRecommendationAdded('upper_body', aiRecommendations.workout.strength.upper)} className="p-1.5 bg-blue-500 shadow-md text-white hover:bg-blue-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1071,7 +1109,7 @@ return (
                   <h4 className="font-bold text-gray-900 text-[15px] mb-1.5">{aiRecommendations.workout.strength.upper.name}</h4>
                   <p className="text-xs text-gray-500 leading-relaxed">{aiRecommendations.workout.strength.upper.desc}</p>
                   <p className="mt-2 text-[11px] font-bold text-blue-500">{aiRecommendations.workout.strength.upper.duration}</p>
-                  {recommendationAdded.workout.upper_body && <p className="mt-1 text-[11px] font-bold text-emerald-500">추가됨</p>}
+                  {isWorkoutRecommendationAdded('upper_body', aiRecommendations.workout.strength.upper) && <p className="mt-1 text-[11px] font-bold text-emerald-500">추가됨</p>}
                 </div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-xs text-gray-400">추천 항목 없음</div>
@@ -1083,7 +1121,7 @@ return (
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full text-xs font-bold shadow-sm">근력 (하체)</span>
                 {aiRecommendations.workout?.strength?.lower && (
-                  <button onClick={() => openWorkoutRecommendationPopup('lower_body', aiRecommendations.workout.strength.lower!)} disabled={recommendationAdded.workout.lower_body} className="p-1.5 bg-indigo-500 shadow-md text-white hover:bg-indigo-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button onClick={() => openWorkoutRecommendationPopup('lower_body', aiRecommendations.workout.strength.lower!)} disabled={isWorkoutRecommendationAdded('lower_body', aiRecommendations.workout.strength.lower)} className="p-1.5 bg-indigo-500 shadow-md text-white hover:bg-indigo-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1096,7 +1134,7 @@ return (
                   <h4 className="font-bold text-gray-900 text-[15px] mb-1.5">{aiRecommendations.workout.strength.lower.name}</h4>
                   <p className="text-xs text-gray-500 leading-relaxed">{aiRecommendations.workout.strength.lower.desc}</p>
                   <p className="mt-2 text-[11px] font-bold text-indigo-500">{aiRecommendations.workout.strength.lower.duration}</p>
-                  {recommendationAdded.workout.lower_body && <p className="mt-1 text-[11px] font-bold text-emerald-500">추가됨</p>}
+                  {isWorkoutRecommendationAdded('lower_body', aiRecommendations.workout.strength.lower) && <p className="mt-1 text-[11px] font-bold text-emerald-500">추가됨</p>}
                 </div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-xs text-gray-400">추천 항목 없음</div>
@@ -1108,7 +1146,7 @@ return (
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-full text-xs font-bold shadow-sm">유산소</span>
                 {aiRecommendations.workout?.cardio && (
-                  <button onClick={() => openWorkoutRecommendationPopup('cardio', aiRecommendations.workout.cardio!)} disabled={recommendationAdded.workout.cardio} className="p-1.5 bg-rose-500 shadow-md text-white hover:bg-rose-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button onClick={() => openWorkoutRecommendationPopup('cardio', aiRecommendations.workout.cardio!)} disabled={isWorkoutRecommendationAdded('cardio', aiRecommendations.workout.cardio)} className="p-1.5 bg-rose-500 shadow-md text-white hover:bg-rose-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1121,7 +1159,7 @@ return (
                   <h4 className="font-bold text-gray-900 text-[15px] mb-1.5">{aiRecommendations.workout.cardio.name}</h4>
                   <p className="text-xs text-gray-500 leading-relaxed">{aiRecommendations.workout.cardio.desc}</p>
                   <p className="mt-2 text-[11px] font-bold text-rose-500">{aiRecommendations.workout.cardio.duration}</p>
-                  {recommendationAdded.workout.cardio && <p className="mt-1 text-[11px] font-bold text-emerald-500">추가됨</p>}
+                  {isWorkoutRecommendationAdded('cardio', aiRecommendations.workout.cardio) && <p className="mt-1 text-[11px] font-bold text-emerald-500">추가됨</p>}
                 </div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-xs text-gray-400">추천 항목 없음</div>
@@ -1133,7 +1171,7 @@ return (
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-500 rounded-full text-xs font-bold shadow-sm">스트레칭</span>
                 {aiRecommendations.workout?.stretching && (
-                  <button onClick={() => openWorkoutRecommendationPopup('stretching', aiRecommendations.workout.stretching!)} disabled={recommendationAdded.workout.stretching} className="p-1.5 bg-emerald-500 shadow-md text-white hover:bg-emerald-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button onClick={() => openWorkoutRecommendationPopup('stretching', aiRecommendations.workout.stretching!)} disabled={isWorkoutRecommendationAdded('stretching', aiRecommendations.workout.stretching)} className="p-1.5 bg-emerald-500 shadow-md text-white hover:bg-emerald-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1146,7 +1184,7 @@ return (
                   <h4 className="font-bold text-gray-900 text-[15px] mb-1.5">{aiRecommendations.workout.stretching.name}</h4>
                   <p className="text-xs text-gray-500 leading-relaxed">{aiRecommendations.workout.stretching.desc}</p>
                   <p className="mt-2 text-[11px] font-bold text-emerald-500">{aiRecommendations.workout.stretching.duration}</p>
-                  {recommendationAdded.workout.stretching && <p className="mt-1 text-[11px] font-bold text-emerald-500">추가됨</p>}
+                  {isWorkoutRecommendationAdded('stretching', aiRecommendations.workout.stretching) && <p className="mt-1 text-[11px] font-bold text-emerald-500">추가됨</p>}
                 </div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-xs text-gray-400">추천 항목 없음</div>
@@ -1179,7 +1217,7 @@ return (
                   <div className="flex justify-between items-center mb-3">
                     <span className="px-2.5 py-1 bg-orange-50 border border-orange-100 text-orange-600 rounded-full text-xs font-bold shadow-sm">{mealLabel}</span>
                     {dietData && (
-                      <button onClick={() => openDietRecommendationPopup(dietData, mealType)} disabled={recommendationAdded.diet[mealType]} className="p-1.5 bg-orange-500 shadow-md text-white hover:bg-orange-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                      <button onClick={() => openDietRecommendationPopup(dietData, mealType)} disabled={isDietRecommendationAdded(mealType, dietData)} className="p-1.5 bg-orange-500 shadow-md text-white hover:bg-orange-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                         <Plus className="w-4 h-4" />
                       </button>
                     )}
@@ -1192,7 +1230,7 @@ return (
                       <h4 className="font-bold text-gray-900 text-sm mb-1">{dietData.name}</h4>
                       <p className="text-xs text-gray-500 mb-2 flex-1">{dietData.desc}</p>
                       <div className="text-xs font-bold text-orange-500">{dietData.calories} kcal</div>
-                      {recommendationAdded.diet[mealType] && <p className="mt-2 text-[11px] font-bold text-emerald-500">추가됨</p>}
+                      {isDietRecommendationAdded(mealType, dietData) && <p className="mt-2 text-[11px] font-bold text-emerald-500">추가됨</p>}
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center min-h-[120px] text-xs text-gray-400">추천 식단 없음</div>

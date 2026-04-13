@@ -40,6 +40,7 @@ type Message = {
 };
 
 const CHAT_SESSION_STORAGE_KEY = "healthAppChatSessionId";
+const CHAT_MESSAGES_STORAGE_KEY = "healthAppChatMessages";
 const FEEDBACK_REASON_OPTIONS: { code: FeedbackReasonCode; label: string }[] = [
   { code: "not_helpful", label: "도움이 안 됐어요" },
   { code: "not_personalized", label: "내 상황에 안 맞아요" },
@@ -72,6 +73,14 @@ function createClientMessageId() {
 
 export default function ChatPage() {
   const router = useRouter();
+  const initialMessages: Message[] = [
+    {
+      id: "welcome",
+      role: "assistant",
+      content: "?덈뀞?섏꽭?? 嫄닿컯, ?앸떒, ?대룞 怨꾪쉷??????명븯寃?臾쇱뼱蹂댁꽭??",
+    },
+  ];
+  void initialMessages;
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -95,10 +104,50 @@ export default function ChatPage() {
     const storedSessionId = window.sessionStorage.getItem(
       CHAT_SESSION_STORAGE_KEY
     );
+    const storedMessages = window.sessionStorage.getItem(
+      CHAT_MESSAGES_STORAGE_KEY
+    );
     if (storedSessionId) {
       setSessionId(storedSessionId);
     }
+    if (storedMessages) {
+      try {
+        const parsed = JSON.parse(storedMessages) as Message[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(
+            parsed.map((message) => ({
+              ...message,
+              isStreaming: false,
+            }))
+          );
+        }
+      } catch (error) {
+        console.error("Failed to restore chat messages:", error);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    const persistedMessages =
+      messages.length > 0
+        ? messages.map((message) => ({
+            ...message,
+            isStreaming: false,
+          }))
+        : [
+            {
+              id: "welcome",
+              role: "assistant",
+              content:
+                "?덈뀞?섏꽭?? 嫄닿컯, ?앸떒, ?대룞 怨꾪쉷??????명븯寃?臾쇱뼱蹂댁꽭??",
+            },
+          ];
+
+    window.sessionStorage.setItem(
+      CHAT_MESSAGES_STORAGE_KEY,
+      JSON.stringify(persistedMessages)
+    );
+  }, [messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
