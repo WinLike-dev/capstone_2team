@@ -30,6 +30,7 @@ def build_home_recommendation_prompt_input(
     scope: HomeRecommendationScope,
     user_profile: dict,
     today_plan: list[dict],
+    recent_recommendations: dict | None = None,
 ) -> str:
     today_exercise_names: list[str] = []
     today_meal_names: list[str] = []
@@ -66,6 +67,10 @@ def build_home_recommendation_prompt_input(
         "height": user_profile.get("height"),
     }
 
+    recent = recent_recommendations or {}
+    recent_workout = recent.get("workout") or {}
+    recent_diet = recent.get("diet") or {}
+
     return "\n\n".join(
         [
             f"[DATE]\n{date}",
@@ -75,6 +80,8 @@ def build_home_recommendation_prompt_input(
             f"[TODAY_DIET_EXCLUDE]\n{json.dumps(today_meal_names, ensure_ascii=False)}",
             f"[TODAY_EXERCISE_BY_SLOT]\n{json.dumps(workout_by_slot, ensure_ascii=False)}",
             f"[TODAY_DIET_BY_SLOT]\n{json.dumps(diet_by_slot, ensure_ascii=False)}",
+            f"[RECENT_WORKOUT_RECOMMENDATIONS]\n{json.dumps(recent_workout, ensure_ascii=False)}",
+            f"[RECENT_DIET_RECOMMENDATIONS]\n{json.dumps(recent_diet, ensure_ascii=False)}",
         ]
     )
 

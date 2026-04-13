@@ -81,6 +81,7 @@ class GraphState(TypedDict):
     proposed_plan_action: Optional[str]
     home_recommendation_scope: Optional[HomeRecommendationScope]
     home_recommendations: Optional[dict[str, Any]]
+    home_recommendation_recent: Optional[dict[str, Any]]
     intimacy_level: int
     resolved_persona_id: Optional[str]
     profile_sync_version: int

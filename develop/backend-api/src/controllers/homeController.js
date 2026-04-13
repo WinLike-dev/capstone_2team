@@ -34,6 +34,7 @@ exports.getRecommendations = async (req, res) => {
       {
         user_id: userId,
         type: scope,
+        recent_recommendations: req.body.recent_recommendations || null,
       },
       {
         timeout: AI_TIMEOUT,

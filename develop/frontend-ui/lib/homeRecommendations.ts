@@ -28,9 +28,15 @@ export type RecommendationAddedState = {
   diet: Record<DietSlot, boolean>;
 };
 
+export type RecommendationHistoryState = {
+  workout: Record<WorkoutSlot, string[]>;
+  diet: Record<DietSlot, string[]>;
+};
+
 export type HomeRecommendationCache = {
   recommendations: HomeRecommendations;
   added: RecommendationAddedState;
+  history: RecommendationHistoryState;
 };
 
 export const WORKOUT_SLOTS: WorkoutSlot[] = [
@@ -54,6 +60,22 @@ export function createEmptyAddedState(): RecommendationAddedState {
       breakfast: false,
       lunch: false,
       dinner: false,
+    },
+  };
+}
+
+export function createEmptyRecommendationHistory(): RecommendationHistoryState {
+  return {
+    workout: {
+      upper_body: [],
+      lower_body: [],
+      cardio: [],
+      stretching: [],
+    },
+    diet: {
+      breakfast: [],
+      lunch: [],
+      dinner: [],
     },
   };
 }
@@ -125,4 +147,81 @@ export function resetAddedStateForScope(
   }
 
   return createEmptyAddedState();
+}
+
+function normalizeRecommendationName(name: string | undefined | null) {
+  return String(name || "")
+    .trim()
+    .toLowerCase();
+}
+
+export function appendRecommendationHistory(
+  current: RecommendationHistoryState,
+  incoming: HomeRecommendations,
+  scope: RecommendationScope,
+  maxPerSlot = 3
+): RecommendationHistoryState {
+  const next: RecommendationHistoryState = {
+    workout: {
+      upper_body: [...current.workout.upper_body],
+      lower_body: [...current.workout.lower_body],
+      cardio: [...current.workout.cardio],
+      stretching: [...current.workout.stretching],
+    },
+    diet: {
+      breakfast: [...current.diet.breakfast],
+      lunch: [...current.diet.lunch],
+      dinner: [...current.diet.dinner],
+    },
+  };
+
+  if (scope === "all" || scope === "workout") {
+    for (const slot of WORKOUT_SLOTS) {
+      const item = incoming.workout[slot];
+      const normalizedName = normalizeRecommendationName(item?.exercise_name);
+      if (!normalizedName) continue;
+      const history = next.workout[slot].filter((entry) => entry !== normalizedName);
+      history.push(normalizedName);
+      next.workout[slot] = history.slice(-maxPerSlot);
+    }
+  }
+
+  if (scope === "all" || scope === "diet") {
+    for (const slot of DIET_SLOTS) {
+      const item = incoming.diet[slot];
+      const normalizedName = normalizeRecommendationName(item?.food_name);
+      if (!normalizedName) continue;
+      const history = next.diet[slot].filter((entry) => entry !== normalizedName);
+      history.push(normalizedName);
+      next.diet[slot] = history.slice(-maxPerSlot);
+    }
+  }
+
+  return next;
+}
+
+export function hasRecommendationHistoryCollision(
+  history: RecommendationHistoryState,
+  incoming: HomeRecommendations,
+  scope: RecommendationScope
+) {
+  if (scope === "all" || scope === "workout") {
+    for (const slot of WORKOUT_SLOTS) {
+      const normalizedName = normalizeRecommendationName(incoming.workout[slot]?.exercise_name);
+      if (normalizedName && history.workout[slot].includes(normalizedName)) {
+        return true;
+      }
+    }
+  }
+
+  if (scope === "all" || scope === "diet") {
+    for (const slot of DIET_SLOTS) {
+      const normalizedName = normalizeRecommendationName(incoming.diet[slot]?.food_name);
+      if (normalizedName && history.diet[slot].includes(normalizedName)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, CheckSquare, Plus, Trash2, X, Droplets, Utensils, Activity, RefreshCw, Heart, Info, Dumbbell, PersonStanding } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,18 +8,22 @@ import { usePlan } from './context/PlanContext';
 import { formatKstDate, formatKstDisplayDate } from '@/lib/date';
 import {
   createEmptyAddedState,
+  createEmptyRecommendationHistory,
   createEmptyRecommendations,
   DIET_SLOTS,
   getHomeRecommendationCacheKey,
+  hasRecommendationHistoryCollision,
   mergeRecommendations,
   resetAddedStateForScope,
   type DietRecommendation,
   type DietSlot,
   type HomeRecommendations,
   type RecommendationAddedState,
+  type RecommendationHistoryState,
   type RecommendationScope,
   type WorkoutRecommendation,
   type WorkoutSlot,
+  appendRecommendationHistory,
 } from '@/lib/homeRecommendations';
 
 export type TodoItem = {
@@ -379,6 +383,9 @@ export default function Home() {
   const [recommendationAdded, setRecommendationAdded] = useState<RecommendationAddedState>(
     () => createEmptyAddedState()
   );
+  const [recommendationHistory, setRecommendationHistory] = useState<RecommendationHistoryState>(
+    () => createEmptyRecommendationHistory()
+  );
   const [isRecommendationLoading, setIsRecommendationLoading] = useState(false);
   const [recommendationRefresh, setRecommendationRefresh] = useState({
     workout: false,
@@ -388,6 +395,9 @@ export default function Home() {
   const [workoutPopup, setWorkoutPopup] = useState<WorkoutPopupState>({ isOpen: false, target: null });
   const [dietPopup, setDietPopup] = useState<DietPopupState>({ isOpen: false, target: null, mealType: null });
   const [alertPopup, setAlertPopup] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
+  const homeRecommendationsRawRef = useRef(homeRecommendationsRaw);
+  const recommendationAddedRef = useRef(recommendationAdded);
+  const recommendationHistoryRef = useRef(recommendationHistory);
 
   const persistNutritionSnapshot = (
     nextTargets = targets,
@@ -411,7 +421,8 @@ export default function Home() {
 
   const persistHomeRecommendationCache = useCallback((
     recommendations: HomeRecommendations,
-    added: RecommendationAddedState
+    added: RecommendationAddedState,
+    history: RecommendationHistoryState
   ) => {
     if (typeof window === 'undefined' || !userData?.user_id) return;
 
@@ -420,9 +431,22 @@ export default function Home() {
       JSON.stringify({
         recommendations,
         added,
+        history,
       })
     );
   }, [userData?.user_id]);
+
+  useEffect(() => {
+    homeRecommendationsRawRef.current = homeRecommendationsRaw;
+  }, [homeRecommendationsRaw]);
+
+  useEffect(() => {
+    recommendationAddedRef.current = recommendationAdded;
+  }, [recommendationAdded]);
+
+  useEffect(() => {
+    recommendationHistoryRef.current = recommendationHistory;
+  }, [recommendationHistory]);
 
   const fetchHomeRecommendations = useCallback(async (scope: RecommendationScope) => {
     if (!userData?.user_id) return;
@@ -434,37 +458,53 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(buildApiUrl('/api/v1/home/recommendations'), {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ type: scope }),
-      });
+      const currentHistory = recommendationHistoryRef.current;
+      let incoming: HomeRecommendations | null = null;
 
-      if (!response.ok) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const response = await fetch(buildApiUrl('/api/v1/home/recommendations'), {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            type: scope,
+            recent_recommendations: currentHistory,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load home recommendations.');
+        }
+
+        const candidate = await response.json() as HomeRecommendations;
+        incoming = candidate;
+
+        if (!hasRecommendationHistoryCollision(currentHistory, candidate, scope)) {
+          break;
+        }
+      }
+
+      if (!incoming) {
         throw new Error('Failed to load home recommendations.');
       }
 
-      const incoming = await response.json() as HomeRecommendations;
-      let nextRaw = incoming;
-      let nextAdded = createEmptyAddedState();
+      const currentRecommendations =
+        scope === 'all'
+          ? createEmptyRecommendations(incoming.date)
+          : homeRecommendationsRawRef.current;
+      const nextRaw = mergeRecommendations(currentRecommendations, incoming, scope);
+      const nextAdded = resetAddedStateForScope(recommendationAddedRef.current, scope);
+      const nextHistory = appendRecommendationHistory(
+        recommendationHistoryRef.current,
+        incoming,
+        scope
+      );
 
-      setHomeRecommendationsRaw((prev) => {
-        nextRaw = mergeRecommendations(
-          scope === 'all' ? createEmptyRecommendations(incoming.date) : prev,
-          incoming,
-          scope
-        );
-        return nextRaw;
-      });
-
+      setHomeRecommendationsRaw(nextRaw);
       setAiRecommendations(mapRecommendationsToLegacyCards(nextRaw));
+      setRecommendationAdded(nextAdded);
+      setRecommendationHistory(nextHistory);
 
-      setRecommendationAdded((prev) => {
-        nextAdded = resetAddedStateForScope(prev, scope);
-        return nextAdded;
-      });
-
-      persistHomeRecommendationCache(nextRaw, nextAdded);
+      persistHomeRecommendationCache(nextRaw, nextAdded, nextHistory);
     } catch (error) {
       console.error('Failed to fetch home recommendations', error);
       setAlertPopup({
@@ -545,7 +585,11 @@ export default function Home() {
         };
         return nextAdded;
       });
-      persistHomeRecommendationCache(homeRecommendationsRaw, nextAdded);
+      persistHomeRecommendationCache(
+        homeRecommendationsRawRef.current,
+        nextAdded,
+        recommendationHistoryRef.current
+      );
     }
 
     setWorkoutPopup({ isOpen: false, target: null });
@@ -587,7 +631,11 @@ export default function Home() {
         };
         return nextAdded;
       });
-      persistHomeRecommendationCache(homeRecommendationsRaw, nextAdded);
+      persistHomeRecommendationCache(
+        homeRecommendationsRawRef.current,
+        nextAdded,
+        recommendationHistoryRef.current
+      );
     }
 
     setDietPopup({ isOpen: false, target: null, mealType: null });
@@ -809,14 +857,17 @@ export default function Home() {
         const parsed = JSON.parse(cached) as {
           recommendations?: HomeRecommendations;
           added?: RecommendationAddedState;
+          history?: RecommendationHistoryState;
         };
 
         if (parsed.recommendations?.date === todayStr) {
           const nextRecommendations = parsed.recommendations;
           const nextAdded = parsed.added || createEmptyAddedState();
+          const nextHistory = parsed.history || createEmptyRecommendationHistory();
           setHomeRecommendationsRaw(nextRecommendations);
           setAiRecommendations(mapRecommendationsToLegacyCards(nextRecommendations));
           setRecommendationAdded(nextAdded);
+          setRecommendationHistory(nextHistory);
           return;
         }
       } catch (error) {
@@ -828,6 +879,7 @@ export default function Home() {
     setHomeRecommendationsRaw(emptyRecommendations);
     setAiRecommendations(mapRecommendationsToLegacyCards(emptyRecommendations));
     setRecommendationAdded(createEmptyAddedState());
+    setRecommendationHistory(createEmptyRecommendationHistory());
     void fetchHomeRecommendations('all');
   }, [fetchHomeRecommendations, isClient, isUserLoading, userData?.user_id]);
 

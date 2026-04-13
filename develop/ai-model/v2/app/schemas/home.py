@@ -9,9 +9,15 @@ from pydantic import BaseModel, Field
 HomeRecommendationScope = Literal["all", "workout", "diet"]
 
 
+class HomeRecommendationRecentHistory(BaseModel):
+    workout: dict[str, list[str]] = Field(default_factory=dict)
+    diet: dict[str, list[str]] = Field(default_factory=dict)
+
+
 class HomeRecommendationRequest(BaseModel):
     user_id: str
     type: HomeRecommendationScope = "all"
+    recent_recommendations: HomeRecommendationRecentHistory | None = None
 
 
 class WorkoutRecommendationItem(BaseModel):

@@ -234,6 +234,7 @@ async def _generate_home_recommendations(
                 scope=scope,
                 user_profile=state.get("user_profile") or {},
                 today_plan=state.get("today_plan") or [],
+                recent_recommendations=state.get("home_recommendation_recent") or {},
             ),
             response_schema=HomeRecommendationResponse,
         )
