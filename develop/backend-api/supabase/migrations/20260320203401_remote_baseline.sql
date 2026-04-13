@@ -1,0 +1,3 @@
+-- Baseline placeholder for an existing remote migration history entry.
+-- The remote project already has version 20260320203401 recorded.
+-- This file keeps local Supabase CLI state aligned with that remote history.

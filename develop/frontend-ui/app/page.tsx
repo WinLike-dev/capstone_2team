@@ -490,10 +490,11 @@ export default function Home() {
       return;
     }
 
+    const target = workoutPopup.target;
     const todayStr = formatKstDate();
     const todayPlan = getPlanByDate(todayStr);
     const isDuplicate = todayPlan?.exercises.some(
-      (ex) => ex.title === workoutPopup.target.name
+      (ex) => ex.title === target.name
     );
 
     if (isDuplicate) {
@@ -502,17 +503,17 @@ export default function Home() {
       return;
     }
 
-    const slot = (workoutPopup.target.slot || 'upper_body') as WorkoutSlot;
+    const slot = (target.slot || 'upper_body') as WorkoutSlot;
     const didAdd = await addWorkout(todayStr, {
-      title: workoutPopup.target.name,
-      time: workoutPopup.target.duration || '추천',
+      title: target.name,
+      time: target.duration || '추천',
       level: getWorkoutSlotLabel(slot),
-      calories: `${workoutPopup.target.calories || 0} kcal`,
+      calories: `${target.calories || 0} kcal`,
       color: getWorkoutSlotColor(slot),
       type: slot,
-      targetSets: slot === 'cardio' ? null : workoutPopup.target.sets ?? 3,
+      targetSets: slot === 'cardio' ? null : target.sets ?? 3,
       durationMinutes: slot === 'cardio'
-        ? workoutPopup.target.duration_minutes ?? 20
+        ? target.duration_minutes ?? 20
         : null,
     });
 
@@ -1046,7 +1047,7 @@ return (
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-600 rounded-full text-xs font-bold shadow-sm">근력 (상체)</span>
                 {aiRecommendations.workout?.strength?.upper && (
-                  <button onClick={() => openWorkoutRecommendationPopup('upper_body', aiRecommendations.workout.strength.upper)} disabled={recommendationAdded.workout.upper_body} className="p-1.5 bg-blue-500 shadow-md text-white hover:bg-blue-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button onClick={() => openWorkoutRecommendationPopup('upper_body', aiRecommendations.workout.strength.upper!)} disabled={recommendationAdded.workout.upper_body} className="p-1.5 bg-blue-500 shadow-md text-white hover:bg-blue-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1071,7 +1072,7 @@ return (
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full text-xs font-bold shadow-sm">근력 (하체)</span>
                 {aiRecommendations.workout?.strength?.lower && (
-                  <button onClick={() => openWorkoutRecommendationPopup('lower_body', aiRecommendations.workout.strength.lower)} disabled={recommendationAdded.workout.lower_body} className="p-1.5 bg-indigo-500 shadow-md text-white hover:bg-indigo-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button onClick={() => openWorkoutRecommendationPopup('lower_body', aiRecommendations.workout.strength.lower!)} disabled={recommendationAdded.workout.lower_body} className="p-1.5 bg-indigo-500 shadow-md text-white hover:bg-indigo-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1096,7 +1097,7 @@ return (
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-full text-xs font-bold shadow-sm">유산소</span>
                 {aiRecommendations.workout?.cardio && (
-                  <button onClick={() => openWorkoutRecommendationPopup('cardio', aiRecommendations.workout.cardio)} disabled={recommendationAdded.workout.cardio} className="p-1.5 bg-rose-500 shadow-md text-white hover:bg-rose-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button onClick={() => openWorkoutRecommendationPopup('cardio', aiRecommendations.workout.cardio!)} disabled={recommendationAdded.workout.cardio} className="p-1.5 bg-rose-500 shadow-md text-white hover:bg-rose-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1121,7 +1122,7 @@ return (
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-500 rounded-full text-xs font-bold shadow-sm">스트레칭</span>
                 {aiRecommendations.workout?.stretching && (
-                  <button onClick={() => openWorkoutRecommendationPopup('stretching', aiRecommendations.workout.stretching)} disabled={recommendationAdded.workout.stretching} className="p-1.5 bg-emerald-500 shadow-md text-white hover:bg-emerald-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button onClick={() => openWorkoutRecommendationPopup('stretching', aiRecommendations.workout.stretching!)} disabled={recommendationAdded.workout.stretching} className="p-1.5 bg-emerald-500 shadow-md text-white hover:bg-emerald-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}

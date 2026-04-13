@@ -7,5 +7,6 @@ const authMiddleware = require('../middleware/auth');
 router.use(authMiddleware);
 // AI 채팅 메시지 전송 (DataFormat_3_ai)
 router.post('/', chatController.sendMessage);
+router.post('/feedback', chatController.submitFeedback);
 
 module.exports = router;

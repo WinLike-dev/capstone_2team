@@ -22,6 +22,7 @@ export default function ProfilePage() {
   const handleLogout = () => {
     localStorage.removeItem('healthAppToken');
     localStorage.removeItem('healthAppUser');
+    sessionStorage.removeItem('healthAppChatSessionId');
     router.push('/login');
   };
 
@@ -43,6 +44,8 @@ export default function ProfilePage() {
   const saveProfileToAPI = async (data: EditProfileForm) => {
     setIsSaving(true);
     const finalData = { ...data };
+    let shouldApplyLocalUpdate = false;
+
     try {
       const payload = {
         user_id: data.user_id || data.email || 'unknown',
@@ -74,22 +77,26 @@ export default function ProfilePage() {
       });
       
       if (!res.ok) {
-        console.warn('Failed to save to server, but continuing local update.');
-      } else {
-        const responseData = await res.json();
-        // 백엔드 응답 형태에 맞게 분기 (data 속성 내부 또는 최상단)
-        if (responseData?.data?.bmi) {
-          finalData.bmi = responseData.data.bmi;
-        } else if (responseData?.bmi) {
-          finalData.bmi = responseData.bmi;
-        }
+        throw new Error('Failed to save profile.');
       }
+
+      const responseData = await res.json();
+      // 백엔드 응답 형태에 맞게 분기 (data 속성 내부 또는 최상단)
+      if (responseData?.data?.bmi) {
+        finalData.bmi = responseData.data.bmi;
+      } else if (responseData?.bmi) {
+        finalData.bmi = responseData.bmi;
+      }
+
+      shouldApplyLocalUpdate = true;
     } catch (error) {
       console.error('API Error:', error);
     } finally {
-      updateUserData(finalData);
-      setIsEditModalOpen(false);
-      setIsGoalModalOpen(false);
+      if (shouldApplyLocalUpdate) {
+        updateUserData(finalData);
+        setIsEditModalOpen(false);
+        setIsGoalModalOpen(false);
+      }
       setIsSaving(false);
     }
   };

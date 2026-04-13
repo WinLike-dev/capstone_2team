@@ -1,10 +1,21 @@
-const axios = require('axios');
+const axiosModule = require('axios');
+const supabase = require('../config/db');
 const logger = require('../utils/logger');
 const { buildDailySessionId } = require('../utils/kst');
+const axios = axiosModule.default || axiosModule;
 
 const FASTAPI_URL = (process.env.FASTAPI_URL || 'http://localhost:8000').replace(/\/$/, '');
 const AI_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT || '90000', 10);
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || '';
+const FEEDBACK_RATINGS = new Set(['up', 'down']);
+const FEEDBACK_REASON_CODES = new Set([
+  'not_helpful',
+  'not_personalized',
+  'incorrect',
+  'too_vague',
+  'tone_issue',
+  'unsafe',
+]);
 
 function buildFastApiHeaders() {
   const headers = {
@@ -16,6 +27,11 @@ function buildFastApiHeaders() {
   }
 
   return headers;
+}
+
+function normalizeText(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim();
 }
 
 // @route   POST /api/v1/chat
@@ -45,6 +61,7 @@ exports.sendMessage = async (req, res) => {
 
     const response = await axios.post(`${FASTAPI_URL}/chat`, payload, {
       timeout: AI_TIMEOUT,
+      proxy: false,
       headers: buildFastApiHeaders(),
     });
 
@@ -69,5 +86,83 @@ exports.sendMessage = async (req, res) => {
     return res.status(500).json({
       error: 'Failed to process chat request.',
     });
+  }
+};
+
+// @route   POST /api/v1/chat/feedback
+// @desc    Save explicit user feedback for a chat answer
+// @access  Private
+exports.submitFeedback = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const clientMessageId = normalizeText(req.body.client_message_id);
+    const sessionId = normalizeText(req.body.session_id) || buildDailySessionId(userId);
+    const userMessage = normalizeText(req.body.user_message);
+    const assistantMessage = normalizeText(req.body.assistant_message);
+    const rating = normalizeText(req.body.rating);
+    const comment = normalizeText(req.body.comment) || null;
+    const intent = normalizeText(req.body.intent) || null;
+    const reasonCodes = Array.isArray(req.body.reason_codes)
+      ? req.body.reason_codes
+        .map((item) => normalizeText(item))
+        .filter(Boolean)
+      : [];
+
+    if (!clientMessageId) {
+      return res.status(400).json({ error: 'client_message_id is required.' });
+    }
+
+    if (!userMessage) {
+      return res.status(400).json({ error: 'user_message is required.' });
+    }
+
+    if (!assistantMessage) {
+      return res.status(400).json({ error: 'assistant_message is required.' });
+    }
+
+    if (!FEEDBACK_RATINGS.has(rating)) {
+      return res.status(400).json({ error: 'rating must be either up or down.' });
+    }
+
+    const invalidReasonCode = reasonCodes.find((code) => !FEEDBACK_REASON_CODES.has(code));
+    if (invalidReasonCode) {
+      return res.status(400).json({ error: `Invalid reason code: ${invalidReasonCode}` });
+    }
+
+    if (rating === 'down' && reasonCodes.length === 0 && !comment) {
+      return res.status(400).json({ error: 'A downvote requires a reason or comment.' });
+    }
+
+    const payload = {
+      user_id: userId,
+      client_message_id: clientMessageId,
+      session_id: sessionId,
+      user_message: userMessage,
+      assistant_message: assistantMessage,
+      rating,
+      reason_codes: reasonCodes,
+      comment,
+      intent,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('chat_feedback')
+      .upsert(payload, { onConflict: 'user_id,client_message_id' })
+      .select('id, rating, reason_codes, comment, created_at, updated_at')
+      .single();
+
+    if (error) {
+      logger.error('Chat feedback save error: %s', error.message);
+      return res.status(500).json({ error: 'Failed to save chat feedback.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      feedback: data,
+    });
+  } catch (error) {
+    logger.error('Chat feedback controller error: %s', error.message);
+    return res.status(500).json({ error: 'Failed to save chat feedback.' });
   }
 };

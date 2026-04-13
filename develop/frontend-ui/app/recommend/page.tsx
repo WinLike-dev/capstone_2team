@@ -75,14 +75,12 @@ export default function RecommendPage() {
   const nextMonth = () => setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
 
   const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
-
-
+  const shouldShowHeaderSkeleton = isUserLoading;
 
   let headerMessage = "꾸준한 식단 관리가<br />성공의 가장 빠른 지름길이에요!";
   let subMessage = "사용자님의 다이어트 목표 달성을 응원합니다.";
 
   if (isUserLoading) {
-    headerMessage = `<div class="h-8 bg-gray-200/50 rounded-md w-64 animate-pulse mb-2 inline-block"></div><br/><div class="h-8 bg-gray-200/50 rounded-md w-48 animate-pulse inline-block"></div>`;
     subMessage = "";
   } else if (userData) {
     const displayName = userData.name || userData.nickname || '사용자';
@@ -99,6 +97,11 @@ export default function RecommendPage() {
       headerMessage = `${displayName} 님의 목표 달성을<br/>AI가 끝까지 응원합니다!`;
     }
   }
+
+  const headerLines = headerMessage
+    .split(/<br\s*\/?>/i)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans pb-28">
@@ -119,8 +122,23 @@ export default function RecommendPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-snug mb-2"
-            dangerouslySetInnerHTML={{ __html: `"${headerMessage}"` }}
-          />
+          >
+            {shouldShowHeaderSkeleton ? (
+              <>
+                <span className="mb-2 block h-8 w-64 rounded-md bg-gray-200/50 animate-pulse" />
+                <span className="block h-8 w-48 rounded-md bg-gray-200/50 animate-pulse" />
+              </>
+            ) : (
+              headerLines.map((line, index) => (
+                <span
+                  key={`${line}-${index}`}
+                  className={index === 0 ? 'block' : 'mt-1 block'}
+                >
+                  {line}
+                </span>
+              ))
+            )}
+          </motion.h1>
           <motion.p 
             key={subMessage}
             initial={{ opacity: 0 }}

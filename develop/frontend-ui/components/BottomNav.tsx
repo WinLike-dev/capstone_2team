@@ -6,9 +6,10 @@ import { usePathname } from 'next/navigation';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const hiddenRoutes = new Set(['/onboarding', '/login', '/signup']);
 
-  // 온보딩 페이지에서는 네비게이션 바 숨김
-  if (pathname === '/onboarding') return null;
+  // 인증/온보딩 페이지에서는 네비게이션 바 숨김
+  if (hiddenRoutes.has(pathname)) return null;
 
   const navItems = [
     { name: '홈', path: '/', icon: Home },
