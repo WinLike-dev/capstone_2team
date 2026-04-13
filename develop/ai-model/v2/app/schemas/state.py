@@ -71,6 +71,7 @@ class GraphState(TypedDict):
     search_query: Optional[str]
 
     pending_writes: list[PendingWrite]
+    awaiting_plan_confirmation: bool
 
     draft_response: Optional[str]
     draft_components: Optional[DraftComponents]
@@ -91,4 +92,5 @@ class GraphState(TypedDict):
     needs_clarification: bool
 
     summary: Optional[str]
+    last_assistant_message: Optional[str]
     messages: Annotated[list[dict[str, Any]], _append_messages]

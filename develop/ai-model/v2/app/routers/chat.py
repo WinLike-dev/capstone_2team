@@ -53,6 +53,7 @@ def _build_initial_state(req: ChatRequest) -> GraphState:
         "search_retry_count": 0,
         "search_query": None,
         "pending_writes": [],
+        "awaiting_plan_confirmation": False,
         "draft_response": None,
         "draft_components": None,
         "proposed_plan": None,
@@ -69,6 +70,7 @@ def _build_initial_state(req: ChatRequest) -> GraphState:
         "fallback_count": 0,
         "needs_clarification": False,
         "summary": None,
+        "last_assistant_message": None,
         "messages": [],
     }
     if req.user_profile_override:
@@ -109,6 +111,7 @@ def _build_debug_state(trace_id: str, result: GraphState) -> dict[str, Any]:
         "proposed_plan": result.get("proposed_plan"),
         "proposed_plan_type": result.get("proposed_plan_type"),
         "proposed_plan_action": result.get("proposed_plan_action"),
+        "awaiting_plan_confirmation": result.get("awaiting_plan_confirmation"),
         "selected_ai_persona": (result.get("user_profile") or {}).get(
             "selected_ai_persona"
         ),
@@ -130,6 +133,7 @@ def _build_state_summary(result: GraphState) -> dict[str, Any]:
         "proposed_plan_type": result.get("proposed_plan_type"),
         "proposed_plan_action": result.get("proposed_plan_action"),
         "proposed_plan_count": len(result.get("proposed_plan") or []),
+        "awaiting_plan_confirmation": result.get("awaiting_plan_confirmation"),
         "pending_writes_count": len(result.get("pending_writes") or []),
         "draft_components": result.get("draft_components"),
     }
@@ -339,6 +343,7 @@ async def _was_write_and_save_pending(
         elif write_succeeded and intent == "계획_승인" and proposed_plan:
             updates = {
                 "pending_writes": [],
+                "awaiting_plan_confirmation": False,
                 "proposed_plan": None,
                 "proposed_plan_type": None,
                 "proposed_plan_action": None,

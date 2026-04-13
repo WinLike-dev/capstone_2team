@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 
 from pydantic import BaseModel, Field
@@ -24,6 +25,33 @@ def _selected_persona_id(profile: dict) -> str | None:
     if isinstance(persona_id, str) and persona_id.strip():
         return persona_id.strip()
     return None
+
+
+def _dedupe_repeated_sentences(text: str) -> str:
+    chunks = [
+        chunk.strip()
+        for chunk in re.split(r"(?<=[.!?])\s+|\n+", text)
+        if chunk.strip()
+    ]
+    if not chunks:
+        return text.strip()
+
+    normalized_seen: set[str] = set()
+    deduped: list[str] = []
+    for chunk in chunks:
+        normalized = re.sub(r"\s+", " ", chunk).strip().lower()
+        if normalized in normalized_seen:
+            continue
+        normalized_seen.add(normalized)
+        deduped.append(chunk)
+
+    if len(deduped) == 1:
+        return deduped[0]
+    return "\n".join(deduped)
+
+
+def _is_plan_flow_intent(intent: str) -> bool:
+    return intent in {"계획", "수정", "계획_승인"}
 
 
 def _persona_guardrails(state: GraphState, draft_components: dict) -> str:
@@ -49,12 +77,38 @@ def _persona_guardrails(state: GraphState, draft_components: dict) -> str:
             [
                 "- For plan or modify answers, preserve the plan direction and change axes already present in the draft.",
                 "- If the draft refers to frequency, intensity, sets, rest, calories, ingredient changes, or meal composition, do not blur those specifics.",
+                "- Do not repeat the same plan summary, confirmation sentence, or approval request in multiple phrasings.",
+                "- Keep the closing line to a single short next-step or confirmation sentence.",
+            ]
+        )
+
+    if intent == "怨꾪쉷_?뱀씤":
+        lines.extend(
+            [
+                "- Keep approval answers short and final.",
+                "- Do not restate the full plan summary again once the user has already approved it.",
             ]
         )
 
     if draft_components.get("core_message"):
         lines.append(
             f"- The final response must stay semantically aligned with this core message: {draft_components['core_message']}"
+        )
+
+    if _is_plan_flow_intent(str(intent or "")):
+        lines.extend(
+            [
+                "- Never repeat the same confirmation or plan summary in slightly different wording.",
+                "- Keep plan-flow answers compact; avoid filler before or after the main point.",
+            ]
+        )
+
+    if intent == "계획_승인":
+        lines.extend(
+            [
+                "- Approval replies should be one short confirmation, not a fresh explanation.",
+                "- Do not re-list the plan contents after approval unless the draft explicitly requires it.",
+            ]
         )
 
     return "\n".join(lines)
@@ -145,6 +199,12 @@ def make_persona_node(deps: NodeDeps):
             )
             final_response = draft_response
 
+        if state.get("intent") in {"怨꾪쉷", "?섏젙", "怨꾪쉷_?뱀씤"}:
+            final_response = _dedupe_repeated_sentences(final_response)
+
+        if _is_plan_flow_intent(str(state.get("intent") or "")):
+            final_response = _dedupe_repeated_sentences(final_response)
+
         deps.trace.record_current_event(
             stage="persona",
             status="ok",
@@ -156,6 +216,7 @@ def make_persona_node(deps: NodeDeps):
         return {
             "response": final_response,
             "resolved_persona_id": resolved_persona_id,
+            "last_assistant_message": final_response,
             "messages": [
                 {"role": "user", "content": state["user_message"]},
                 {"role": "assistant", "content": final_response},

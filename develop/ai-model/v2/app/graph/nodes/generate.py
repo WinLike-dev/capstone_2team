@@ -93,7 +93,7 @@ def make_generate_node(deps: NodeDeps):
                 title="Approval draft shortcut used",
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
-            return _build_approval_draft(state)
+            return _build_approval_draft_v2(state)
 
         context = _build_draft_context(state)
         system_prompt = _build_draft_system_prompt(state, failure_reason)
@@ -173,7 +173,7 @@ def make_generate_node(deps: NodeDeps):
             },
             duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
         )
-        return {
+        result = {
             "draft_response": draft_text,
             "draft_components": draft_components,
             "proposed_plan": proposed_plan,
@@ -182,6 +182,9 @@ def make_generate_node(deps: NodeDeps):
             "self_eval_count": 0,
             "self_eval_failure_reason": None,
         }
+        if intent in {INTENT_PLAN, INTENT_MODIFY} and proposed_plan:
+            result["awaiting_plan_confirmation"] = True
+        return result
 
     return generate_node
 
@@ -353,6 +356,48 @@ def _build_approval_draft(state: GraphState) -> dict:
         {
             "core_message": f"{plan_label} {action_label} 승인을 확인했다.",
             "suggested_action": "이제 저장 절차를 진행한다.",
+            "search_grounding_summary": "",
+        }
+    )
+    return {
+        "draft_response": render_draft_preview(components),
+        "draft_components": components,
+        "proposed_plan": proposed_plan,
+        "proposed_plan_type": proposed_plan_type,
+        "proposed_plan_action": proposed_plan_action,
+        "self_eval_count": 0,
+        "self_eval_failure_reason": None,
+    }
+
+
+def _build_approval_draft_v2(state: GraphState) -> dict:
+    proposed_plan = state.get("proposed_plan") or []
+    if not proposed_plan:
+        components = normalize_draft_components(
+            {
+                "core_message": "지금은 승인 대기 중인 계획이 없어요.",
+                "suggested_action": "먼저 계획을 제안받은 뒤 승인 요청을 해주세요.",
+            }
+        )
+        return {
+            "draft_response": render_draft_preview(components),
+            "draft_components": components,
+            "proposed_plan": None,
+            "proposed_plan_type": None,
+            "proposed_plan_action": None,
+            "self_eval_count": 0,
+            "self_eval_failure_reason": None,
+        }
+
+    proposed_plan_type = state.get("proposed_plan_type")
+    proposed_plan_action = state.get("proposed_plan_action") or "create"
+    plan_label = "식단" if proposed_plan_type == "diet" else "운동"
+    action_label = "수정안" if proposed_plan_action == "update" else "계획"
+
+    components = normalize_draft_components(
+        {
+            "core_message": f"{plan_label} {action_label} 반영할게.",
+            "suggested_action": "",
             "search_grounding_summary": "",
         }
     )

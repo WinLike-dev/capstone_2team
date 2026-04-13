@@ -43,6 +43,7 @@ def _build_home_initial_state(req: HomeRecommendationRequest) -> GraphState:
         "search_retry_count": 0,
         "search_query": None,
         "pending_writes": [],
+        "awaiting_plan_confirmation": False,
         "draft_response": None,
         "draft_components": None,
         "proposed_plan": None,
@@ -59,6 +60,7 @@ def _build_home_initial_state(req: HomeRecommendationRequest) -> GraphState:
         "fallback_count": 0,
         "needs_clarification": False,
         "summary": None,
+        "last_assistant_message": None,
         "messages": [],
     }
 
