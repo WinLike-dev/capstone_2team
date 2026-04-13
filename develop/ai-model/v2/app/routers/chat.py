@@ -214,6 +214,21 @@ async def chat(
                 response={"response": timeout_message},
             )
             return ChatResponse(session_id=session_id, response=timeout_message)
+        except Exception as exc:
+            logger.exception("Graph request failed: session=%s", session_id)
+            trace_store.record_alert(
+                trace_id,
+                severity="error",
+                message="Graph request failed",
+                detail={"error": str(exc)},
+            )
+            fallback_message = "죄송해요, 초안을 만드는 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요."
+            trace_store.finish_trace(
+                trace_id,
+                status="failed",
+                response={"response": fallback_message},
+            )
+            return ChatResponse(session_id=session_id, response=fallback_message)
 
         response_text = result.get("response") or "죄송해요, 응답을 생성하지 못했어요."
         emotion = result.get("emotion")
