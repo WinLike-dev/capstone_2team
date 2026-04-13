@@ -141,10 +141,15 @@ const formatWorkoutPrescription = (item: WorkoutRecommendation | null) => {
   return '추천';
 };
 
-const getMealSlotLabel = (mealType: DietSlot) => {
-  if (mealType === 'breakfast') return '아침';
-  if (mealType === 'lunch') return '점심';
-  return '저녁';
+const matchesMealSlot = (savedType: string | undefined, mealType: DietSlot) => {
+  const normalized = String(savedType || '').trim().toLowerCase();
+  if (mealType === 'breakfast') {
+    return normalized === '아침' || normalized === 'breakfast';
+  }
+  if (mealType === 'lunch') {
+    return normalized === '점심' || normalized === 'lunch';
+  }
+  return normalized === '저녁' || normalized === 'dinner';
 };
 
 const createLegacyRecommendations = (): LegacyRecommendations => ({
@@ -554,8 +559,9 @@ export default function Home() {
 
     const todayStr = formatKstDate();
     const todayPlan = getPlanByDate(todayStr);
-    const mealLabel = getMealSlotLabel(dietPopup.mealType);
-    const existingDiet = todayPlan?.diets.find((d) => d.type === mealLabel);
+    const existingDiet = todayPlan?.diets.find((d) =>
+      matchesMealSlot(d.type, dietPopup.mealType as DietSlot)
+    );
 
     if (existingDiet && existingDiet.name === dietPopup.target.name) {
       setDietPopup({ isOpen: false, target: null, mealType: null });
@@ -850,13 +856,12 @@ export default function Home() {
     if (!diet) return false;
     if (recommendationAdded.diet[mealType]) return true;
 
-    const mealLabel = getMealSlotLabel(mealType);
     return Boolean(
       todayRecommendationPlan?.diets.some((savedDiet) => {
         const savedName = savedDiet.name.trim().toLowerCase();
         const recommendationName = diet.name.trim().toLowerCase();
         return (
-          savedDiet.type === mealLabel &&
+          matchesMealSlot(savedDiet.type, mealType) &&
           savedName === recommendationName
         );
       })
@@ -1284,8 +1289,9 @@ return (
                   <span className="text-[10px] font-bold text-gray-400 block mb-2">기존 식단</span>
                   {(() => {
                     const todayPlan = getPlanByDate(new Date());
-                    const mealLabel = dietPopup.mealType === 'breakfast' ? '아침' : dietPopup.mealType === 'lunch' ? '점심' : '저녁';
-                    const oldDiet = todayPlan?.diets.find(d => d.type === mealLabel);
+                    const oldDiet = todayPlan?.diets.find((d) =>
+                      matchesMealSlot(d.type, dietPopup.mealType as DietSlot)
+                    );
 
                     if (oldDiet) {
                       return (
