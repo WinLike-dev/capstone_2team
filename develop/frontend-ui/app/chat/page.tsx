@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { usePlan } from "../context/PlanContext";
 
 type FeedbackRating = "up" | "down";
 type FeedbackReasonCode =
@@ -73,6 +74,7 @@ function createClientMessageId() {
 
 export default function ChatPage() {
   const router = useRouter();
+  const { fetchPlans } = usePlan();
   const initialMessages: Message[] = [
     {
       id: "welcome",
@@ -428,6 +430,11 @@ export default function ChatPage() {
       const botText =
         data.response || data.answer || data.message || "응답을 불러오지 못했습니다.";
       const intent = typeof data.intent === "string" ? data.intent : null;
+      const planSyncApplied = data.plan_sync_applied === true;
+
+      if (planSyncApplied) {
+        void fetchPlans();
+      }
 
       setIsLoading(false);
       await simulateStreamingResponse(botText, {

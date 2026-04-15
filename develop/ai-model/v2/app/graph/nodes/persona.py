@@ -63,6 +63,8 @@ def _persona_guardrails(state: GraphState, draft_components: dict) -> str:
         "- Do not weaken or generalize specific reasoning that is already present in reason_points.",
         "- If approval_question exists, keep that approval flow in the final response.",
     ]
+    if state.get("support_mode") == "care":
+        lines.append("- Keep the tone warm and validating, but do not change the task outcome or factual content.")
 
     if intent == "정보":
         lines.extend(
@@ -77,6 +79,7 @@ def _persona_guardrails(state: GraphState, draft_components: dict) -> str:
             [
                 "- For plan or modify answers, preserve the plan direction and change axes already present in the draft.",
                 "- If the draft refers to frequency, intensity, sets, rest, calories, ingredient changes, or meal composition, do not blur those specifics.",
+                "- If plan_preview exists, keep the visible plan structure and major item details in the final response.",
                 "- Do not repeat the same plan summary, confirmation sentence, or approval request in multiple phrasings.",
                 "- Keep the closing line to a single short next-step or confirmation sentence.",
             ]
@@ -172,6 +175,7 @@ def make_persona_node(deps: NodeDeps):
             "core_message": draft_components["core_message"],
             "reason_points": draft_components["reason_points"],
             "suggested_action": draft_components["suggested_action"],
+            "plan_preview": draft_components["plan_preview"],
             "safety_notes": draft_components["safety_notes"],
             "approval_question": draft_components["approval_question"],
             "search_grounding_summary": draft_components["search_grounding_summary"],
@@ -216,11 +220,6 @@ def make_persona_node(deps: NodeDeps):
         return {
             "response": final_response,
             "resolved_persona_id": resolved_persona_id,
-            "last_assistant_message": final_response,
-            "messages": [
-                {"role": "user", "content": state["user_message"]},
-                {"role": "assistant", "content": final_response},
-            ],
         }
 
     return persona_node

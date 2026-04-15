@@ -104,7 +104,11 @@ class WASClient:
                 duration_ms=time.perf_counter() - started_at,
                 error=f"HTTP {exc.response.status_code}",
             )
-            raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
+            raise ExternalServiceError(
+                service="WAS",
+                message=f"HTTP {exc.response.status_code}",
+                status_code=exc.response.status_code,
+            )
         except httpx.RequestError as exc:
             self._record_trace(
                 trace_id,
@@ -160,7 +164,11 @@ class WASClient:
                 request_body=body,
                 error=f"HTTP {exc.response.status_code}",
             )
-            raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
+            raise ExternalServiceError(
+                service="WAS",
+                message=f"HTTP {exc.response.status_code}",
+                status_code=exc.response.status_code,
+            )
         except httpx.RequestError as exc:
             self._record_trace(
                 trace_id,
@@ -212,7 +220,11 @@ class WASClient:
                 request_body=body,
                 error=f"HTTP {exc.response.status_code}",
             )
-            raise ExternalServiceError(service="WAS", message=f"HTTP {exc.response.status_code}")
+            raise ExternalServiceError(
+                service="WAS",
+                message=f"HTTP {exc.response.status_code}",
+                status_code=exc.response.status_code,
+            )
         except httpx.RequestError as exc:
             self._record_trace(
                 trace_id,

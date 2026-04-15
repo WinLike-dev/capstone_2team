@@ -78,6 +78,7 @@ interface PlanContextType {
   getPlanByDate: (date: Date | string) => DailyPlan | null;
   userData: UserData | null;
   isUserLoading: boolean;
+  fetchPlans: () => Promise<void>;
   fetchUserProfile: () => Promise<void>;
   updateUserData: (data: Partial<UserData>) => void;
 }
@@ -550,6 +551,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
         getPlanByDate,
         userData,
         isUserLoading,
+        fetchPlans,
         fetchUserProfile,
         updateUserData,
       }}

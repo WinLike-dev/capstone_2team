@@ -107,25 +107,79 @@ export function mergeRecommendations(
   incoming: HomeRecommendations,
   scope: RecommendationScope
 ): HomeRecommendations {
-  if (scope === "workout") {
-    return {
-      ...current,
-      date: incoming.date,
-      scope,
-      workout: incoming.workout,
-    };
+  const next =
+    scope === "workout"
+      ? {
+          ...current,
+          date: incoming.date,
+          workout: incoming.workout,
+        }
+      : scope === "diet"
+        ? {
+            ...current,
+            date: incoming.date,
+            diet: incoming.diet,
+          }
+        : incoming;
+
+  return {
+    ...next,
+    scope: resolveRecommendationScope(next),
+  };
+}
+
+export function hasAnyWorkoutRecommendations(recommendations: HomeRecommendations) {
+  return WORKOUT_SLOTS.some((slot) => recommendations.workout[slot] !== null);
+}
+
+export function hasAnyDietRecommendations(recommendations: HomeRecommendations) {
+  return DIET_SLOTS.some((slot) => recommendations.diet[slot] !== null);
+}
+
+export function resolveRecommendationScope(
+  recommendations: HomeRecommendations
+): RecommendationScope {
+  const hasWorkout = hasAnyWorkoutRecommendations(recommendations);
+  const hasDiet = hasAnyDietRecommendations(recommendations);
+
+  if (hasWorkout && hasDiet) {
+    return "all";
   }
 
-  if (scope === "diet") {
-    return {
-      ...current,
-      date: incoming.date,
-      scope,
-      diet: incoming.diet,
-    };
+  if (hasWorkout) {
+    return "workout";
   }
 
-  return incoming;
+  if (hasDiet) {
+    return "diet";
+  }
+
+  return "all";
+}
+
+export function isRecommendationScopeComplete(
+  recommendations: HomeRecommendations,
+  scope: RecommendationScope
+) {
+  if (scope === "all" || scope === "workout") {
+    const hasMissingWorkout = WORKOUT_SLOTS.some(
+      (slot) => recommendations.workout[slot] === null
+    );
+    if (hasMissingWorkout) {
+      return false;
+    }
+  }
+
+  if (scope === "all" || scope === "diet") {
+    const hasMissingDiet = DIET_SLOTS.some(
+      (slot) => recommendations.diet[slot] === null
+    );
+    if (hasMissingDiet) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function resetAddedStateForScope(

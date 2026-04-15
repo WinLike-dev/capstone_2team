@@ -33,6 +33,7 @@ def normalize_draft_components(
             "core_message": text,
             "reason_points": [],
             "suggested_action": "",
+            "plan_preview": "",
             "safety_notes": [],
             "approval_question": None,
             "search_grounding_summary": "",
@@ -45,6 +46,7 @@ def normalize_draft_components(
         "core_message": core_message,
         "reason_points": _clean_list(payload.get("reason_points")),
         "suggested_action": _clean_text(payload.get("suggested_action")),
+        "plan_preview": _clean_text(payload.get("plan_preview")),
         "safety_notes": _clean_list(payload.get("safety_notes")),
         "approval_question": approval_question,
         "search_grounding_summary": _clean_text(payload.get("search_grounding_summary")),
@@ -66,6 +68,9 @@ def render_draft_preview(components: DraftComponents) -> str:
 
     if components["suggested_action"]:
         parts.append(f"제안: {components['suggested_action']}")
+
+    if components["plan_preview"]:
+        parts.append(f"계획:\n{components['plan_preview']}")
 
     if components["safety_notes"]:
         notes = "\n".join(f"- {item}" for item in components["safety_notes"])

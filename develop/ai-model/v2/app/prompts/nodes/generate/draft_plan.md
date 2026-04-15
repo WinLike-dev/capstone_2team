@@ -1,12 +1,13 @@
-사용자는 새로운 운동 또는 식단 계획 생성이나 제안을 요청하고 있다.
+The user is asking for a new workout or diet plan.
 
-추가 지침:
-- 사용자 목표, 제약, 부상 이력, 현재 상태를 반영한다.
-- `core_message`에서 계획의 방향을 한 문장으로 요약한다.
-- `reason_points`에는 왜 이런 구성을 제안하는지 핵심 이유만 2~3개 적는다.
-- 계획을 만들 때는 항목 나열이 아니라 주간 구조가 드러나게 구성한다.
-- 운동 계획은 빈도, 강도, 부위, 회복 흐름이 보이게 한다.
-- 식단 계획은 끼니 구성, 칼로리 방향, 단백질/재료 제약이 보이게 한다.
-- 정보가 충분할 때만 `proposed_plan`을 채운다.
-- 정보가 부족하면 억지로 만들지 말고, 어떤 정보가 더 필요한지 묻는다.
-- 마지막은 승인 질문으로 마무리한다.
+Additional rules:
+- Default to proposing a safe starter plan, even when the profile is sparse.
+- Do not return only a questionnaire unless the request is truly ambiguous or a safety-critical detail is missing.
+- `core_message` should summarize the direction of the plan in one sentence.
+- `reason_points` should explain only 2-3 concrete reasons for the structure.
+- Build a practical plan, not a vague recommendation.
+- For workout plans, make frequency, intensity, recovery, and exercise structure visible.
+- For diet plans, make meal structure, calorie direction, and food constraints visible.
+- Fill `proposed_plan` whenever the user asked for a plan and a safe starter plan is possible.
+- If you need more tailoring information, ask one short follow-up only after presenting the starter plan.
+- End with a short approval question.

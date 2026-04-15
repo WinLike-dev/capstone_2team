@@ -110,14 +110,34 @@ def make_modify_node(deps: NodeDeps):
                 target_source,
             )
         except ExternalServiceError as exc:
-            logger.error("Full plan load failed: %s", exc)
+            logger.warning("Full plan load failed; using fallback context when possible: %s", exc)
             modify_target = resolved_target
-            plan = {}
+            plan, fallback_source = _fallback_modify_context(state, modify_target)
+            if _count_plan_items(plan) > 0:
+                logger.info(
+                    "Modify full-plan load failed; using fallback context: user_id=%s target=%s source=%s",
+                    user_id,
+                    modify_target,
+                    fallback_source,
+                )
+            else:
+                plan = {}
             deps.trace.record_current_alert(
-                severity="error",
-                message="Full plan load from WAS failed",
+                severity="warning",
+                message="Full plan load from WAS failed; fallback context applied when available",
                 detail={"modify_target": resolved_target, "error": str(exc)},
             )
+
+        if _count_plan_items(plan) == 0:
+            fallback_plan, fallback_source = _fallback_modify_context(state, modify_target)
+            if _count_plan_items(fallback_plan) > 0:
+                logger.info(
+                    "Modify context empty after WAS load; using fallback context: user_id=%s target=%s source=%s",
+                    user_id,
+                    modify_target,
+                    fallback_source,
+                )
+                plan = fallback_plan
 
         if not modify_target:
             deps.trace.record_current_alert(
@@ -212,6 +232,11 @@ def _infer_modify_target(state: GraphState) -> tuple[str | None, str]:
     if proposed_plan_type in {"workout", "diet"}:
         return proposed_plan_type, "proposed_plan"
 
+    active_proposal = state.get("active_proposal") or {}
+    active_proposal_domain = active_proposal.get("domain")
+    if active_proposal_domain in {"workout", "diet"}:
+        return active_proposal_domain, "active_proposal"
+
     message_target = _infer_target_from_message(str(state.get("user_message") or ""))
     if message_target:
         return message_target, "message"
@@ -291,3 +316,55 @@ def _count_plan_items(plan: dict | None) -> int:
     if not isinstance(items, list):
         return 0
     return len(items)
+
+
+def _fallback_modify_context(state: GraphState, modify_target: str | None) -> tuple[dict, str]:
+    active_proposal = state.get("active_proposal") or {}
+    active_domain = active_proposal.get("domain")
+    active_items = active_proposal.get("items")
+    if (
+        modify_target in {"workout", "diet"}
+        and active_domain == modify_target
+        and isinstance(active_items, list)
+        and active_items
+    ):
+        return {"items": list(active_items)}, "active_proposal"
+
+    proposed_plan = state.get("proposed_plan") or []
+    proposed_plan_type = state.get("proposed_plan_type")
+    if (
+        modify_target in {"workout", "diet"}
+        and proposed_plan_type == modify_target
+        and isinstance(proposed_plan, list)
+        and proposed_plan
+    ):
+        return {"items": list(proposed_plan)}, "proposed_plan"
+
+    today_plan = state.get("today_plan") or []
+    today_plan_items = _fallback_items_from_today_plan(today_plan, modify_target)
+    if today_plan_items:
+        return {"items": today_plan_items}, "today_plan"
+
+    return {}, "none"
+
+
+def _fallback_items_from_today_plan(today_plan: list[dict], modify_target: str | None) -> list[dict]:
+    if modify_target not in {"workout", "diet"}:
+        return []
+
+    expected_type = "exercise" if modify_target == "workout" else "meal"
+    items: list[dict] = []
+    for item in today_plan:
+        item_type = str(item.get("type") or "").lower()
+        if item_type and item_type != expected_type:
+            continue
+        items.append(
+            {
+                "id": item.get("id"),
+                "name": item.get("name") or ("Workout Item" if modify_target == "workout" else "Meal Item"),
+                "detail": item.get("detail") or item.get("description"),
+                "day": item.get("day") or item.get("date"),
+                "completed": bool(item.get("completed", False)),
+            }
+        )
+    return items

@@ -7,6 +7,7 @@ from typing import Any, TypedDict
 
 from app.core.exceptions import ExternalServiceError
 from app.graph.deps import NodeDeps
+from app.graph.nodes.intent import INTENT_APPROVAL
 from app.schemas.llm_responses import PlanExtractResponse, PlanModifyResponse
 from app.schemas.state import PendingWrite
 from app.schemas.was import to_plan_create, to_plan_update
@@ -98,7 +99,7 @@ async def execute_was_writes(
                 logger.warning("profile WAS write failed: %s", exc)
                 pending.append(write)
 
-    if intent == "계획_승인" and proposed_plan:
+    if intent == INTENT_APPROVAL and proposed_plan:
         resolved_plan_type = proposed_plan_type or modify_target or "workout"
         write_type = "plan_update" if proposed_plan_action == "update" else "plan_create"
         raw_payload = {

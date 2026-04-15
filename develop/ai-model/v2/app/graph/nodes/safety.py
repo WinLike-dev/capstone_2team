@@ -70,10 +70,6 @@ def make_safety_node(deps: NodeDeps):
 
         return {
             "response": response,
-            "messages": [
-                {"role": "user", "content": state["user_message"]},
-                {"role": "assistant", "content": response},
-            ],
         }
 
     return safety_node

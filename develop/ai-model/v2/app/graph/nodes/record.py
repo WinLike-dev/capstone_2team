@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from app.core.exceptions import ExternalServiceError
@@ -47,7 +48,9 @@ def make_record_node(deps: NodeDeps):
 
 
 async def _handle_profile(state: GraphState) -> dict:
-    changes: dict[str, Any] = state.get("profile_changes") or {}
+    changes: dict[str, Any] = state.get("profile_changes") or _infer_profile_changes(
+        str(state.get("user_message") or "")
+    )
 
     invalid_fields = set(changes.keys()) - _ALLOWED_PROFILE_FIELDS
     if invalid_fields:
@@ -68,7 +71,6 @@ async def _handle_plan_check(deps: NodeDeps, state: GraphState) -> dict:
         return {"response": _ERR_NOT_TODAY}
 
     profile_changes = state.get("profile_changes") or {}
-    item_id = profile_changes.get("item_id")
 
     today_plan: list[dict] = state.get("today_plan") or []
     try:
@@ -76,6 +78,10 @@ async def _handle_plan_check(deps: NodeDeps, state: GraphState) -> dict:
     except ExternalServiceError as exc:
         logger.warning("plan_check refresh failed; using cached today_plan: %s", exc)
 
+    item_id = profile_changes.get("item_id") or _infer_plan_check_item_id(
+        str(state.get("user_message") or ""),
+        today_plan,
+    )
     plan_ids = {item.get("id") for item in today_plan}
     if item_id not in plan_ids:
         return {"response": _ERR_NOT_IN_PLAN}
@@ -89,3 +95,68 @@ async def _handle_plan_check(deps: NodeDeps, state: GraphState) -> dict:
         "today_plan": updated_plan,
         "profile_changes": {"item_id": item_id},
     }
+
+
+def _infer_profile_changes(message: str) -> dict[str, Any]:
+    normalized = " ".join(message.strip().split())
+    lowered = normalized.lower()
+    changes: dict[str, Any] = {}
+
+    weight_match = re.search(r"(\d+(?:\.\d+)?)\s*kg", lowered)
+    if weight_match and any(token in lowered for token in ("체중", "몸무게")):
+        changes["weight"] = float(weight_match.group(1))
+
+    height_match = re.search(r"(\d+(?:\.\d+)?)\s*cm", lowered)
+    if height_match and "키" in lowered:
+        changes["height"] = float(height_match.group(1))
+
+    age_match = re.search(r"(\d+)\s*살", lowered)
+    if age_match and "나이" in lowered:
+        changes["age"] = int(age_match.group(1))
+
+    allergy_match = re.search(r"([가-힣a-z0-9\s]+?)\s*알레르기", normalized, re.IGNORECASE)
+    if allergy_match:
+        allergy = allergy_match.group(1).strip()
+        allergy = re.sub(r"^(내|저|제)\s+", "", allergy).strip()
+        allergy = re.sub(r"\s*(추가|기록|저장|반영|업데이트|변경|수정)해줘?$", "", allergy).strip()
+        if allergy and allergy != "알레르기":
+            changes["allergies"] = [allergy]
+
+    goal_match = re.search(
+        r"목표(?:를|는|가)?\s*([가-힣a-z0-9\s]+?)\s*(?:으로|로)\s*(?:변경|수정|기록|저장|반영|업데이트)",
+        normalized,
+        re.IGNORECASE,
+    )
+    if goal_match:
+        goal = goal_match.group(1).strip()
+        if goal:
+            changes["goal"] = goal
+
+    return changes
+
+
+def _infer_plan_check_item_id(message: str, today_plan: list[dict]) -> str | None:
+    if not today_plan:
+        return None
+
+    lowered = message.lower()
+    target_type = None
+    if any(token in lowered for token in ("식단", "식사", "메뉴", "먹었")):
+        target_type = "meal"
+    elif any(token in lowered for token in ("운동", "루틴", "세트", "유산소")):
+        target_type = "exercise"
+
+    if target_type:
+        typed_candidates = [
+            item for item in today_plan if str(item.get("type") or "").lower() == target_type
+        ]
+        incomplete_typed = [item for item in typed_candidates if not item.get("completed")]
+        if incomplete_typed:
+            return str(incomplete_typed[0].get("id") or "") or None
+        if typed_candidates:
+            return str(typed_candidates[0].get("id") or "") or None
+
+    incomplete = [item for item in today_plan if not item.get("completed")]
+    if incomplete:
+        return str(incomplete[0].get("id") or "") or None
+    return str(today_plan[0].get("id") or "") or None

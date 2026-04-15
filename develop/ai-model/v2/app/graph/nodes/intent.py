@@ -6,6 +6,7 @@ import re
 
 from pydantic import BaseModel, Field
 
+from app.core.conversation_state import infer_domain
 from app.core.prompt_loader import load_prompt
 from app.graph.deps import NodeDeps
 from app.schemas.intent import IntentOutput
@@ -25,13 +26,13 @@ INTENT_SAFETY = "안전경고"
 INTENT_HOME_RECOMMENDATION = "home_recommendation"
 
 _SAFETY_PATTERNS = re.compile(
-    r"자해|자살|죽고\s*싶|극단적\s*선택|위험|폭행|마약|과다\s*복용|"
-    r"가슴.*조여|숨이?\s*차|호흡.*힘들|어지럽|쓰러질\s*것\s*같|실신|기절",
+    r"자해|자살|죽고\s*싶|극단적\s*선택|위험|실행|마약|과다\s*복용|과복용|"
+    r"가슴.*조여|가슴.*아파|숨.*차|호흡.*힘들|어지럽|심한.*알레르기|기절|"
+    r"약을.*많이.*먹",
     re.IGNORECASE,
 )
-
 _CASUAL_PATTERNS = re.compile(
-    r"^(안녕|하이|헬로|hello|hi|반가워|고마워|감사|굿밤|수고|바이|bye)[\s!?.]*$",
+    r"^(안녕|하이|헬로|hello|hi|반가워|고마워|감사|수고|잘가|bye)[\s!?.]*$",
     re.IGNORECASE,
 )
 
@@ -59,6 +60,7 @@ class PlanConfirmationDecision(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason: str = Field(default="")
 
+
 _PLAN_DOMAIN_KEYWORDS = (
     "운동",
     "식단",
@@ -75,8 +77,8 @@ _PLAN_REQUEST_KEYWORDS = (
     "추천",
     "루틴",
     "플랜",
+    "계획",
     "짜줘",
-    "짤",
     "구성",
     "설계",
     "만들어",
@@ -90,16 +92,15 @@ _PLAN_EXCLUDE_KEYWORDS = (
     "변경",
     "교체",
     "조정",
-    "낮춰",
-    "높여",
-    "승인",
+    "빼",
+    "추가",
+    "확인",
     "확정",
     "반영",
     "적용",
     "진행",
     "기록",
-    "추가",
-    "삭제",
+    "체크",
 )
 _MODIFY_KEYWORDS = (
     "수정",
@@ -107,57 +108,47 @@ _MODIFY_KEYWORDS = (
     "변경",
     "교체",
     "조정",
-    "낮춰",
-    "높여",
+    "빼",
     "다시",
     "줄여",
     "늘려",
-    "빼고",
+    "덜",
+    "추가",
+    "제외",
 )
 _APPROVAL_KEYWORDS = (
-    "승인",
+    "확인",
     "확정",
     "반영",
     "적용",
-    "진행해",
+    "진행",
     "진행하자",
     "이대로",
     "그대로",
-    "오케이",
     "좋아",
     "좋습니다",
-    "저장해",
+    "오케이",
 )
 _APPROVAL_COMMITMENT_KEYWORDS = (
-    "?뱀씤",
-    "?뺤젙",
-    "諛섏쁺",
-    "?곸슜",
-    "吏꾪뻾",
-    "洹몃?濡",
-    "醫뗭븘",
-    "醫뗭뒿?덈떎",
-    "?ㅼ???",
+    "진행",
+    "적용",
+    "반영",
+    "해줘",
+    "해줘요",
+    "오케이",
+    "좋아",
     "ok",
     "okay",
 )
 _EXPLICIT_PLAN_APPROVAL_PHRASES = (
-    "좋아요",
-    "좋습니다",
-    "진행해줘",
-    "진행해 줘",
-    "반영해줘",
-    "반영해 줘",
-    "적용해줘",
-    "적용해 줘",
+    "좋아 진행해줘",
+    "좋아 반영해줘",
+    "좋아 적용해줘",
+    "그대로 진행해줘",
     "그대로 적용해줘",
-    "그대로 적용해 줘",
     "이 계획으로 진행해줘",
-    "이 계획으로 진행해 줘",
-    "일정에 반영해줘",
-    "일정에 반영해 줘",
+    "이 계획 반영해줘",
     "확정하고 반영해줘",
-    "확정하고 반영해 줘",
     "확인했어",
 )
 _PLAN_REFERENCE_KEYWORDS = (
@@ -168,12 +159,11 @@ _PLAN_REFERENCE_KEYWORDS = (
     "운동",
     "방금",
     "제안",
-    "추천안",
+    "추천",
     "수정안",
     "그거",
     "그걸",
     "이거",
-    "이걸",
 )
 _PROFILE_FIELD_KEYWORDS = (
     "체중",
@@ -184,11 +174,13 @@ _PROFILE_FIELD_KEYWORDS = (
     "부상 이력",
     "기저질환",
     "질환",
-    "질병",
+    "복용약",
     "나이",
     "성별",
     "목표",
     "활동량",
+    "mbti",
+    "별명",
 )
 _PROFILE_UPDATE_KEYWORDS = (
     "기록",
@@ -196,18 +188,16 @@ _PROFILE_UPDATE_KEYWORDS = (
     "수정",
     "변경",
     "반영",
-    "저장",
     "업데이트",
     "입력",
+    "저장",
 )
 _CONTEXT_DEPENDENT_REFERENCES = (
     "그거",
     "그걸",
-    "이거",
-    "이걸",
+    "그걸로",
     "아까 말한 거",
     "그 방식",
-    "저 방식",
     "방금 거",
     "저거",
 )
@@ -220,7 +210,6 @@ _MEMORY_SAVE_KEYWORDS = (
     "앞으로 내 별명은",
     "내 별명은",
 )
-
 _MEMORY_QUERY_KEYWORDS = (
     "기억나",
     "기억해?",
@@ -231,34 +220,10 @@ _MEMORY_QUERY_KEYWORDS = (
     "이전에 말한",
     "조금 전에 말한",
 )
-
-
-_MEMORY_SAVE_KEYWORDS = (
-    "\uae30\uc5b5\ud574\uc918",
-    "\uae30\uc5b5\ud574 \uc918",
-    "\uae30\uc5b5\ud574",
-    "\uc78a\uc9c0\ub9c8",
-    "\uc78a\uc9c0 \ub9c8",
-    "\uc55e\uc73c\ub85c \ub0b4 \ubcc4\uba85\uc740",
-    "\ub0b4 \ubcc4\uba85\uc740",
-)
-
-_MEMORY_QUERY_KEYWORDS = (
-    "\uae30\uc5b5\ub098",
-    "\uae30\uc5b5\ud574?",
-    "\ub0b4\uac00 \ubb50\ub77c\uace0 \ud588",
-    "\ubc29\uae08 \ub0b4\uac00 \ub9d0\ud55c",
-    "\uc544\uae4c \ub0b4\uac00 \ub9d0\ud55c",
-    "\ub0b4 \ubcc4\uba85",
-    "\uc774\uc804\uc5d0 \ub9d0\ud55c",
-    "\uc870\uae08 \uc804\uc5d0 \ub9d0\ud55c",
-)
-
 _PLAN_CONFIRMATION_REFERENCE_KEYWORDS = (
     "아까",
     "방금",
     "그전",
-    "그 전에",
     "이전",
     "그거",
     "그걸",
@@ -267,32 +232,25 @@ _PLAN_CONFIRMATION_REFERENCE_KEYWORDS = (
     "그 식단",
     "그대로",
 )
-
 _PLAN_CHANGE_MARKERS = (
     "말고",
     "대신",
     "바꿔",
     "변경",
     "조정",
-    "낮춰",
-    "높여",
+    "빼",
     "줄여",
     "늘려",
-    "빼고",
-    "빼줘",
     "추가",
-    "추가해",
     "제외",
     "강도",
     "세트",
     "횟수",
     "시간",
     "칼로리",
-    "아침",
-    "점심",
-    "저녁",
+    "식사",
+    "재료",
 )
-
 _SHORT_APPROVAL_RESPONSES = (
     "응",
     "네",
@@ -303,18 +261,19 @@ _SHORT_APPROVAL_RESPONSES = (
     "okay",
     "ok",
 )
-
-_HARDCODED_CONFIRMATION_APPROVAL_PHRASES = (
-    "좋아요. 방금 수정한 계획으로 진행해줘.",
-    "좋아요 방금 수정한 계획으로 진행해줘",
-    "수정된 계획 확인했어. 그대로 적용해줘.",
-    "수정된 계획 확인했어 그대로 적용해줘",
-    "수정한 계획으로 진행해줘",
-    "수정된 계획 그대로 적용해줘",
-    "수정된 계획 반영해줘",
-    "방금 수정한 계획으로 진행해줘",
-    "방금 수정한 계획 적용해줘",
-    "방금 수정한 계획 반영해줘",
+_CARE_SUPPORT_MARKERS = (
+    "지쳐",
+    "지쳤",
+    "힘들",
+    "불안",
+    "우울",
+    "무기력",
+    "걱정",
+    "스트레스",
+    "멘탈",
+    "버겁",
+    "외롭",
+    "외로워",
 )
 
 
@@ -323,7 +282,8 @@ def make_intent_node(deps: NodeDeps):
         if state.get("request_kind") == "home_recommendation":
             return _build_result(INTENT_HOME_RECOMMENDATION, state)
 
-        message = state["user_message"]
+        message = str(state["user_message"])
+        routing_message = _routing_message(state, message)
         previous_intent = state.get("previous_intent")
 
         if _SAFETY_PATTERNS.search(message):
@@ -332,7 +292,7 @@ def make_intent_node(deps: NodeDeps):
         if _CASUAL_PATTERNS.match(message.strip()) and previous_intent != INTENT_CARE:
             return _build_result(INTENT_CASUAL, state)
 
-        if _looks_like_memory_save_request(message):
+        if _looks_like_memory_save_request(routing_message):
             return _build_result(
                 INTENT_CASUAL,
                 state,
@@ -340,7 +300,7 @@ def make_intent_node(deps: NodeDeps):
                 should_save_episode=True,
             )
 
-        if _looks_like_memory_query(message):
+        if _looks_like_memory_query(routing_message):
             return _build_result(
                 INTENT_INFO,
                 state,
@@ -375,10 +335,7 @@ def make_intent_node(deps: NodeDeps):
                 stage="confirm_gate",
                 status="ok",
                 title="Hardcoded confirmation approval matched",
-                detail={
-                    "source": "hardcoded_phrase",
-                    "user_message": message,
-                },
+                detail={"source": "hardcoded_phrase", "user_message": message},
             )
             return _build_result(INTENT_APPROVAL, state, confidence=0.99)
 
@@ -403,13 +360,13 @@ def make_intent_node(deps: NodeDeps):
                 },
             )
 
-        if not awaiting_plan_confirmation and _looks_like_plan_approval(message, state):
+        if not awaiting_plan_confirmation and _looks_like_plan_approval(routing_message, state):
             return _build_result(INTENT_APPROVAL, state, confidence=0.94)
 
-        if _looks_like_profile_record(message):
+        if _looks_like_profile_record(routing_message):
             return _build_result(INTENT_RECORD, state, confidence=0.9)
 
-        if _looks_like_modify_request(message):
+        if _looks_like_modify_request(routing_message):
             return _build_result(
                 INTENT_MODIFY,
                 state,
@@ -417,7 +374,7 @@ def make_intent_node(deps: NodeDeps):
                 search_targets=["vdb_external", "web"],
             )
 
-        if _looks_like_plan_request(message):
+        if _looks_like_plan_request(routing_message):
             return _build_result(
                 INTENT_PLAN,
                 state,
@@ -426,7 +383,11 @@ def make_intent_node(deps: NodeDeps):
             )
 
         context = _build_context_v3(state)
-        user_content = f"{context}\n\n현재 메시지: {message}" if context else f"현재 메시지: {message}"
+        user_content = (
+            f"{context}\n\n[Original User Message]\n{message}\n\n[Resolved User Message]\n{routing_message}"
+            if context
+            else f"[Original User Message]\n{message}\n\n[Resolved User Message]\n{routing_message}"
+        )
 
         try:
             raw = await deps.router.generate(
@@ -442,9 +403,22 @@ def make_intent_node(deps: NodeDeps):
         profile_changes_dict = None
         if output.profile_changes:
             profile_changes_dict = {item.field: item.value for item in output.profile_changes}
+        output_intent = _coerce_llm_intent(output.intent, state, routing_message)
 
         return {
-            "intent": output.intent,
+            "intent": output_intent,
+            **_contract_fields(
+                output_intent,
+                state,
+                record_type=output.record_type,
+                modify_target=output.modify_target,
+                profile_changes=profile_changes_dict,
+                routing_message=routing_message,
+                emotion_override={
+                    "label": output.emotion.label,
+                    "intensity": output.emotion.intensity,
+                },
+            ),
             "confidence": output.confidence,
             "emotion": {
                 "label": output.emotion.label,
@@ -479,8 +453,10 @@ def _build_result(
     should_save_episode: bool = False,
     short_term_memory_query: bool = False,
 ) -> dict:
+    is_profile_record = intent == INTENT_RECORD and _looks_like_profile_record(str(state.get("user_message") or ""))
     return {
         "intent": intent,
+        **_contract_fields(intent, state),
         "confidence": confidence,
         "emotion": state.get("emotion") or {"label": "중립", "intensity": 0.0},
         "previous_intent": state.get("intent"),
@@ -489,7 +465,7 @@ def _build_result(
         "should_save_episode": should_save_episode,
         "short_term_memory_query": short_term_memory_query,
         "has_fact_change": False,
-        "record_type": None,
+        "record_type": "profile" if is_profile_record else None,
         "profile_changes": None,
         "is_today": None,
         "modify_target": None,
@@ -500,33 +476,133 @@ def _build_result(
     }
 
 
-def _build_context(state: GraphState) -> str:
-    parts: list[str] = []
+def _contract_fields(
+    intent: str,
+    state: GraphState,
+    *,
+    record_type: str | None = None,
+    modify_target: str | None = None,
+    profile_changes: dict | None = None,
+    routing_message: str | None = None,
+    emotion_override: dict | None = None,
+) -> dict:
+    action_intent = _action_intent_from_legacy(intent)
+    support_mode = _support_mode(intent, state, routing_message, emotion_override)
+    resolution = state.get("context_resolution") or {}
+    resolved_domain = resolution.get("resolved_domain")
+    active_proposal = state.get("active_proposal") or {}
+    resolved_reference = resolution.get("resolved_reference")
+    effective_message = routing_message or state.get("user_message")
+    inferred_domain = infer_domain(effective_message)
 
-    if state.get("previous_intent"):
-        parts.append(f"이전 의도: {state['previous_intent']}")
+    domain = "general"
+    if action_intent == "safety":
+        domain = "general"
+    elif record_type == "profile" or profile_changes:
+        domain = "profile"
+    elif modify_target in {"workout", "diet"}:
+        domain = modify_target
+    elif resolved_domain in {"workout", "diet", "profile", "general"} and resolved_domain != "none":
+        domain = resolved_domain
+    elif action_intent in {"create", "modify", "approval"} and inferred_domain in {"workout", "diet"}:
+        domain = inferred_domain
+    elif action_intent == "approval" and state.get("proposed_plan_type") in {"workout", "diet"}:
+        domain = str(state.get("proposed_plan_type"))
+    elif resolved_reference == "active_proposal" and active_proposal.get("domain") in {"workout", "diet"}:
+        domain = str(active_proposal["domain"])
+    elif inferred_domain in {"workout", "diet", "profile"}:
+        domain = inferred_domain
+    else:
+        domain = "general"
 
-    if state.get("previous_emotion"):
-        emotion = state["previous_emotion"]
-        parts.append(f"이전 감정: {emotion['label']} (강도 {emotion['intensity']:.1f})")
+    ambiguous = bool(resolution.get("ambiguous")) or intent == INTENT_FALLBACK
+    return {
+        "action_intent": action_intent,
+        "domain": domain,
+        "support_mode": support_mode,
+        "ambiguous": ambiguous,
+    }
 
-    if state.get("summary"):
-        parts.append(f"대화 요약: {state['summary']}")
 
-    return "\n".join(parts)
+def _action_intent_from_legacy(intent: str) -> str:
+    if intent == INTENT_PLAN:
+        return "create"
+    if intent == INTENT_MODIFY:
+        return "modify"
+    if intent == INTENT_INFO:
+        return "info"
+    if intent == INTENT_RECORD:
+        return "record"
+    if intent == INTENT_APPROVAL:
+        return "approval"
+    if intent == INTENT_CASUAL:
+        return "casual"
+    if intent == INTENT_SAFETY:
+        return "safety"
+    if intent == INTENT_HOME_RECOMMENDATION:
+        return "home_recommendation"
+    if intent == INTENT_CARE:
+        return "casual"
+    return "fallback"
+
+
+def _support_mode(
+    intent: str,
+    state: GraphState,
+    routing_message: str | None,
+    emotion_override: dict | None = None,
+) -> str:
+    if intent == INTENT_CARE:
+        return "care"
+
+    normalized = str(routing_message or state.get("user_message") or "").lower()
+    if any(marker in normalized for marker in _CARE_SUPPORT_MARKERS):
+        return "care"
+
+    emotion = emotion_override or state.get("emotion") or {}
+    emotion_intensity = float(emotion.get("intensity") or 0.0)
+    if emotion_intensity >= 0.6:
+        return "care"
+
+    emotion_label = str(emotion.get("label") or "").lower()
+    if any(marker in emotion_label for marker in ("불안", "우울", "슬픔", "외로움", "stress", "anx", "sad")):
+        return "care"
+
+    return "normal"
+
+
+def _coerce_llm_intent(intent: str, state: GraphState, routing_message: str) -> str:
+    if intent == INTENT_APPROVAL and not _has_pending_plan_confirmation_v2(state):
+        if _looks_like_modify_request(routing_message):
+            return INTENT_MODIFY
+        if _looks_like_plan_request(routing_message):
+            return INTENT_PLAN
+        if _looks_like_profile_record(routing_message):
+            return INTENT_RECORD
+        return INTENT_FALLBACK
+    return intent
+
+
+def _routing_message(state: GraphState, message: str) -> str:
+    resolution = state.get("context_resolution") or {}
+    resolved_reference = resolution.get("resolved_reference")
+    resolved_text = str(resolution.get("resolved_text") or "").strip()
+    confidence = float(resolution.get("confidence") or 0.0)
+    if resolved_reference and resolved_reference != "none" and resolved_text and confidence >= 0.6:
+        return resolved_text
+    return message
 
 
 def _latest_assistant_message(state: GraphState) -> str:
-    messages = state.get("messages") or []
-    for message in reversed(messages):
-        if message.get("role") == "assistant":
-            return str(message.get("content") or "")
+    recent_turns = (state.get("recent_dialogue") or {}).get("recent_turns") or []
+    for turn in reversed(recent_turns):
+        assistant_text = str(turn.get("assistant_text") or "").strip()
+        if assistant_text:
+            return assistant_text
     return ""
 
 
 def _latest_assistant_message_v2(state: GraphState) -> str:
-    if state.get("last_assistant_message"):
-        return str(state.get("last_assistant_message") or "")
     return _latest_assistant_message(state)
 
 
@@ -540,18 +616,36 @@ def _build_context_v3(state: GraphState) -> str:
         emotion = state["previous_emotion"]
         parts.append(f"이전 감정: {emotion['label']} (강도 {emotion['intensity']:.1f})")
 
-    if state.get("summary"):
-        parts.append(f"대화 요약: {state['summary']}")
-
     latest_assistant = _latest_assistant_message_v2(state)
     if latest_assistant:
         parts.append(f"직전 AI 응답: {latest_assistant[:200]}")
+
+    resolution = state.get("context_resolution") or {}
+    if resolution.get("resolved_reference") != "none" and resolution.get("resolved_text"):
+        parts.append(
+            "Resolved context: "
+            f"{resolution.get('resolved_reference')} / {resolution.get('resolved_domain')} / "
+            f"{str(resolution.get('resolved_text') or '')[:200]}"
+        )
+
+    recent_turns = ((state.get("recent_dialogue") or {}).get("recent_turns") or [])[-2:]
+    if recent_turns:
+        parts.append(
+            "Recent dialogue summary:\n"
+            + "\n".join(
+                f"- {turn.get('action_intent')}/{turn.get('domain')}: {turn.get('user_summary')}"
+                for turn in recent_turns
+            )
+        )
 
     return "\n".join(parts)
 
 
 def _has_pending_plan_confirmation_v2(state: GraphState) -> bool:
-    return bool(state.get("awaiting_plan_confirmation")) and bool(state.get("proposed_plan"))
+    if bool(state.get("awaiting_plan_confirmation")) and bool(state.get("proposed_plan")):
+        return True
+    active_proposal = state.get("active_proposal")
+    return bool(active_proposal and active_proposal.get("items"))
 
 
 def _matches_hardcoded_confirmation_approval(message: str) -> bool:
@@ -559,38 +653,12 @@ def _matches_hardcoded_confirmation_approval(message: str) -> bool:
     if not normalized:
         return False
 
-    if normalized in {
-        phrase.lower() for phrase in _HARDCODED_CONFIRMATION_APPROVAL_PHRASES
-    }:
+    if normalized in {phrase.lower() for phrase in _EXPLICIT_PLAN_APPROVAL_PHRASES}:
         return True
 
-    has_modified_plan_reference = any(
-        phrase in normalized
-        for phrase in (
-            "수정된 계획",
-            "수정한 계획",
-            "방금 수정한 계획",
-        )
-    )
-    has_apply_verb = any(
-        phrase in normalized
-        for phrase in (
-            "진행해줘",
-            "진행해 줘",
-            "적용해줘",
-            "적용해 줘",
-            "반영해줘",
-            "반영해 줘",
-        )
-    )
-    has_acceptance_prefix = normalized.startswith("좋아요") or normalized.startswith("좋습니다")
-    if has_modified_plan_reference and has_apply_verb:
-        return True
-    if "그대로" in normalized and has_apply_verb and "계획 확인" in normalized:
-        return True
-    if has_acceptance_prefix and has_modified_plan_reference and has_apply_verb:
-        return True
-    return False
+    has_plan_reference = any(keyword in normalized for keyword in _PLAN_REFERENCE_KEYWORDS)
+    has_apply_verb = any(keyword in normalized for keyword in _APPROVAL_COMMITMENT_KEYWORDS)
+    return has_plan_reference and has_apply_verb and not _looks_like_explicit_plan_change(message, {})
 
 
 async def _classify_plan_confirmation(
@@ -600,8 +668,8 @@ async def _classify_plan_confirmation(
 ) -> PlanConfirmationDecision | None:
     latest_assistant = _latest_assistant_message_v2(state)
     proposed_plan = state.get("proposed_plan") or []
-    proposed_plan_type = state.get("proposed_plan_type") or ""
-    proposed_plan_action = state.get("proposed_plan_action") or ""
+    proposed_plan_type = state.get("proposed_plan_type") or (state.get("active_proposal") or {}).get("domain") or ""
+    proposed_plan_action = state.get("proposed_plan_action") or (state.get("active_proposal") or {}).get("write_mode") or ""
     user_content = (
         "[Assistant Plan Response]\n"
         f"{latest_assistant[:800]}\n\n"
@@ -641,80 +709,41 @@ async def _classify_plan_confirmation(
         deps.trace.record_current_alert(
             severity="warning",
             message="Plan confirmation classification failed",
-            detail={
-                "error": str(exc),
-                "user_message": message,
-            },
+            detail={"error": str(exc), "user_message": message},
         )
         if _looks_like_plan_approval(message, state) or _looks_like_plan_acceptance_followup(message, state):
             deps.trace.record_current_event(
                 stage="confirm_gate",
                 status="ok",
                 title="Heuristic confirmation fallback approved",
-                detail={
-                    "reason": "heuristic_fallback",
-                    "user_message": message,
-                },
+                detail={"reason": "heuristic_fallback", "user_message": message},
             )
             return PlanConfirmationDecision(approved=True, confidence=0.9, reason="heuristic_fallback")
         return None
 
 
-def _build_context_v2(state: GraphState) -> str:
-    parts: list[str] = []
-
-    if state.get("previous_intent"):
-        parts.append(f"이전 의도: {state['previous_intent']}")
-
-    if state.get("previous_emotion"):
-        emotion = state["previous_emotion"]
-        parts.append(f"이전 감정: {emotion['label']} (강도 {emotion['intensity']:.1f})")
-
-    if state.get("summary"):
-        parts.append(f"대화 요약: {state['summary']}")
-
-    latest_assistant = _latest_assistant_message_v2(state)
-    if latest_assistant:
-        parts.append(f"직전 AI 응답: {latest_assistant[:200]}")
-
-    return "\n".join(parts)
-
-
-def _has_pending_plan_confirmation(state: GraphState) -> bool:
-    return _has_pending_plan_confirmation_v2(state)
-
-
 def _has_recent_plan_intent(state: GraphState) -> bool:
-    return state.get("intent") in {
-        INTENT_PLAN,
-        INTENT_MODIFY,
-        INTENT_APPROVAL,
-    } or state.get("previous_intent") in {
+    return state.get("intent") in {INTENT_PLAN, INTENT_MODIFY, INTENT_APPROVAL} or state.get("previous_intent") in {
         INTENT_PLAN,
         INTENT_MODIFY,
         INTENT_APPROVAL,
     }
 
 
-def _looks_like_explicit_plan_change(message: str, state: GraphState) -> bool:
+def _looks_like_explicit_plan_change(message: str, state: GraphState | dict) -> bool:
     normalized = message.strip().lower()
-    if not normalized or not _has_pending_plan_confirmation_v2(state):
+    if not normalized:
         return False
 
     has_change_marker = any(marker in normalized for marker in _PLAN_CHANGE_MARKERS)
     has_modify_keyword = any(keyword in normalized for keyword in _MODIFY_KEYWORDS)
-    has_contrast_marker = any(marker in normalized for marker in ("말고", "대신", "빼고"))
-    has_commitment_keyword = any(
-        keyword in normalized for keyword in _APPROVAL_COMMITMENT_KEYWORDS
-    )
-    has_confirmation_reference = any(
-        keyword in normalized for keyword in _PLAN_CONFIRMATION_REFERENCE_KEYWORDS
-    )
+    has_commitment_keyword = any(keyword in normalized for keyword in _APPROVAL_COMMITMENT_KEYWORDS)
+    has_confirmation_reference = any(keyword in normalized for keyword in _PLAN_CONFIRMATION_REFERENCE_KEYWORDS)
     looks_like_referential_acceptance = has_confirmation_reference and has_commitment_keyword
 
     if has_modify_keyword and not looks_like_referential_acceptance:
         return True
-    if has_change_marker and (has_contrast_marker or not looks_like_referential_acceptance):
+    if has_change_marker and not looks_like_referential_acceptance:
         return True
     return False
 
@@ -731,30 +760,15 @@ def _looks_like_plan_acceptance_followup(message: str, state: GraphState) -> boo
         return False
 
     is_short_ack = normalized in {item.lower() for item in _SHORT_APPROVAL_RESPONSES}
-    has_commitment_keyword = any(
-        keyword in normalized for keyword in _APPROVAL_COMMITMENT_KEYWORDS
-    )
+    has_commitment_keyword = any(keyword in normalized for keyword in _APPROVAL_COMMITMENT_KEYWORDS)
     has_reference = any(
         keyword in normalized
-        for keyword in (
-            *_PLAN_REFERENCE_KEYWORDS,
-            *_PLAN_CONFIRMATION_REFERENCE_KEYWORDS,
-        )
-    )
-    latest_assistant = _latest_assistant_message_v2(state).lower()
-    assistant_requested_confirmation = _assistant_requested_plan_confirmation(state)
-    message_is_question = "?" in normalized or normalized.endswith("까") or normalized.endswith("나요")
-    appears_off_topic = (
-        not has_reference
-        and not has_commitment_keyword
-        and not any(keyword in latest_assistant for keyword in _PLAN_REFERENCE_KEYWORDS)
+        for keyword in (*_PLAN_REFERENCE_KEYWORDS, *_PLAN_CONFIRMATION_REFERENCE_KEYWORDS)
     )
 
-    if message_is_question or appears_off_topic:
-        return False
     if is_short_ack:
         return True
-    return has_commitment_keyword or (assistant_requested_confirmation and has_reference)
+    return has_commitment_keyword and has_reference
 
 
 def _assistant_requested_plan_confirmation(state: GraphState) -> bool:
@@ -762,13 +776,8 @@ def _assistant_requested_plan_confirmation(state: GraphState) -> bool:
     if not latest_assistant:
         return False
 
-    has_plan_reference = any(
-        keyword in latest_assistant for keyword in _PLAN_REFERENCE_KEYWORDS
-    )
-    has_confirmation_prompt = any(
-        keyword in latest_assistant for keyword in _APPROVAL_KEYWORDS
-    ) or "吏꾪뻾 ?щ?" in latest_assistant
-
+    has_plan_reference = any(keyword in latest_assistant for keyword in _PLAN_REFERENCE_KEYWORDS)
+    has_confirmation_prompt = any(keyword in latest_assistant for keyword in _APPROVAL_KEYWORDS)
     return has_plan_reference and has_confirmation_prompt
 
 
@@ -790,16 +799,10 @@ def _looks_like_modify_request(message: str) -> bool:
 def _looks_like_plan_approval(message: str, state: GraphState) -> bool:
     normalized = message.strip().lower()
     has_approval_keyword = any(keyword in normalized for keyword in _APPROVAL_KEYWORDS)
-    has_commitment_keyword = any(
-        keyword in normalized for keyword in _APPROVAL_COMMITMENT_KEYWORDS
-    )
-    has_explicit_approval_phrase = any(
-        phrase in normalized for phrase in _EXPLICIT_PLAN_APPROVAL_PHRASES
-    )
+    has_commitment_keyword = any(keyword in normalized for keyword in _APPROVAL_COMMITMENT_KEYWORDS)
+    has_explicit_approval_phrase = any(phrase in normalized for phrase in _EXPLICIT_PLAN_APPROVAL_PHRASES)
     has_plan_reference = any(keyword in normalized for keyword in _PLAN_REFERENCE_KEYWORDS)
-    has_confirmation_reference = any(
-        keyword in normalized for keyword in _PLAN_CONFIRMATION_REFERENCE_KEYWORDS
-    )
+    has_confirmation_reference = any(keyword in normalized for keyword in _PLAN_CONFIRMATION_REFERENCE_KEYWORDS)
     has_modify_keyword = any(keyword in normalized for keyword in _MODIFY_KEYWORDS)
     has_profile_keyword = any(keyword in normalized for keyword in _PROFILE_FIELD_KEYWORDS)
     has_plan_context = (
@@ -808,15 +811,10 @@ def _looks_like_plan_approval(message: str, state: GraphState) -> bool:
         or _has_recent_plan_intent(state)
         or _assistant_requested_plan_confirmation(state)
     )
+
     if has_plan_context and has_explicit_approval_phrase and not has_profile_keyword:
         return True
-    if (
-        has_plan_context
-        and has_confirmation_reference
-        and has_commitment_keyword
-        and not has_profile_keyword
-        and not _looks_like_explicit_plan_change(message, state)
-    ):
+    if has_plan_context and has_confirmation_reference and has_commitment_keyword and not has_profile_keyword:
         return True
     if not has_approval_keyword:
         return False
@@ -848,36 +846,24 @@ def _looks_like_memory_query(message: str) -> bool:
     has_question_shape = (
         "?" in normalized
         or normalized.endswith("뭐야")
-        or normalized.endswith("뭔지")
+        or normalized.endswith("뭐지")
         or normalized.endswith("기억나")
     )
     return has_memory_keyword and has_question_shape
 
 
-def _looks_like_memory_save_request(message: str) -> bool:
-    normalized = message.strip().lower()
-    return any(keyword in normalized for keyword in _MEMORY_SAVE_KEYWORDS)
-
-
-def _looks_like_memory_query(message: str) -> bool:
-    normalized = message.strip().lower()
-    has_memory_keyword = any(keyword in normalized for keyword in _MEMORY_QUERY_KEYWORDS)
-    has_question_shape = (
-        "?" in normalized
-        or normalized.endswith("\ubb50\uc57c")
-        or normalized.endswith("\ubb50\uc9c0")
-        or normalized.endswith("\uae30\uc5b5\ub098")
-    )
-    return has_memory_keyword and has_question_shape
-
-
 def _looks_like_context_dependent_fallback(message: str, state: GraphState) -> bool:
+    resolution = state.get("context_resolution") or {}
+    if resolution.get("resolved_reference") not in {None, "", "none"}:
+        return False
+
     normalized = message.strip().lower()
     has_reference = any(keyword in normalized for keyword in _CONTEXT_DEPENDENT_REFERENCES)
     has_plan_context = (
         _has_pending_plan_confirmation_v2(state)
         or bool(state.get("proposed_plan"))
         or _has_recent_plan_intent(state)
+        or bool((state.get("recent_dialogue") or {}).get("recent_turns"))
         or state.get("intent") in {INTENT_INFO, INTENT_RECORD}
         or state.get("previous_intent") in {INTENT_INFO, INTENT_RECORD}
     )

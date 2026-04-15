@@ -9,13 +9,13 @@ from contextlib import asynccontextmanager
 import aiosqlite
 import httpx
 from fastapi import FastAPI
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pinecone import PineconeAsyncio, ServerlessSpec
 
 from app.clients.embedding import EMBEDDING_DIM, EmbeddingClient
 from app.clients.gemini import GeminiClient
 from app.clients.pinecone import PineconeClient
 from app.clients.was import WASClient
+from app.core.checkpoint_filter import FilteringAsyncSqliteSaver
 from app.core.config import get_settings
 from app.core.profile_sync import ProfileSyncTracker
 from app.core.trace_store import TraceLogHandler, TraceStore
@@ -150,7 +150,7 @@ async def lifespan(app: FastAPI):
     db_path = settings.CHECKPOINT_DB_PATH
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
     checkpointer_conn = await aiosqlite.connect(db_path)
-    checkpointer = AsyncSqliteSaver(checkpointer_conn)
+    checkpointer = FilteringAsyncSqliteSaver(checkpointer_conn)
     await checkpointer.setup()
     app.state._checkpointer = checkpointer
     logger.info("SQLite checkpointer initialized (path=%s)", db_path)

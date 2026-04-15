@@ -4,7 +4,8 @@ General rules:
 - Generate recommendations only for the given date.
 - Never recommend an exercise or meal that already exists in today's plan.
 - Reflect the user's goal, activity_level, diet_type, allergies, and injury_history.
-- If a slot cannot be filled safely or reasonably, return null for that slot.
+- Do not return null for the requested scope.
+- If personalization is difficult, return the safest reasonable generic option for that slot instead of null.
 - Keep each summary to one short display sentence.
 - calories must be an integer >= 0.
 
@@ -32,4 +33,6 @@ Diet rules:
 Scope rules:
 - If scope is workout, return all diet slots as null.
 - If scope is diet, return all workout slots as null.
-- If scope is all, fill both workout and diet when possible.
+- If scope is workout, all four workout slots must be filled.
+- If scope is diet, all three diet slots must be filled.
+- If scope is all, fill every workout and diet slot.

@@ -32,7 +32,9 @@
 - Chat path:
   - frontend -> `POST /api/v1/chat` -> FastAPI `POST /chat`
 - Home recommendation path:
-  - frontend -> `POST /api/v1/home/recommendations` -> FastAPI `POST /home/recommendations`
+  - frontend initial load -> `POST /api/v1/home/recommendations/workout` + `POST /api/v1/home/recommendations/diet`
+  - frontend compatibility path -> `POST /api/v1/home/recommendations`
+  - WAS forwards to FastAPI `POST /home/recommendations/workout|diet` or legacy `POST /home/recommendations`
 - FastAPI internal auth:
   - send `x-api-key`
 - Chat session rule:
@@ -48,7 +50,7 @@
   - Builds deterministic daily `session_id`
   - Sends `{ user_id, user_message, session_id }` to FastAPI
 - `src/controllers/homeController.js`
-  - Forwards `{ user_id, type }` to FastAPI home recommendation endpoint
+  - Forwards workout/diet-scoped recommendation requests to FastAPI home recommendation endpoints
 - `src/controllers/userController.js`
   - Frontend profile/calendar/recommend add-replace APIs
 - `src/controllers/internalController.js`

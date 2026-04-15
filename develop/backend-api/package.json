@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "logs": "mkdir -p logs"
+    "logs": "mkdir -p logs",
+    "test:contracts": "node scripts/test_internal_contracts.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

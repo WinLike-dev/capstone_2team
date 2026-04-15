@@ -27,10 +27,6 @@ def make_fallback_node(deps: NodeDeps):
             "response": _CLARIFICATION_RESPONSE,
             "fallback_count": count + 1,
             "needs_clarification": True,
-            "messages": [
-                {"role": "user", "content": state["user_message"]},
-                {"role": "assistant", "content": _CLARIFICATION_RESPONSE},
-            ],
         }
 
     return fallback_node

@@ -194,6 +194,7 @@ Behavior:
 - automatic deploy on push to `test/all`
 - deploys `backend` and `ai` in parallel
 - installs Docker on Ubuntu VMs if it is missing
+- normalizes the remote bootstrap script to UTF-8 without BOM and LF line endings before execution
 
 Firewall note:
 

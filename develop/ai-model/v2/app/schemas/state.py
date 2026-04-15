@@ -1,18 +1,9 @@
 """Shared LangGraph state for the v2 model."""
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Optional
+from typing import Any, Literal, Optional
 
 from typing_extensions import TypedDict
-
-from app.core.config import get_settings
-
-
-def _append_messages(existing: list[dict], new: list[dict] | dict) -> list[dict]:
-    if isinstance(new, dict):
-        new = [new]
-    combined = existing + new
-    return combined[-get_settings().MAX_MESSAGES :]
 
 
 class EmotionState(TypedDict):
@@ -29,6 +20,7 @@ class DraftComponents(TypedDict):
     core_message: str
     reason_points: list[str]
     suggested_action: str
+    plan_preview: str
     safety_notes: list[str]
     approval_question: Optional[str]
     search_grounding_summary: str
@@ -36,6 +28,70 @@ class DraftComponents(TypedDict):
 
 RequestKind = Literal["chat", "home_recommendation"]
 HomeRecommendationScope = Literal["all", "workout", "diet"]
+ActionIntent = Literal[
+    "create",
+    "modify",
+    "info",
+    "record",
+    "approval",
+    "casual",
+    "safety",
+    "fallback",
+    "home_recommendation",
+]
+Domain = Literal["workout", "diet", "profile", "general", "none"]
+SupportMode = Literal["care", "normal"]
+ResolvedReference = Literal[
+    "none",
+    "active_proposal",
+    "today_plan",
+    "previous_answer",
+    "recent_chat",
+    "user_memory",
+]
+StateEffect = Literal[
+    "none",
+    "proposal_created",
+    "proposal_updated",
+    "proposal_approved",
+    "profile_recorded",
+    "plan_checked",
+    "clarification_requested",
+]
+WriteMode = Literal["create", "update"]
+
+
+class ContextResolution(TypedDict):
+    resolved_reference: ResolvedReference
+    resolved_domain: Domain
+    resolved_text: str
+    confidence: float
+    ambiguous: bool
+
+
+class ActiveProposal(TypedDict):
+    domain: Literal["workout", "diet"]
+    write_mode: WriteMode
+    items: list[dict[str, Any]]
+    summary: str
+    last_used_turn: int
+
+
+class RecentTurn(TypedDict):
+    turn_id: int
+    user_text: str
+    assistant_text: str
+    user_summary: str
+    assistant_summary: str
+    action_intent: ActionIntent
+    domain: Domain
+    support_mode: SupportMode
+    referenced_object: ResolvedReference
+    state_effect: StateEffect
+
+
+class RecentDialogue(TypedDict):
+    recent_turns: list[RecentTurn]
 
 
 class GraphState(TypedDict):
@@ -50,6 +106,11 @@ class GraphState(TypedDict):
     is_session_start: bool
 
     intent: str
+    action_intent: Optional[ActionIntent]
+    domain: Domain
+    support_mode: SupportMode
+    ambiguous: bool
+    context_resolution: ContextResolution
     confidence: float
     emotion: Optional[EmotionState]
     previous_intent: Optional[str]
@@ -73,6 +134,8 @@ class GraphState(TypedDict):
 
     pending_writes: list[PendingWrite]
     awaiting_plan_confirmation: bool
+    active_proposal: Optional[ActiveProposal]
+    recent_dialogue: RecentDialogue
 
     draft_response: Optional[str]
     draft_components: Optional[DraftComponents]
@@ -92,7 +155,3 @@ class GraphState(TypedDict):
 
     fallback_count: int
     needs_clarification: bool
-
-    summary: Optional[str]
-    last_assistant_message: Optional[str]
-    messages: Annotated[list[dict[str, Any]], _append_messages]

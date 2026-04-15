@@ -24,18 +24,20 @@
   - send `{ message }`
   - backend translates to FastAPI contract
 - Home recommendations:
-  - call `POST /api/v1/home/recommendations`
-  - send `{ type: 'all' | 'workout' | 'diet' }`
+  - initial load: call `POST /api/v1/home/recommendations/workout` then `POST /api/v1/home/recommendations/diet`
+  - workout refresh: call `POST /api/v1/home/recommendations/workout`
+  - diet refresh: call `POST /api/v1/home/recommendations/diet`
+  - send `{ recent_recommendations }`
 - Profile/calendar:
   - call `backend-api` user routes only
 
 ## Home Recommendation UI Rules
 - First entry to home tab on a KST day:
-  - request `type=all`
+  - request workout first, then diet
 - Workout refresh button:
-  - request `type=workout`
+  - request workout endpoint only
 - Diet refresh button:
-  - request `type=diet`
+  - request diet endpoint only
 - Cache:
   - localStorage
   - one day per user, KST-based

@@ -4,7 +4,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from typing import Any
 
+from app.core.conversation_state import infer_domain
 from app.core.prompt_loader import load_prompt
 from app.graph.deps import NodeDeps
 from app.schemas.llm_responses import QueryRegenResponse, SearchEvalResponse
@@ -18,7 +20,7 @@ INTENT_MODIFY = "수정"
 INTENT_INFO = "정보"
 
 TOP_K = 8
-_WEB_ENABLED_INTENTS = {INTENT_PLAN, INTENT_INFO}
+_WEB_ENABLED_INTENTS = {INTENT_INFO}
 _ACCEPT_SCORE_BY_INTENT = {
     INTENT_INFO: 0.6,
     INTENT_PLAN: 0.55,
@@ -54,7 +56,7 @@ _QUERY_REGEN_PROMPT = load_prompt("nodes/search/query_regen.md")
 def make_search_node(deps: NodeDeps):
     async def search_node(state: GraphState) -> dict:
         started_at = time.perf_counter()
-        query = state.get("search_query") or state["user_message"]
+        query = state.get("search_query") or _resolved_query(state)
         targets = list(state.get("search_targets") or [])
         retry_count = state.get("search_retry_count", 0)
         intent = state.get("intent", "")
@@ -67,6 +69,7 @@ def make_search_node(deps: NodeDeps):
 
         query = _augment_query(query, state)
         targets = _normalize_targets(state, query, targets)
+        external_filter, relaxed_external_filter = _build_external_filters(state, query)
 
         if intent in _WEB_ENABLED_INTENTS and "vdb_external" in targets and "web" not in targets:
             targets.append("web")
@@ -92,8 +95,23 @@ def make_search_node(deps: NodeDeps):
             )
             return _degraded(state, intent)
 
-        raw_results = await _parallel_search(deps, state["user_id"], query, query_vec, targets)
+        raw_results = await _parallel_search(
+            deps,
+            state["user_id"],
+            query,
+            query_vec,
+            targets,
+            external_filter=external_filter,
+        )
         merged_results = _merge_results(raw_results)
+        merged_results = await _expand_external_results_if_needed(
+            deps,
+            query_vec,
+            targets,
+            merged_results,
+            strict_filter=external_filter,
+            relaxed_filter=relaxed_external_filter,
+        )
 
         if _should_skip_eval(state, merged_results):
             deps.trace.record_current_event(
@@ -138,7 +156,7 @@ def make_search_node(deps: NodeDeps):
 
         retry_score = _retry_score_for_intent(intent)
         if score < retry_score:
-            new_query = await _regenerate_query(deps, state["user_message"], merged_results)
+            new_query = await _regenerate_query(deps, _resolved_query(state), merged_results)
             deps.trace.record_current_event(
                 stage="search",
                 status="warn",
@@ -180,11 +198,23 @@ def _augment_query(query: str, state: GraphState) -> str:
     return f"{query} [{', '.join(additions)}]"
 
 
+def _resolved_query(state: GraphState) -> str:
+    resolution = state.get("context_resolution") or {}
+    resolved_text = str(resolution.get("resolved_text") or "").strip()
+    resolved_reference = resolution.get("resolved_reference")
+    confidence = float(resolution.get("confidence") or 0.0)
+
+    if resolved_reference and resolved_reference != "none" and resolved_text and confidence >= 0.6:
+        return resolved_text
+    return str(state.get("user_message") or "")
+
+
 def _normalize_targets(state: GraphState, query: str, targets: list[str]) -> list[str]:
     normalized = list(dict.fromkeys(targets))
     intent = state.get("intent")
+    action_intent = state.get("action_intent")
 
-    if intent == INTENT_MODIFY:
+    if action_intent in {"create", "modify"} or intent == INTENT_MODIFY:
         return [target for target in normalized if target != "web"]
 
     if intent == INTENT_INFO and "web" in normalized and not _info_needs_web(query):
@@ -196,6 +226,154 @@ def _normalize_targets(state: GraphState, query: str, targets: list[str]) -> lis
 def _info_needs_web(query: str) -> bool:
     normalized = query.strip().lower()
     return any(keyword in normalized for keyword in _INFO_WEB_KEYWORDS)
+
+
+def _build_external_filters(state: GraphState, query: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    domain = _resolved_domain(state, query)
+    action_intent = str(state.get("action_intent") or "")
+    category_candidates = _external_categories_for_domain(domain)
+    use_case_candidates = _external_use_cases_for_request(domain, action_intent, query)
+    population_candidates = _external_populations_for_profile(state)
+    clauses: list[dict[str, Any]] = []
+    relaxed_filter: dict[str, Any] | None = None
+
+    if category_candidates:
+        clauses.append({"category": {"$in": category_candidates}})
+    if use_case_candidates:
+        clauses.append({"use_case": {"$in": use_case_candidates}})
+    if population_candidates:
+        clauses.append({"population": {"$in": population_candidates}})
+
+    if not clauses:
+        return None, None
+    if category_candidates:
+        relaxed_filter = {"category": {"$in": category_candidates}}
+    if len(clauses) == 1:
+        return clauses[0], relaxed_filter if relaxed_filter != clauses[0] else None
+    return {"$and": clauses}, relaxed_filter
+
+
+def _resolved_domain(state: GraphState, query: str) -> str:
+    domain = str(state.get("domain") or "").strip()
+    if domain in {"workout", "diet", "profile", "general"}:
+        return domain
+    resolution = state.get("context_resolution") or {}
+    resolved_domain = str(resolution.get("resolved_domain") or "").strip()
+    if resolved_domain in {"workout", "diet", "profile", "general"} and resolved_domain != "none":
+        return resolved_domain
+    return infer_domain(query)
+
+
+def _external_categories_for_domain(domain: str) -> list[str]:
+    if domain == "workout":
+        return [
+            "workout_resistance_guidelines",
+            "workout_technique",
+            "workout_program_design",
+            "hypertrophy_volume",
+            "hypertrophy_frequency",
+            "cardio_guidelines",
+            "hiit_programming",
+            "hiit_efficiency",
+            "mobility_pnf",
+            "stretching_performance",
+        ]
+    if domain == "diet":
+        return [
+            "nutrition_kdri",
+            "nutrition_protein",
+            "nutrition_timing",
+            "nutrition_allergy",
+            "supplement_creatine",
+            "supplement_omega3",
+            "physique_cutting",
+        ]
+    return []
+
+
+def _external_use_cases_for_request(domain: str, action_intent: str, query: str) -> list[str]:
+    normalized = query.lower()
+    if domain == "workout":
+        use_cases = {
+            "create": [
+                "program_design",
+                "novice_programming",
+                "intermediate_programming",
+                "cardio_programming",
+                "mobility",
+                "coaching",
+            ],
+            "modify": [
+                "program_adjustment",
+                "fatigue_management",
+                "injury_prevention",
+                "risk_screening",
+                "mobility",
+                "coaching",
+            ],
+            "info": [
+                "program_design",
+                "technique_cueing",
+                "evidence_interpretation",
+                "injury_prevention",
+                "risk_screening",
+                "mobility",
+                "coaching",
+            ],
+        }.get(action_intent, ["program_design", "coaching", "evidence_interpretation"])
+        if any(keyword in normalized for keyword in ("통증", "부상", "아픔", "무릎", "허리", "어깨")):
+            use_cases.extend(["injury_prevention", "risk_screening", "mobility"])
+        return list(dict.fromkeys(use_cases))
+
+    if domain == "diet":
+        use_cases = {
+            "create": [
+                "meal_planning",
+                "training_day_nutrition",
+                "muscle_gain",
+                "fat_loss",
+                "coaching",
+            ],
+            "modify": [
+                "meal_planning",
+                "fat_loss",
+                "allergy_safe_planning",
+                "coaching",
+            ],
+            "info": [
+                "meal_planning",
+                "training_day_nutrition",
+                "supplement_use",
+                "allergy_safe_planning",
+                "evidence_interpretation",
+                "coaching",
+            ],
+        }.get(action_intent, ["meal_planning", "coaching", "evidence_interpretation"])
+        if any(keyword in normalized for keyword in ("알레르기", "유당", "갑각류", "계란", "우유", "견과")):
+            use_cases.append("allergy_safe_planning")
+        if any(keyword in normalized for keyword in ("보충제", "크레아틴", "오메가3")):
+            use_cases.append("supplement_use")
+        return list(dict.fromkeys(use_cases))
+
+    return []
+
+
+def _external_populations_for_profile(state: GraphState) -> list[str]:
+    profile = state.get("user_profile") or {}
+    populations: list[str] = []
+    age = profile.get("age")
+    if isinstance(age, (int, float)) and age >= 65:
+        populations.append("older_adults")
+
+    allergy_value = profile.get("allergies") or profile.get("allergy") or []
+    if isinstance(allergy_value, list):
+        allergy_text = " ".join(str(item) for item in allergy_value).lower()
+    else:
+        allergy_text = str(allergy_value).lower()
+    if allergy_text:
+        populations.append("food_allergy")
+
+    return list(dict.fromkeys(populations))
 
 
 def _should_skip_eval(state: GraphState, results: list[dict]) -> bool:
@@ -252,6 +430,8 @@ async def _parallel_search(
     query: str,
     vector: list[float],
     targets: list[str],
+    *,
+    external_filter: dict[str, Any] | None = None,
 ) -> list[dict]:
     tasks = []
     for target in targets:
@@ -260,7 +440,7 @@ async def _parallel_search(
         elif target == "vdb_user_important":
             tasks.append(deps.pinecone.search_important(user_id, vector, TOP_K))
         elif target == "vdb_external":
-            tasks.append(deps.pinecone.search_external(vector, TOP_K))
+            tasks.append(deps.pinecone.search_external(vector, TOP_K, metadata_filter=external_filter))
         elif target == "web":
             tasks.append(_web_search(deps, query))
 
@@ -273,6 +453,37 @@ async def _parallel_search(
         else:
             logger.warning("Search target failed and was ignored: %s", result)
     return combined
+
+
+async def _expand_external_results_if_needed(
+    deps: NodeDeps,
+    vector: list[float],
+    targets: list[str],
+    merged_results: list[dict],
+    *,
+    strict_filter: dict[str, Any] | None,
+    relaxed_filter: dict[str, Any] | None,
+) -> list[dict]:
+    if "vdb_external" not in targets:
+        return merged_results
+
+    external_results = [result for result in merged_results if result.get("source") == "external"]
+    if len(external_results) >= 2:
+        return merged_results
+
+    expanded_results = list(merged_results)
+    if relaxed_filter and relaxed_filter != strict_filter:
+        relaxed_results = await deps.pinecone.search_external(vector, TOP_K, metadata_filter=relaxed_filter)
+        expanded_results = _merge_results(expanded_results + relaxed_results)
+        external_results = [result for result in expanded_results if result.get("source") == "external"]
+        if len(external_results) >= 2:
+            return expanded_results
+
+    if strict_filter:
+        semantic_results = await deps.pinecone.search_external(vector, TOP_K)
+        expanded_results = _merge_results(expanded_results + semantic_results)
+
+    return expanded_results
 
 
 async def _web_search(deps: NodeDeps, query: str) -> list[dict]:

@@ -73,7 +73,7 @@ exports.sendMessage = async (req, res) => {
     const upstreamStatus = error.response?.status;
     const upstreamPayload = error.response?.data;
 
-    logger.error('Chat gateway error: %s', error.message);
+    logger.error(`Chat gateway error: ${error.message}`);
 
     if (upstreamStatus) {
       return res.status(502).json({
@@ -153,7 +153,7 @@ exports.submitFeedback = async (req, res) => {
       .single();
 
     if (error) {
-      logger.error('Chat feedback save error: %s', error.message);
+      logger.error(`Chat feedback save error: ${error.message}`);
       return res.status(500).json({ error: 'Failed to save chat feedback.' });
     }
 
@@ -162,7 +162,7 @@ exports.submitFeedback = async (req, res) => {
       feedback: data,
     });
   } catch (error) {
-    logger.error('Chat feedback controller error: %s', error.message);
+    logger.error(`Chat feedback controller error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to save chat feedback.' });
   }
 };

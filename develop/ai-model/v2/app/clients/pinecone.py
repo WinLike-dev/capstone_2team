@@ -32,14 +32,49 @@ class PineconeClient:
 
     # ── 검색 ─────────────────────────────────────────────────────────────────
 
-    async def search_memory(self, user_id: str, vector: list[float], top_k: int = 5) -> list[dict]:
-        return await self._search(self._memory_ns(user_id), vector, top_k, source="memory")
+    async def search_memory(
+        self,
+        user_id: str,
+        vector: list[float],
+        top_k: int = 5,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        return await self._search(
+            self._memory_ns(user_id),
+            vector,
+            top_k,
+            source="memory",
+            metadata_filter=metadata_filter,
+        )
 
-    async def search_important(self, user_id: str, vector: list[float], top_k: int = 5) -> list[dict]:
-        return await self._search(self._important_ns(user_id), vector, top_k, source="important")
+    async def search_important(
+        self,
+        user_id: str,
+        vector: list[float],
+        top_k: int = 5,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        return await self._search(
+            self._important_ns(user_id),
+            vector,
+            top_k,
+            source="important",
+            metadata_filter=metadata_filter,
+        )
 
-    async def search_external(self, vector: list[float], top_k: int = 5) -> list[dict]:
-        return await self._search(self.EXTERNAL_NS, vector, top_k, source="external")
+    async def search_external(
+        self,
+        vector: list[float],
+        top_k: int = 5,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        return await self._search(
+            self.EXTERNAL_NS,
+            vector,
+            top_k,
+            source="external",
+            metadata_filter=metadata_filter,
+        )
 
     # ── 저장 ─────────────────────────────────────────────────────────────────
 
@@ -98,14 +133,23 @@ class PineconeClient:
     # ── 내부 구현 ─────────────────────────────────────────────────────────────
 
     async def _search(
-        self, namespace: str, vector: list[float], top_k: int, source: str
+        self,
+        namespace: str,
+        vector: list[float],
+        top_k: int,
+        source: str,
+        metadata_filter: dict[str, Any] | None = None,
     ) -> list[dict]:
-        result = await self._index.query(
-            vector=vector,
-            top_k=top_k,
-            namespace=namespace,
-            include_metadata=True,
-        )
+        query_kwargs: dict[str, Any] = {
+            "vector": vector,
+            "top_k": top_k,
+            "namespace": namespace,
+            "include_metadata": True,
+        }
+        if metadata_filter:
+            query_kwargs["filter"] = metadata_filter
+
+        result = await self._index.query(**query_kwargs)
         return [
             {
                 "id": m.id,
@@ -117,6 +161,8 @@ class PineconeClient:
                 "subtopic": m.metadata.get("subtopic", ""),
                 "chunk_title": m.metadata.get("chunk_title", ""),
                 "evidence_type": m.metadata.get("evidence_type", ""),
+                "population": m.metadata.get("population", ""),
+                "use_case": m.metadata.get("use_case", ""),
                 "year": m.metadata.get("year", ""),
                 "timestamp": m.metadata.get("timestamp", ""),
             }

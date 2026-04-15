@@ -1,0 +1,703 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import sys
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Any
+
+import aiosqlite
+import httpx
+from fastapi import FastAPI
+
+for key, value in {
+    "GEMINI_API_KEY": "test-gemini",
+    "ROUTER_API_KEY": "test-router",
+    "PINECONE_API_KEY": "test-pinecone",
+    "PINECONE_INDEX_NAME": "test-index",
+    "WAS_BASE_URL": "http://was.test",
+    "INTERNAL_API_KEY": "test-internal-key",
+    "APP_ENV": "development",
+}.items():
+    os.environ.setdefault(key, value)
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.core.checkpoint_filter import FilteringAsyncSqliteSaver
+from app.core.exceptions import ExternalServiceError
+from app.core.trace_store import TraceStore
+from app.graph.builder import build_graph
+from app.graph.deps import NodeDeps
+from app.graph.nodes.intent import INTENT_INFO, INTENT_RECORD
+from app.routers.chat import router as chat_router
+
+MSG_CREATE_WORKOUT = "\uc624\ub298 \uc6b4\ub3d9 \uacc4\ud68d \uc9dc\uc918"
+MSG_MODIFY_WORKOUT = "\uadf8\uac70 \uc880 \ub35c \ube61\uc138\uac8c \ubc14\uafd4\uc918"
+MSG_INFO_REASON = "\uc65c \uadf8\ub807\uac8c \uc9f0\uc5b4?"
+MSG_APPROVAL = "\uc88b\uc544 \uadf8\uac78\ub85c \uc9c4\ud589\ud574\uc918"
+MSG_RECORD_WEIGHT = "\ub0b4 \uccb4\uc911 72kg\ub85c \uae30\ub85d\ud574\uc918"
+MSG_PLAN_CHECK = "\uc624\ub298 \uc6b4\ub3d9 \uccb4\ud06c\ud588\uc5b4"
+MSG_CARE = "\uc624\ub298 \ub108\ubb34 \uc678\ub85c\uc6cc"
+MSG_SAFETY = "\uc228\uc774 \ub108\ubb34 \ucc28\uace0 \uc5b4\uc9c0\ub7ec\uc6cc"
+
+
+class FakeProfileSync:
+    def __init__(self) -> None:
+        self._versions: dict[str, int] = {}
+
+    async def get_profile_version(self, user_id: str) -> int:
+        return self._versions.get(user_id, 0)
+
+    def bump(self, user_id: str) -> None:
+        self._versions[user_id] = self._versions.get(user_id, 0) + 1
+
+
+class FakeEmbed:
+    async def embed(self, text: str) -> list[float]:
+        base = float(len(text.strip()) or 1)
+        return [base, base / 10.0, base / 100.0]
+
+
+class FakePinecone:
+    def __init__(self) -> None:
+        self.memory: dict[str, list[dict[str, Any]]] = {}
+        self.important: dict[str, list[dict[str, Any]]] = {}
+
+    async def search_memory(
+        self,
+        user_id: str,
+        vector: list[float],
+        top_k: int,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        return list(self.memory.get(user_id, []))[:top_k]
+
+    async def search_important(
+        self,
+        user_id: str,
+        vector: list[float],
+        top_k: int,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        return list(self.important.get(user_id, []))[:top_k]
+
+    async def search_external(
+        self,
+        vector: list[float],
+        top_k: int,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        domain = _infer_external_domain(metadata_filter)
+        if domain == "diet":
+            texts = [
+                "Balanced protein and fiber support satiety.",
+                "Allergen ingredients should be replaced with safe alternatives.",
+            ]
+        else:
+            texts = [
+                "Early plans should prioritize sustainability over intensity.",
+                "Pain or injury history should lower impact and volume.",
+            ]
+        return [
+            {
+                "id": f"external-{domain}-{idx}",
+                "source": "external",
+                "text": text,
+                "score": 0.92 - idx * 0.05,
+                "metadata": {"category": domain},
+            }
+            for idx, text in enumerate(texts[:top_k])
+        ]
+
+    async def upsert_memory(
+        self,
+        user_id: str,
+        vector: list[float],
+        text: str,
+        emotion_label: str,
+        intensity: float,
+    ) -> None:
+        self.memory.setdefault(user_id, []).append(
+            {"id": f"mem-{len(self.memory.get(user_id, []))}", "text": text, "score": 0.7, "source": "memory"}
+        )
+
+    async def upsert_important(self, user_id: str, vector: list[float], text: str) -> None:
+        self.important.setdefault(user_id, []).append(
+            {"id": f"fact-{len(self.important.get(user_id, []))}", "text": text, "score": 0.8, "source": "important"}
+        )
+
+    async def delete_important(self, user_id: str, ids: list[str]) -> None:
+        existing = self.important.get(user_id, [])
+        self.important[user_id] = [item for item in existing if item.get("id") not in set(ids)]
+
+
+class FakeWAS:
+    def __init__(self, profile_sync: FakeProfileSync) -> None:
+        self.profile_sync = profile_sync
+        self.profiles: dict[str, dict[str, Any]] = {}
+        self.today_plans: dict[str, list[dict[str, Any]]] = {}
+        self.full_plans: dict[str, dict[str, dict[str, Any]]] = {}
+        self.write_log: list[tuple[str, str, Any]] = []
+
+    def _ensure_user(self, user_id: str) -> None:
+        self.profiles.setdefault(
+            user_id,
+            {
+                "selected_ai_persona": "default",
+                "goal": "maintain",
+                "allergies": [],
+                "injury_history": [],
+            },
+        )
+        self.today_plans.setdefault(
+            user_id,
+            [
+                {"id": f"{user_id}-exercise-1", "name": "Upper Body", "type": "exercise", "completed": False},
+                {"id": f"{user_id}-meal-1", "name": "Breakfast", "type": "meal", "completed": False},
+            ],
+        )
+        self.full_plans.setdefault(
+            user_id,
+            {
+                "workout": {"items": []},
+                "diet": {"items": []},
+            },
+        )
+
+    async def get_user_profile(self, user_id: str) -> dict[str, Any]:
+        self._ensure_user(user_id)
+        return dict(self.profiles[user_id])
+
+    async def get_today_plan(self, user_id: str) -> list[dict[str, Any]]:
+        self._ensure_user(user_id)
+        return [dict(item) for item in self.today_plans[user_id]]
+
+    async def get_workout_plan_full(self, user_id: str) -> dict[str, Any]:
+        self._ensure_user(user_id)
+        return json.loads(json.dumps(self.full_plans[user_id]["workout"]))
+
+    async def get_diet_plan_full(self, user_id: str) -> dict[str, Any]:
+        self._ensure_user(user_id)
+        return json.loads(json.dumps(self.full_plans[user_id]["diet"]))
+
+    async def put_user_profile(self, user_id: str, payload: dict[str, Any]) -> None:
+        self._ensure_user(user_id)
+        self.profiles[user_id].update(payload)
+        self.profile_sync.bump(user_id)
+        self.write_log.append(("profile", user_id, dict(payload)))
+
+    async def put_plan_check(self, user_id: str, item_id: str) -> None:
+        self._ensure_user(user_id)
+        updated: list[dict[str, Any]] = []
+        for item in self.today_plans[user_id]:
+            next_item = dict(item)
+            if next_item.get("id") == item_id:
+                next_item["completed"] = True
+            updated.append(next_item)
+        self.today_plans[user_id] = updated
+        self.write_log.append(("plan_check", user_id, item_id))
+
+    async def post_plan_create(self, user_id: str, payload: dict[str, Any]) -> None:
+        await self._write_plan(user_id, payload, mode="create")
+
+    async def put_plan_update(self, user_id: str, payload: dict[str, Any]) -> None:
+        await self._write_plan(user_id, payload, mode="update")
+
+    async def _write_plan(self, user_id: str, payload: dict[str, Any], *, mode: str) -> None:
+        self._ensure_user(user_id)
+        plan_type = str(payload.get("plan_type") or "workout")
+        items: list[dict[str, Any]] = []
+        for index, item in enumerate(payload.get("items") or [], start=1):
+            normalized = dict(item)
+            normalized.setdefault("id", f"{user_id}-{plan_type}-{index}")
+            normalized.setdefault("completed", False)
+            normalized["type"] = "meal" if plan_type == "diet" else "exercise"
+            items.append(normalized)
+        self.full_plans[user_id][plan_type] = {"items": items}
+        self.today_plans[user_id] = [dict(item) for item in items]
+        self.write_log.append((f"plan_{mode}", user_id, {"plan_type": plan_type, "count": len(items)}))
+
+
+class FlakyWAS(FakeWAS):
+    def __init__(
+        self,
+        profile_sync: FakeProfileSync,
+        *,
+        missing_profile_users: set[str] | None = None,
+        missing_today_users: set[str] | None = None,
+        failing_workout_full_users: set[str] | None = None,
+    ) -> None:
+        super().__init__(profile_sync)
+        self.missing_profile_users = set(missing_profile_users or set())
+        self.missing_today_users = set(missing_today_users or set())
+        self.failing_workout_full_users = set(failing_workout_full_users or set())
+
+    async def get_user_profile(self, user_id: str) -> dict[str, Any]:
+        if user_id in self.missing_profile_users:
+            raise ExternalServiceError(service="WAS", message="HTTP 404", status_code=404)
+        return await super().get_user_profile(user_id)
+
+    async def get_today_plan(self, user_id: str) -> list[dict[str, Any]]:
+        if user_id in self.missing_today_users:
+            raise ExternalServiceError(service="WAS", message="HTTP 404", status_code=404)
+        return await super().get_today_plan(user_id)
+
+    async def get_workout_plan_full(self, user_id: str) -> dict[str, Any]:
+        if user_id in self.failing_workout_full_users:
+            raise ExternalServiceError(service="WAS", message="HTTP 500", status_code=500)
+        return await super().get_workout_plan_full(user_id)
+
+
+class FakeRouter:
+    async def generate(self, *, system_prompt: str, user_content: str, response_schema):  # noqa: ANN001
+        schema_name = getattr(response_schema, "__name__", "")
+        if schema_name == "IntentOutput":
+            return json.dumps(self._intent_output(user_content), ensure_ascii=False)
+        if schema_name == "PlanConfirmationDecision":
+            return json.dumps(self._plan_confirmation(user_content), ensure_ascii=False)
+        if schema_name == "SearchEvalResponse":
+            return json.dumps({"score": 0.95, "reason": "fake_eval"}, ensure_ascii=False)
+        if schema_name == "QueryRegenResponse":
+            return json.dumps({"query": _extract_after_marker(user_content, "\uc6d0\ub798 \uc9c8\ubb38:") or "search query"}, ensure_ascii=False)
+        if schema_name == "DraftResponse":
+            return json.dumps(self._draft_response(user_content), ensure_ascii=False)
+        if schema_name == "SelfEvalResponse":
+            return json.dumps({"passed": True, "reason": ""}, ensure_ascii=False)
+        if schema_name == "PersonaResponse":
+            return json.dumps({"response": self._persona_response(user_content)}, ensure_ascii=False)
+        if schema_name == "MemoryManagerResponse":
+            return json.dumps({"has_changes": False, "operations": []}, ensure_ascii=False)
+        raise RuntimeError(f"Unsupported fake schema: {schema_name}")
+
+    async def search_web(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": f"web-{idx}",
+                "source": "web",
+                "text": f"web evidence {idx + 1}: {query}",
+                "score": 0.75 - idx * 0.05,
+            }
+            for idx in range(min(max_results, 2))
+        ]
+
+    def _intent_output(self, user_content: str) -> dict[str, Any]:
+        message = _extract_resolved_message(user_content).lower()
+        emotion_label = "\uc911\ub9bd"
+        emotion_intensity = 0.0
+        if any(token in message for token in ("\uc9c0\uccd0", "\ud798\ub4e4", "\ubd88\uc548", "\uc6b8\uc6b8", "\uc678\ub86c", "\uac71\uc815", "\uc2a4\ud2b8\ub808\uc2a4")):
+            emotion_label = "\ubd88\uc548"
+            emotion_intensity = 0.76
+
+        if any(token in message for token in ("\uc624\ub298 \uc6b4\ub3d9 \uccb4\ud06c", "\uc6b4\ub3d9 \uccb4\ud06c\ud588\uc5b4", "\uc6b4\ub3d9 \uc644\ub8cc")):
+            return {
+                "intent": INTENT_RECORD,
+                "confidence": 0.94,
+                "emotion": {"label": emotion_label, "intensity": emotion_intensity},
+                "has_fact_change": False,
+                "requires_past_memory": False,
+                "should_save_episode": False,
+                "record_type": "plan_check",
+                "profile_changes": None,
+                "is_today": True,
+                "modify_target": None,
+                "search_targets": [],
+            }
+
+        if any(token in message for token in ("\uc65c", "\ubb50\uc57c", "\uc5bc\ub9c8\ub098", "\uad81\uae08", "\ub300\uc2e0 \ubb50")):
+            return {
+                "intent": INTENT_INFO,
+                "confidence": 0.91,
+                "emotion": {"label": emotion_label, "intensity": emotion_intensity},
+                "has_fact_change": False,
+                "requires_past_memory": False,
+                "should_save_episode": False,
+                "record_type": None,
+                "profile_changes": None,
+                "is_today": None,
+                "modify_target": None,
+                "search_targets": ["vdb_external"],
+            }
+
+        if any(token in message for token in ("\uc678\ub85c\uc6cc", "\uc678\ub86d", "\uc8fc\ub9d0 \uc798 \ubcf4\ub0b4", "\ubcc4\uc77c \uc5c6\uc9c0")):
+            return {
+                "intent": "casual",
+                "confidence": 0.82,
+                "emotion": {"label": emotion_label, "intensity": emotion_intensity},
+                "has_fact_change": False,
+                "requires_past_memory": False,
+                "should_save_episode": False,
+                "record_type": None,
+                "profile_changes": None,
+                "is_today": None,
+                "modify_target": None,
+                "search_targets": [],
+            }
+
+        return {
+            "intent": "fallback",
+            "confidence": 0.3,
+            "emotion": {"label": emotion_label, "intensity": emotion_intensity},
+            "has_fact_change": False,
+            "requires_past_memory": False,
+            "should_save_episode": False,
+            "record_type": None,
+            "profile_changes": None,
+            "is_today": None,
+            "modify_target": None,
+            "search_targets": [],
+        }
+
+    def _plan_confirmation(self, user_content: str) -> dict[str, Any]:
+        message = _extract_after_marker(user_content, "[User Message]").lower()
+        approved = (
+            any(token in message for token in ("\uc88b\uc544", "\uc9c4\ud589", "\uc801\uc6a9", "\ubc18\uc601", "\uadf8\ub300\ub85c", "\uc751", "\ub124", "\uc624\ucf00\uc774", "\ud655\uc778"))
+            and not any(token in message for token in ("\ubc14\uafd4", "\uc218\uc815", "\ubcc0\uacbd", "\uc870\uc815", "\ub367", "\ube7c", "\ucd94\uac00", "\uc81c\uc678"))
+        )
+        return {"approved": approved, "confidence": 0.97 if approved else 0.2, "reason": "fake_confirmation"}
+
+    def _draft_response(self, user_content: str) -> dict[str, Any]:
+        message = _extract_generate_message(user_content).lower()
+        if any(token in message for token in ("\uccb4\uc911", "\ubab8\ubb34\uac8c", "\uc54c\ub808\ub974\uae30", "\ubaa9\ud45c")):
+            return {
+                "core_message": "Profile updated.",
+                "reason_points": ["The latest user-provided profile field was applied."],
+                "suggested_action": "If you want, I can update another profile field too.",
+                "safety_notes": [],
+                "approval_question": None,
+                "search_grounding_summary": "",
+                "proposed_plan": [],
+                "proposed_plan_type": None,
+            }
+
+        if any(token in message for token in ("\uc65c", "\ubb50\uc57c", "\uc5bc\ub9c8\ub098", "\ub300\uc2e0 \ubb50", "\uad81\uae08")):
+            return {
+                "core_message": "Here is the main reason behind that recommendation.",
+                "reason_points": ["I combined the user context with policy evidence."],
+                "suggested_action": "If you want, I can explain the reasoning in more detail.",
+                "safety_notes": [],
+                "approval_question": None,
+                "search_grounding_summary": "I summarized the search evidence into the answer.",
+                "proposed_plan": [],
+                "proposed_plan_type": None,
+            }
+
+        if any(token in message for token in ("\uc678\ub85c\uc6cc", "\uc678\ub86d", "\uc9c0\uccd0", "\ud798\ub4e4", "\ubd88\uc548", "\uc6b8\uc6b8")):
+            return {
+                "core_message": "You do not need to push hard today.",
+                "reason_points": ["Lowering the burden fits your current emotional state better."],
+                "suggested_action": "If you want, I can switch to a gentler plan.",
+                "safety_notes": [],
+                "approval_question": None,
+                "search_grounding_summary": "",
+                "proposed_plan": [],
+                "proposed_plan_type": None,
+            }
+
+        if any(token in message for token in ("\uc2dd\ub2e8", "\uce7c\ub85c\ub9ac", "\uc2dd\uc0ac")):
+            is_modify = any(token in message for token in ("\uc218\uc815", "\ubc14\uafd4", "\uc870\uc815", "\uc81c\uc678", "\ub367"))
+            plan_items = [
+                {"name": "Breakfast", "detail": "Greek yogurt and fruit", "day": "2026-04-16", "ex_list": []},
+                {"name": "Dinner", "detail": "Chicken breast and vegetables", "day": "2026-04-16", "ex_list": []},
+            ]
+            if is_modify:
+                plan_items[0]["detail"] = "Oatmeal and banana"
+            return {
+                "core_message": "Here is a diet plan." if not is_modify else "I adjusted the diet plan to make it lighter.",
+                "reason_points": ["I considered both the user goal and food constraints."],
+                "suggested_action": "If you want, tell me whether to proceed with this plan.",
+                "safety_notes": [],
+                "approval_question": "Should I proceed with this diet plan?",
+                "search_grounding_summary": "I applied diet guidance and user constraints.",
+                "proposed_plan": plan_items,
+                "proposed_plan_type": "diet",
+            }
+
+        is_modify = any(token in message for token in ("\uc218\uc815", "\ubc14\uafd4", "\uc870\uc815", "\ub367", "\uc57d\ud558\uac8c"))
+        exercise_sets = 3 if not is_modify else 2
+        plan_items = [
+            {
+                "name": "Lower Body Session",
+                "detail": "Lower-impact lower body routine",
+                "day": "2026-04-16",
+                "ex_list": [
+                    {"exercise_name": "Leg Press", "sets": exercise_sets, "calories": 80},
+                    {"exercise_name": "Bridge", "sets": exercise_sets, "calories": 40},
+                ],
+            },
+            {
+                "name": "Cardio",
+                "detail": "Low-intensity walking",
+                "day": "2026-04-16",
+                "ex_list": [{"exercise_name": "Treadmill Walk", "duration_minutes": 20, "calories": 90}],
+            },
+        ]
+        return {
+            "core_message": "Here is a workout plan." if not is_modify else "I prepared a lower-intensity workout update.",
+            "reason_points": ["I prioritized sustainability and safety."],
+            "suggested_action": "If you want, tell me whether to proceed with this plan.",
+            "safety_notes": [],
+            "approval_question": "Should I proceed with this workout plan?",
+            "search_grounding_summary": "I applied workout guidance and user constraints.",
+            "proposed_plan": plan_items,
+            "proposed_plan_type": "workout",
+        }
+
+    def _persona_response(self, user_content: str) -> str:
+        marker = "[Structured Draft]\n"
+        payload_text = user_content.split(marker, 1)[1] if marker in user_content else "{}"
+        payload = json.loads(payload_text)
+        lines: list[str] = []
+        for key in ("core_message", "plan_preview", "suggested_action", "approval_question", "search_grounding_summary"):
+            value = str(payload.get(key) or "").strip()
+            if value:
+                lines.append(value)
+        lines.extend(str(item).strip() for item in payload.get("safety_notes") or [] if str(item).strip())
+        return "\n".join(lines) if lines else "Response ready."
+
+
+class SparsePlanRouter(FakeRouter):
+    def _draft_response(self, user_content: str) -> dict[str, Any]:
+        message = _extract_generate_message(user_content).lower()
+        if any(token in message for token in ("\uc6b4\ub3d9", "\uacc4\ud68d", "\uc2dd\ub2e8")) and not any(
+            token in message for token in ("\uc218\uc815", "\ubc14\uafd4", "\uc870\uc815", "\uc81c\uc678", "\ub367", "\uc65c", "\ubb50\uc57c")
+        ):
+            return {
+                "core_message": "I need a bit more information before tailoring the plan.",
+                "reason_points": ["The request is broad."],
+                "suggested_action": "Please tell me your goal and preferred style.",
+                "safety_notes": [],
+                "approval_question": None,
+                "search_grounding_summary": "",
+                "proposed_plan": [],
+                "proposed_plan_type": None,
+            }
+        return super()._draft_response(user_content)
+
+
+def _infer_external_domain(metadata_filter: dict[str, Any] | None) -> str:
+    if not metadata_filter:
+        return "workout"
+    serialized = json.dumps(metadata_filter, ensure_ascii=False)
+    if "diet" in serialized or "nutrition" in serialized:
+        return "diet"
+    return "workout"
+
+
+def _extract_resolved_message(user_content: str) -> str:
+    if "[Resolved User Message]" in user_content:
+        tail = user_content.split("[Resolved User Message]", 1)[1].strip()
+        return tail.splitlines()[0].strip()
+    if "[Original User Message]" in user_content:
+        tail = user_content.split("[Original User Message]", 1)[1].strip()
+        return tail.splitlines()[0].strip()
+    return user_content.strip().splitlines()[-1].strip()
+
+
+def _extract_after_marker(content: str, marker: str) -> str:
+    if marker not in content:
+        return ""
+    tail = content.split(marker, 1)[1].strip()
+    return tail.splitlines()[0].strip() if tail else ""
+
+
+def _extract_generate_message(user_content: str) -> str:
+    for marker in ("[\ud604\uc7ac \uc9c8\ubb38]", "[Current Recall Question]", "[User Message]"):
+        if marker in user_content:
+            tail = user_content.split(marker, 1)[1].strip()
+            return tail.splitlines()[0].strip()
+    return user_content.strip().splitlines()[-1].strip()
+
+
+async def build_test_stack(
+    fake_was: FakeWAS | None = None,
+    fake_router: FakeRouter | None = None,
+) -> tuple[FastAPI, Any, NodeDeps, FakeWAS, FilteringAsyncSqliteSaver]:
+    profile_sync = fake_was.profile_sync if fake_was is not None else FakeProfileSync()
+    fake_was = fake_was or FakeWAS(profile_sync)
+    fake_router = fake_router or FakeRouter()
+    deps = NodeDeps(
+        gemini=fake_router,
+        router=fake_router,
+        was=fake_was,
+        pinecone=FakePinecone(),
+        embed=FakeEmbed(),
+        profile_sync=profile_sync,
+        trace=TraceStore(),
+    )
+
+    temp_dir = tempfile.TemporaryDirectory()
+    db_path = Path(temp_dir.name) / "checkpoints.sqlite"
+    conn = await aiosqlite.connect(str(db_path))
+    checkpointer = FilteringAsyncSqliteSaver(conn)
+    await checkpointer.setup()
+    graph = build_graph(deps, checkpointer=checkpointer)
+
+    app = FastAPI()
+    app.include_router(chat_router)
+    app.state.graph = graph
+    app.state.deps = deps
+    app.state.trace_store = deps.trace
+    app.state._temp_dir = temp_dir
+    app.state._checkpointer = checkpointer
+    return app, graph, deps, fake_was, checkpointer
+
+
+async def run_request(
+    client: httpx.AsyncClient,
+    user_id: str,
+    message: str,
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "user_id": user_id,
+        "user_message": message,
+        "session_id": session_id,
+        "user_profile_override": {"selected_ai_persona": "default", "goal": "maintain"},
+    }
+    response = await client.post(
+        "/chat",
+        json=payload,
+        headers={"x-api-key": os.environ["INTERNAL_API_KEY"]},
+    )
+    body = response.json()
+    if response.status_code != 200:
+        raise AssertionError(f"HTTP {response.status_code}: {body}")
+    return body
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+async def main() -> None:
+    app, graph, deps, fake_was, checkpointer = await build_test_stack()
+    transport = httpx.ASGITransport(app=app)
+
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            flow_user = f"e2e-flow-{uuid.uuid4().hex[:6]}"
+            profile_user = f"e2e-profile-{uuid.uuid4().hex[:6]}"
+            plancheck_user = f"e2e-check-{uuid.uuid4().hex[:6]}"
+            care_user = f"e2e-care-{uuid.uuid4().hex[:6]}"
+            safety_user = f"e2e-safety-{uuid.uuid4().hex[:6]}"
+
+            create = await run_request(client, flow_user, MSG_CREATE_WORKOUT)
+            session_id = create["session_id"]
+            create_debug = create["debug_state"]
+            require(create_debug["action_intent"] == "create", "create action_intent mismatch")
+            require(create_debug["domain"] == "workout", "create domain mismatch")
+            require(create_debug["proposed_plan_count"] >= 1, "create proposal missing")
+            require("Leg Press" in create["response"], "create response should expose workout plan")
+
+            modify = await run_request(client, flow_user, MSG_MODIFY_WORKOUT, session_id=session_id)
+            modify_debug = modify["debug_state"]
+            require(modify_debug["action_intent"] == "modify", "modify action_intent mismatch")
+            require(modify_debug["proposed_plan_action"] == "update", "modify should keep update write mode")
+            require("2세트" in modify["response"], "modify response should expose lowered workout intensity")
+
+            info = await run_request(client, flow_user, MSG_INFO_REASON, session_id=session_id)
+            info_debug = info["debug_state"]
+            require(info_debug["action_intent"] == "info", "info action_intent mismatch")
+            require(info_debug["domain"] == "workout", "info domain mismatch")
+            require("reason" in info["response"].lower(), "info response should explain rationale")
+
+            approval = await run_request(client, flow_user, MSG_APPROVAL, session_id=session_id)
+            approval_debug = approval["debug_state"]
+            require(approval_debug["action_intent"] == "approval", "approval action_intent mismatch")
+            require(bool(approval.get("plan_sync_applied")), "approval should trigger synchronous WAS write")
+            require(
+                any(entry[0] in {"plan_create", "plan_update"} for entry in fake_was.write_log),
+                "approval should write plan to fake WAS",
+            )
+            saved = await graph.aget_state({"configurable": {"thread_id": session_id}})
+            require(not saved.values.get("active_proposal"), "active proposal should be cleared after approval write")
+
+            profile = await run_request(client, profile_user, MSG_RECORD_WEIGHT)
+            profile_debug = profile["debug_state"]
+            require(profile_debug["action_intent"] == "record", "profile record action_intent mismatch")
+            require(fake_was.profiles[profile_user]["weight"] == 72.0, "profile weight should be written to fake WAS")
+
+            plan_check = await run_request(client, plancheck_user, MSG_PLAN_CHECK)
+            plancheck_debug = plan_check["debug_state"]
+            require(plancheck_debug["action_intent"] == "record", "plan_check action_intent mismatch")
+            exercise_items = [item for item in fake_was.today_plans[plancheck_user] if item.get("type") == "exercise"]
+            require(exercise_items and exercise_items[0]["completed"] is True, "today exercise item should be marked completed")
+
+            care = await run_request(client, care_user, MSG_CARE)
+            care_debug = care["debug_state"]
+            require(care_debug["action_intent"] == "casual", "care action_intent mismatch")
+            require(care_debug["support_mode"] == "care", "care support_mode mismatch")
+
+            safety = await run_request(client, safety_user, MSG_SAFETY)
+            safety_debug = safety["debug_state"]
+            require(safety_debug["action_intent"] == "safety", "safety action_intent mismatch")
+            require(bool(safety["response"]), "safety response should not be empty")
+
+            print("[e2e] 8/8 passed")
+            print(f"  create session_id={session_id}")
+            print(f"  approval plan_sync_applied={approval.get('plan_sync_applied')}")
+            print(f"  profile weight={fake_was.profiles[profile_user]['weight']}")
+            print(f"  plan_check completed={exercise_items[0]['completed']}")
+    finally:
+        await checkpointer.conn.close()
+        app.state._temp_dir.cleanup()
+
+    await run_resilience_smoke()
+    await run_starter_plan_fallback_smoke()
+
+
+async def run_resilience_smoke() -> None:
+    missing_user = f"e2e-missing-{uuid.uuid4().hex[:6]}"
+    flaky_sync = FakeProfileSync()
+    flaky_was = FlakyWAS(
+        flaky_sync,
+        missing_profile_users={missing_user},
+        missing_today_users={missing_user},
+        failing_workout_full_users={missing_user},
+    )
+    app, graph, deps, _, checkpointer = await build_test_stack(fake_was=flaky_was)
+    transport = httpx.ASGITransport(app=app)
+
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            create = await run_request(client, missing_user, MSG_CREATE_WORKOUT)
+            require(create["debug_state"]["action_intent"] == "create", "missing-profile create should still succeed")
+            require(bool(create["response"]), "missing-profile create response should not be empty")
+
+            session_id = create["session_id"]
+            modify = await run_request(client, missing_user, MSG_MODIFY_WORKOUT, session_id=session_id)
+            require(modify["debug_state"]["action_intent"] == "modify", "modify should still succeed when full plan load fails")
+            require("Leg Press" in modify["response"], "modify should still expose workout plan when full plan load fails")
+
+            print("[e2e-resilience] 2/2 passed")
+    finally:
+        await checkpointer.conn.close()
+        app.state._temp_dir.cleanup()
+
+
+async def run_starter_plan_fallback_smoke() -> None:
+    fallback_user = f"e2e-starter-{uuid.uuid4().hex[:6]}"
+    app, graph, deps, fake_was, checkpointer = await build_test_stack(fake_router=SparsePlanRouter())
+    transport = httpx.ASGITransport(app=app)
+
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            create = await run_request(client, fallback_user, MSG_CREATE_WORKOUT)
+            create_debug = create["debug_state"]
+            require(create_debug["action_intent"] == "create", "starter fallback create action_intent mismatch")
+            require(create_debug["proposed_plan_count"] >= 1, "starter fallback should synthesize proposed plan")
+            require("스쿼트" in create["response"] or "빠른 걷기" in create["response"], "starter fallback response should expose starter workout plan")
+            print("[e2e-starter-fallback] 1/1 passed")
+    finally:
+        await checkpointer.conn.close()
+        app.state._temp_dir.cleanup()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

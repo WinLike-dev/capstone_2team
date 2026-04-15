@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.graph.deps import NodeDeps
 from app.graph.nodes.care import make_care_node
+from app.graph.nodes.context_resolver import make_context_resolver_node
 from app.graph.nodes.fallback import make_fallback_node
 from app.graph.nodes.generate import make_generate_node
 from app.graph.nodes.intent import make_intent_node
@@ -76,6 +77,7 @@ def build_graph(deps: NodeDeps, checkpointer: BaseCheckpointSaver):
     builder = StateGraph(GraphState)
 
     builder.add_node("preprocess", make_preprocess_node(deps))
+    builder.add_node("context_resolver", make_context_resolver_node(deps))
     builder.add_node("analyze_intent", make_intent_node(deps))
     builder.add_node("safety", make_safety_node(deps))
     builder.add_node("care", make_care_node(deps))
@@ -87,7 +89,8 @@ def build_graph(deps: NodeDeps, checkpointer: BaseCheckpointSaver):
     builder.add_node("persona", make_persona_node(deps))
 
     builder.add_edge(START, "preprocess")
-    builder.add_edge("preprocess", "analyze_intent")
+    builder.add_edge("preprocess", "context_resolver")
+    builder.add_edge("context_resolver", "analyze_intent")
 
     builder.add_conditional_edges(
         "analyze_intent",

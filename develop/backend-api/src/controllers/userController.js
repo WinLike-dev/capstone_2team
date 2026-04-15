@@ -7,6 +7,12 @@ const {
   toOptionalNumber,
   toOptionalString,
 } = require('../utils/profileFields');
+const {
+  buildProfileRowForUpsert,
+  ensureUserHealthProfile,
+  ensureUserHealthProfileRow,
+} = require('../services/profileService');
+const { loadExercisePlansWithItems } = require('../services/exercisePlanReadService');
 
 const DEFAULT_WORKOUT_COLORS = [
   'from-sky-400 to-blue-500',
@@ -184,16 +190,8 @@ async function getOwnedExerciseItem(userId, itemId) {
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user.user_id;
-
-    const { data: profile, error } = await supabase
-      .from('user_health_profiles')
-      .select('*, users(nickname)')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    return res.json(normalizeProfileRow(profile || {}));
+    const profile = await ensureUserHealthProfile(supabase, userId);
+    return res.json(profile || normalizeProfileRow({ user_id: userId }));
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Failed to load profile.' });
@@ -208,6 +206,21 @@ exports.saveProfile = async (req, res) => {
     const userId = req.user.user_id;
     const incomingProfile = buildProfilePayload({ ...req.body, user_id: userId });
     const nickname = toOptionalString(req.body.nickname);
+    const existingProfile = await ensureUserHealthProfileRow(supabase, userId);
+    if (!existingProfile) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const profilePayload = buildProfileRowForUpsert(userId, existingProfile, incomingProfile);
+    profilePayload.bmi = computeBmi(profilePayload.weight, profilePayload.height) ?? 0;
+
+    const { data: profile, error } = await supabase
+      .from('user_health_profiles')
+      .upsert(profilePayload, { onConflict: 'user_id' })
+      .select('*, users(nickname)')
+      .single();
+
+    if (error) throw error;
 
     if (nickname) {
       const { error: nicknameError } = await supabase
@@ -216,31 +229,8 @@ exports.saveProfile = async (req, res) => {
         .eq('user_id', userId);
 
       if (nicknameError) throw nicknameError;
+      profile.users = { ...(profile.users || {}), nickname };
     }
-
-    const { data: existingProfile, error: existingError } = await supabase
-      .from('user_health_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (existingError) throw existingError;
-
-    const mergedWeight = incomingProfile.weight ?? existingProfile?.weight ?? null;
-    const mergedHeight = incomingProfile.height ?? existingProfile?.height ?? null;
-    const bmi = computeBmi(mergedWeight, mergedHeight);
-
-    if (bmi !== null) {
-      incomingProfile.bmi = bmi;
-    }
-
-    const { data: profile, error } = await supabase
-      .from('user_health_profiles')
-      .upsert(incomingProfile, { onConflict: 'user_id' })
-      .select('*, users(nickname)')
-      .single();
-
-    if (error) throw error;
 
     const changedFields = Object.keys(incomingProfile).filter((field) => field !== 'user_id');
     if (nickname) {
@@ -277,15 +267,18 @@ exports.updatePersonaSetting = async (req, res) => {
       return res.status(400).json({ error: 'selected_ai_persona is required.' });
     }
 
+    const existingProfile = await ensureUserHealthProfileRow(supabase, targetUserId);
+    if (!existingProfile) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const profilePayload = buildProfileRowForUpsert(targetUserId, existingProfile, {
+      selected_ai_persona: selectedAiPersona,
+    });
+
     const { data: profile, error } = await supabase
       .from('user_health_profiles')
-      .upsert(
-        {
-          user_id: targetUserId,
-          selected_ai_persona: selectedAiPersona,
-        },
-        { onConflict: 'user_id' }
-      )
+      .upsert(profilePayload, { onConflict: 'user_id' })
       .select('user_id, selected_ai_persona')
       .single();
 
@@ -316,16 +309,11 @@ exports.getCalendar = async (req, res) => {
       return res.status(400).json({ error: 'start_date and end_date are required.' });
     }
 
-    const { data: exercises, error: exerciseError } = await supabase
-      .from('user_exercise_plans')
-      .select('*, exercise_items(*)')
-      .eq('user_id', userId)
-      .gte('target_date', startDate)
-      .lte('target_date', endDate)
-      .order('target_date', { ascending: true })
-      .order('created_at', { ascending: true });
-
-    if (exerciseError) throw exerciseError;
+    const exercises = await loadExercisePlansWithItems(supabase, {
+      userId,
+      startDate,
+      endDate,
+    });
 
     const { data: meals, error: mealError } = await supabase
       .from('user_meal_plans')

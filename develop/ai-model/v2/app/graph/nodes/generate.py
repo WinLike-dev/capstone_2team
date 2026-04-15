@@ -71,8 +71,17 @@ _ANTI_REPETITION_PROMPT = """Anti-repetition mode:
 - Avoid re-listing the same reasons or plan summary unless the user explicitly asks for them again.
 """
 
+_STARTER_PLAN_PROMPT = """Starter plan mode:
+- The user asked for a plan or plan modification, so do not return only a questionnaire.
+- If profile information is sparse, still propose a safe low-risk starter plan that can be refined later.
+- Use conservative assumptions: beginner-friendly, sustainable volume, low-to-moderate intensity.
+- Ask at most one short follow-up after presenting the starter plan.
+- Leave proposed_plan empty only when the request is truly ambiguous or safety-critical details are missing.
+"""
+
 _SHORT_TERM_MEMORY_RECENT_LIMIT = 8
 _REPETITION_OVERLAP_THRESHOLD = 0.8
+_RECENT_DIALOGUE_HISTORY_LIMIT = 4
 
 
 def make_generate_node(deps: NodeDeps):
@@ -167,6 +176,20 @@ def make_generate_node(deps: NodeDeps):
             proposed_plan_type = state.get("proposed_plan_type")
             proposed_plan_action = state.get("proposed_plan_action")
 
+        if not proposed_plan and intent == INTENT_PLAN:
+            (
+                draft_components,
+                draft_text,
+                proposed_plan,
+                proposed_plan_type,
+                proposed_plan_action,
+            ) = _build_starter_plan_fallback(state)
+            deps.trace.record_current_alert(
+                severity="warning",
+                message="Create draft returned no structured plan; starter fallback applied",
+                detail={"domain": proposed_plan_type},
+            )
+
         if intent in _SELF_EVAL_INTENTS:
             passed, reason = await _self_evaluate(deps, state, draft_text)
             if not passed:
@@ -243,6 +266,9 @@ async def _generate_home_recommendations(
             result,
             scope=scope,
             date=date,
+            user_profile=state.get("user_profile") or {},
+            today_plan=state.get("today_plan") or [],
+            recent_recommendations=state.get("home_recommendation_recent") or {},
         )
     except Exception as exc:
         logger.error("Home recommendation generation failed: %s", exc)
@@ -251,7 +277,13 @@ async def _generate_home_recommendations(
             message="Home recommendation generation failed",
             detail={"scope": scope, "error": str(exc)},
         )
-        normalized = empty_home_recommendations(date=date, scope=scope)
+        normalized = empty_home_recommendations(
+            date=date,
+            scope=scope,
+            user_profile=state.get("user_profile") or {},
+            today_plan=state.get("today_plan") or [],
+            recent_recommendations=state.get("home_recommendation_recent") or {},
+        )
 
     deps.trace.record_current_event(
         stage="generate",
@@ -302,7 +334,7 @@ async def _request_draft_with_guardrails(
         title="Draft regeneration requested",
         detail={
             "short_term_memory_query": bool(state.get("short_term_memory_query")),
-            "last_assistant_present": bool(state.get("last_assistant_message")),
+            "last_assistant_present": bool(_latest_assistant_reference(state)),
         },
     )
 
@@ -312,6 +344,7 @@ async def _request_draft_with_guardrails(
             failure_reason,
             reinforce_short_term=True,
             avoid_repetition=True,
+            force_starter_plan=_should_retry_for_missing_plan(state, draft_result),
         ),
         user_content=_build_draft_context(
             state,
@@ -329,15 +362,14 @@ def _build_draft_context(state: GraphState, *, force_short_term: bool = False) -
     parts: list[str] = []
     parts.append(f"[오늘 날짜]\n{kst_today_iso()}")
 
-    messages = state.get("messages", [])
-    if messages:
-        history = "\n".join(
-            f"{message['role']}: {message['content'][:200]}"
-            for message in messages[-4:]
-        )
-        parts.append(f"[최근 대화]\n{history}")
+    recent_dialogue = _recent_dialogue_history(state)
+    if recent_dialogue:
+        parts.append(f"[Recent Dialogue]\n{recent_dialogue}")
 
-    parts.append(f"[현재 질문]\n{state['user_message']}")
+    resolved_user_message = _resolved_user_message(state)
+    parts.append(f"[현재 질문]\n{resolved_user_message}")
+    if resolved_user_message != state["user_message"]:
+        parts.append(f"[Original User Message]\n{state['user_message']}")
 
     results = state.get("search_results") or []
     if results:
@@ -350,6 +382,11 @@ def _build_draft_context(state: GraphState, *, force_short_term: bool = False) -
     modify_context = state.get("modify_plan_context")
     if modify_context:
         parts.append(f"[현재 전체 플랜]\n{json.dumps(modify_context, ensure_ascii=False)[:500]}")
+    else:
+        active_proposal = state.get("active_proposal") or {}
+        proposal_summary = str(active_proposal.get("summary") or "").strip()
+        if proposal_summary:
+            parts.append(f"[Active Proposal]\n{proposal_summary[:200]}")
 
     profile = state.get("user_profile")
     if profile:
@@ -367,19 +404,15 @@ def _build_draft_context(state: GraphState, *, force_short_term: bool = False) -
 def _build_short_term_memory_context(state: GraphState) -> str:
     parts = [f"[Today]\n{kst_today_iso()}"]
 
-    recent_messages = (state.get("messages") or [])[-_SHORT_TERM_MEMORY_RECENT_LIMIT:]
-    if recent_messages:
-        history = "\n".join(
-            f"{message['role']}: {str(message.get('content') or '')[:240]}"
-            for message in recent_messages
-        )
-        parts.append(f"[Recent Chat History]\n{history}")
+    dialogue_history = _recent_dialogue_history(state, limit=_SHORT_TERM_MEMORY_RECENT_LIMIT)
+    if dialogue_history:
+        parts.append(f"[Recent Chat History]\n{dialogue_history}")
 
-    last_assistant_message = str(state.get("last_assistant_message") or "").strip()
+    last_assistant_message = _latest_assistant_reference(state)
     if last_assistant_message:
         parts.append(f"[Previous Assistant Response]\n{last_assistant_message[:400]}")
 
-    parts.append(f"[Current Recall Question]\n{state['user_message']}")
+    parts.append(f"[Current Recall Question]\n{_resolved_user_message(state)}")
     parts.append(
         "[Instruction]\nUse only the recent chat history above. "
         "If the answer is missing there, say you cannot confirm it from the recent conversation."
@@ -399,6 +432,7 @@ def _build_draft_system_prompt(
     *,
     reinforce_short_term: bool = False,
     avoid_repetition: bool = False,
+    force_starter_plan: bool = False,
 ) -> str:
     intent = state.get("intent", "")
     intent_prompt = _DRAFT_PROMPTS_BY_INTENT.get(intent, _DRAFT_DEFAULT_PROMPT)
@@ -409,6 +443,10 @@ def _build_draft_system_prompt(
     sections.append(
         f"현재 사용자 감정: {emotion.get('label', '중립')} (강도 {emotion.get('intensity', 0.0):.1f})"
     )
+    if state.get("support_mode") == "care":
+        sections.append(
+            "Support mode is care. Keep the task answer intact, but make the tone emotionally supportive and non-judgmental."
+        )
 
     if state.get("search_quality") == "degraded":
         sections.append(
@@ -423,12 +461,15 @@ def _build_draft_system_prompt(
     if reinforce_short_term or state.get("short_term_memory_query"):
         sections.append(_SHORT_TERM_MEMORY_PROMPT)
 
-    if avoid_repetition or state.get("last_assistant_message"):
+    if force_starter_plan:
+        sections.append(_STARTER_PLAN_PROMPT)
+
+    latest_assistant_message = _latest_assistant_reference(state)
+    if avoid_repetition or latest_assistant_message:
         sections.append(_ANTI_REPETITION_PROMPT)
-        last_assistant_message = str(state.get("last_assistant_message") or "").strip()
-        if last_assistant_message:
+        if latest_assistant_message:
             sections.append(
-                f"Previous assistant response to avoid repeating:\n{last_assistant_message[:400]}"
+                f"Previous assistant response to avoid repeating:\n{latest_assistant_message[:400]}"
             )
 
     return "\n\n".join(section for section in sections if section)
@@ -437,11 +478,173 @@ def _build_draft_system_prompt(
 def _build_components_from_result(draft_result: DraftResponse, state: GraphState) -> DraftComponents:
     payload = draft_result.model_dump()
     components = normalize_draft_components(payload)
+    components["plan_preview"] = _render_plan_preview(draft_result, state)
 
     if not components["search_grounding_summary"] and state.get("search_results"):
         components["search_grounding_summary"] = "검색 결과를 참고해 핵심 근거만 정리했다."
 
     return components
+
+
+def _render_plan_preview(draft_result: DraftResponse, state: GraphState) -> str:
+    if state.get("intent") not in {INTENT_PLAN, INTENT_MODIFY}:
+        return ""
+
+    plan_items = [item.model_dump() for item in draft_result.proposed_plan] if draft_result.proposed_plan else []
+    if not plan_items:
+        return ""
+
+    lines: list[str] = []
+    for item in plan_items[:6]:
+        title = _plan_item_title(item)
+        detail = _plan_item_detail(item)
+        if detail:
+            lines.append(f"- {title}: {detail}")
+        else:
+            lines.append(f"- {title}")
+
+    remaining = len(plan_items) - 6
+    if remaining > 0:
+        lines.append(f"- 외 {remaining}개 세부 항목")
+
+    return "\n".join(lines)
+
+
+def _render_plan_preview_from_items(plan_items: list[dict]) -> str:
+    if not plan_items:
+        return ""
+
+    lines: list[str] = []
+    for item in plan_items[:6]:
+        title = _plan_item_title(item)
+        detail = _plan_item_detail(item)
+        lines.append(f"- {title}: {detail}" if detail else f"- {title}")
+    return "\n".join(lines)
+
+
+def _plan_item_title(item: dict) -> str:
+    day = str(item.get("day") or "").strip()
+    name = str(item.get("name") or "").strip() or "계획 항목"
+    return f"{day} {name}".strip()
+
+
+def _plan_item_detail(item: dict) -> str:
+    detail = str(item.get("detail") or "").strip()
+    exercise_lines = _exercise_preview(item.get("ex_list") or [])
+    if detail and exercise_lines:
+        return f"{detail} / {exercise_lines}"
+    if exercise_lines:
+        return exercise_lines
+    return detail
+
+
+def _exercise_preview(ex_list: list[dict]) -> str:
+    if not isinstance(ex_list, list) or not ex_list:
+        return ""
+
+    parts: list[str] = []
+    for exercise in ex_list[:4]:
+        exercise_name = str(exercise.get("exercise_name") or "").strip()
+        if not exercise_name:
+            continue
+
+        sets = exercise.get("sets")
+        duration = exercise.get("duration_minutes")
+        if isinstance(sets, int) and sets > 0:
+            parts.append(f"{exercise_name} {sets}세트")
+        elif isinstance(duration, int) and duration > 0:
+            parts.append(f"{exercise_name} {duration}분")
+        else:
+            parts.append(exercise_name)
+
+    remaining = len(ex_list) - 4
+    if remaining > 0:
+        parts.append(f"외 {remaining}종목")
+
+    return ", ".join(parts)
+
+
+def _build_starter_plan_fallback(
+    state: GraphState,
+) -> tuple[DraftComponents, str, list[dict], str | None, str | None]:
+    plan_type = _infer_plan_type_from_message(str(state.get("user_message") or "")) or (
+        "diet" if state.get("domain") == "diet" else "workout"
+    )
+    today = kst_today_iso()
+    profile = state.get("user_profile") or {}
+
+    if plan_type == "diet":
+        allergies = [str(item).strip() for item in (profile.get("allergies") or []) if str(item).strip()]
+        allergy_note = f"알레르기 정보({', '.join(allergies)})는 제외해서 구성했어요." if allergies else ""
+        proposed_plan = [
+            {
+                "name": "Breakfast",
+                "detail": "그릭요거트, 바나나, 견과류를 곁들인 가벼운 아침",
+                "day": today,
+                "ex_list": [],
+            },
+            {
+                "name": "Lunch",
+                "detail": "현미밥, 닭가슴살, 채소 위주의 균형 점심",
+                "day": today,
+                "ex_list": [],
+            },
+            {
+                "name": "Dinner",
+                "detail": "단백질과 채소 중심의 부담 적은 저녁",
+                "day": today,
+                "ex_list": [],
+            },
+        ]
+        components = normalize_draft_components(
+            {
+                "core_message": "지금 정보만으로도 바로 시작할 수 있는 기본 식단안을 먼저 제안할게요.",
+                "reason_points": [
+                    "정보가 적을 때도 무리 없이 시작할 수 있도록 균형형 구성으로 잡았어요.",
+                    "다음 턴에서 목표나 선호 음식에 맞춰 더 세밀하게 조정할 수 있어요.",
+                ],
+                "suggested_action": "원하면 선호 음식, 알레르기, 식사 시간대에 맞춰 바로 수정해드릴게요.",
+                "approval_question": "이 기본 식단안으로 먼저 진행할까요?",
+                "search_grounding_summary": allergy_note or "기본 영양 균형과 안전한 시작 기준을 반영했어요.",
+            }
+        )
+    else:
+        proposed_plan = [
+            {
+                "name": "전신 가벼운 근력 운동",
+                "detail": "초보자도 시작하기 쉬운 저강도 전신 루틴",
+                "day": today,
+                "ex_list": [
+                    {"exercise_name": "스쿼트", "sets": 2, "calories": 60},
+                    {"exercise_name": "푸쉬업", "sets": 2, "calories": 50},
+                    {"exercise_name": "버드독", "sets": 2, "calories": 30},
+                ],
+            },
+            {
+                "name": "가벼운 유산소",
+                "detail": "호흡과 리듬을 살리는 걷기 중심 루틴",
+                "day": today,
+                "ex_list": [
+                    {"exercise_name": "빠른 걷기", "duration_minutes": 20, "calories": 90},
+                ],
+            },
+        ]
+        components = normalize_draft_components(
+            {
+                "core_message": "지금 정보만으로도 바로 시작할 수 있는 가벼운 운동 계획을 먼저 제안할게요.",
+                "reason_points": [
+                    "추가 정보가 적어도 안전하게 시작할 수 있도록 저강도와 전신 균형 중심으로 구성했어요.",
+                    "다음 턴에서 목표나 선호 운동에 맞춰 강도와 종목을 더 정교하게 조정할 수 있어요.",
+                ],
+                "suggested_action": "부담되는 동작이 있으면 바로 말해 주세요. 강도나 종목을 바로 바꿔드릴게요.",
+                "approval_question": "이 기본 운동안으로 먼저 진행할까요?",
+                "search_grounding_summary": "기본 안전 원칙과 지속 가능한 시작 기준을 반영했어요.",
+            }
+        )
+
+    components["plan_preview"] = _render_plan_preview_from_items(proposed_plan)
+    draft_text = render_draft_preview(components)
+    return components, draft_text, proposed_plan, plan_type, "create"
 
 
 def _build_direct_short_term_memory_draft(state: GraphState) -> dict | None:
@@ -499,22 +702,17 @@ def _extract_recent_alias(state: GraphState) -> str | None:
     alias_pattern = re.compile(
         r"(?:\ub0b4\s*\ubcc4\uba85(?:\uc740|\uc774)?|(?:\uc55e\uc73c\ub85c\s*)?\ub0b4\s*\ubcc4\uba85(?:\uc740|\uc774)?)\s*(?::|=)?\s*([^\n,.!?]+)"
     )
-    for message in reversed(state.get("messages", [])):
-        if message.get("role") != "user":
-            continue
-        content = str(message.get("content") or "")
-        match = alias_pattern.search(content)
+    for user_text in reversed(_recent_user_texts(state)):
+        match = alias_pattern.search(user_text)
         if match:
             return match.group(1).strip(" \"'")
     return None
 
-
 def _latest_previous_user_message(state: GraphState) -> str:
-    for message in reversed(state.get("messages", [])):
-        if message.get("role") == "user":
-            return str(message.get("content") or "").strip()
+    recent_user_texts = _recent_user_texts(state)
+    if recent_user_texts:
+        return recent_user_texts[-1].strip()
     return ""
-
 
 def _looks_like_recent_utterance_query(user_message: str) -> bool:
     normalized = re.sub(r"\s+", " ", user_message.strip().lower())
@@ -532,10 +730,13 @@ def _looks_like_recent_utterance_query(user_message: str) -> bool:
 
 
 def _needs_generate_retry(state: GraphState, draft_result: DraftResponse) -> bool:
+    if _should_retry_for_missing_plan(state, draft_result):
+        return True
+
     if state.get("short_term_memory_query") and draft_result.search_grounding_summary:
         return True
 
-    last_assistant_message = str(state.get("last_assistant_message") or "").strip()
+    last_assistant_message = _latest_assistant_reference(state)
     if not last_assistant_message:
         return False
 
@@ -554,9 +755,63 @@ def _is_too_similar(current_text: str, previous_text: str) -> bool:
     return overlap >= _REPETITION_OVERLAP_THRESHOLD
 
 
+def _should_retry_for_missing_plan(state: GraphState, draft_result: DraftResponse) -> bool:
+    if state.get("short_term_memory_query"):
+        return False
+    if state.get("intent") not in {INTENT_PLAN, INTENT_MODIFY}:
+        return False
+    if draft_result.proposed_plan:
+        return False
+    return not bool(state.get("needs_clarification"))
+
+
 def _normalized_overlap_tokens(text: str) -> list[str]:
     normalized = re.sub(r"\s+", " ", text.strip().lower())
     return re.findall(r"[0-9a-z\uac00-\ud7a3]+", normalized)
+
+
+def _resolved_user_message(state: GraphState) -> str:
+    resolution = state.get("context_resolution") or {}
+    resolved_text = str(resolution.get("resolved_text") or "").strip()
+    resolved_reference = resolution.get("resolved_reference")
+    confidence = float(resolution.get("confidence") or 0.0)
+    if resolved_reference and resolved_reference != "none" and resolved_text and confidence >= 0.6:
+        return resolved_text
+    return str(state.get("user_message") or "")
+
+
+def _recent_dialogue_history(state: GraphState, *, limit: int = _RECENT_DIALOGUE_HISTORY_LIMIT) -> str:
+    recent_turns = ((state.get("recent_dialogue") or {}).get("recent_turns") or [])[-limit:]
+    if not recent_turns:
+        return ""
+
+    lines: list[str] = []
+    for turn in recent_turns:
+        user_text = str(turn.get("user_summary") or turn.get("user_text") or "").strip()
+        assistant_text = str(turn.get("assistant_summary") or turn.get("assistant_text") or "").strip()
+        if user_text:
+            lines.append(f"user: {user_text[:240]}")
+        if assistant_text:
+            lines.append(f"assistant: {assistant_text[:240]}")
+    return "\n".join(lines)
+
+
+def _latest_assistant_reference(state: GraphState) -> str:
+    recent_turns = (state.get("recent_dialogue") or {}).get("recent_turns") or []
+    for turn in reversed(recent_turns):
+        assistant_text = str(turn.get("assistant_text") or "").strip()
+        if assistant_text:
+            return assistant_text
+    return ""
+
+
+def _recent_user_texts(state: GraphState) -> list[str]:
+    recent_turns = (state.get("recent_dialogue") or {}).get("recent_turns") or []
+    return [
+        str(turn.get("user_text") or "").strip()
+        for turn in recent_turns
+        if str(turn.get("user_text") or "").strip()
+    ]
 
 
 def _build_approval_draft(state: GraphState) -> dict:

@@ -17,23 +17,20 @@ function buildFastApiHeaders() {
   return headers;
 }
 
-// @route   POST /api/v1/home/recommendations
-// @desc    Home tab recommendation gateway -> FastAPI /home/recommendations
-// @access  Private
-exports.getRecommendations = async (req, res) => {
+async function forwardRecommendations(req, res, scope) {
   try {
     const userId = req.user.user_id;
-    const scope = String(req.body.type || 'all').trim().toLowerCase();
+    const normalizedScope = String(scope || req.body.type || 'all').trim().toLowerCase();
 
-    if (!['all', 'workout', 'diet'].includes(scope)) {
+    if (!['all', 'workout', 'diet'].includes(normalizedScope)) {
       return res.status(400).json({ error: 'type must be one of all, workout, diet.' });
     }
 
     const response = await axios.post(
-      `${FASTAPI_URL}/home/recommendations`,
+      `${FASTAPI_URL}/home/recommendations${normalizedScope === 'all' ? '' : `/${normalizedScope}`}`,
       {
         user_id: userId,
-        type: scope,
+        type: normalizedScope,
         recent_recommendations: req.body.recent_recommendations || null,
       },
       {
@@ -47,7 +44,7 @@ exports.getRecommendations = async (req, res) => {
     const upstreamStatus = error.response?.status;
     const upstreamPayload = error.response?.data;
 
-    logger.error('Home recommendation gateway error: %s', error.message);
+    logger.error(`Home recommendation gateway error: ${error.message}`);
 
     if (upstreamStatus) {
       return res.status(502).json({
@@ -61,4 +58,17 @@ exports.getRecommendations = async (req, res) => {
       error: 'Failed to load home recommendations.',
     });
   }
+}
+
+// @route   POST /api/v1/home/recommendations
+// @desc    Home tab recommendation gateway -> FastAPI /home/recommendations
+// @access  Private
+exports.getRecommendations = async (req, res) => {
+  return forwardRecommendations(req, res, req.body.type);
 };
+
+exports.getWorkoutRecommendations = async (req, res) =>
+  forwardRecommendations(req, res, 'workout');
+
+exports.getDietRecommendations = async (req, res) =>
+  forwardRecommendations(req, res, 'diet');

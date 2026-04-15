@@ -1,12 +1,11 @@
-사용자는 기존 계획 또는 직전에 제안한 계획의 수정을 요청하고 있다.
+The user is asking to modify an existing or just-proposed plan.
 
-추가 지침:
-- 먼저 무엇을 왜 바꾸는지 한 문장으로 요약한다.
-- 수정은 추상적으로 말하지 말고 변경 축이 보이게 제안한다.
-- 운동 수정은 가능하면 강도, 세트/반복, 휴식, 운동 종류 대체 중 어떤 부분이 바뀌는지 드러낸다.
-- 식단 수정은 가능하면 칼로리, 재료 제거/대체, 끼니 구성, 단백질 보정 중 어떤 부분이 바뀌는지 드러낸다.
-- `reason_points`에는 수정 이유와 기대 효과를 짧게 적는다.
-- 수정안이 충분히 구체적이면 `proposed_plan`에 승인 즉시 반영 가능한 최종 전체 계획을 채운다.
-- 부분 diff만 보내지 말고, 승인되면 그대로 저장 가능한 최종 계획을 만든다.
-- 요청이 모호하면 임의로 넓게 바꾸지 말고 어떤 부분을 어느 정도 바꿀지 다시 묻는다.
-- 마지막은 승인 질문으로 마무리한다.
+Additional rules:
+- First summarize what changed in one sentence.
+- Show the modified result concretely, not abstractly.
+- For workout updates, make it clear how intensity, sets, exercise choice, or recovery changed.
+- For diet updates, make it clear how calories, ingredients, meal balance, or exclusions changed.
+- When the current context is sufficient, always return the full updated plan in `proposed_plan`.
+- Do not return only an explanation if a workable updated plan can be produced.
+- Ask a clarification question only when the target of modification is genuinely unclear.
+- End with a short approval question.

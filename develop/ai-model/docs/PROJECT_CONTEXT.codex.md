@@ -45,6 +45,8 @@
 ## Home Recommendation Contract
 - Request path:
   - `POST /home/recommendations`
+  - `POST /home/recommendations/workout`
+  - `POST /home/recommendations/diet`
 - Request body:
   - `user_id`
   - `type = all | workout | diet`
@@ -59,7 +61,8 @@
   - `breakfast`
   - `lunch`
   - `dinner`
-- Slot values can be `null`.
+- Requested-scope slots must be filled.
+- Non-requested section slots remain `null`.
 - Workout prescription rules:
   - `upper_body`, `lower_body`, `stretching` use `sets`
   - `cardio` uses `duration_minutes`

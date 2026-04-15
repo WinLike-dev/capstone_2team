@@ -13,6 +13,7 @@ import {
   DIET_SLOTS,
   getHomeRecommendationCacheKey,
   hasRecommendationHistoryCollision,
+  isRecommendationScopeComplete,
   mergeRecommendations,
   resetAddedStateForScope,
   type DietRecommendation,
@@ -74,6 +75,8 @@ type DietPopupState = {
   mealType: DietSlot | null;
 };
 
+type RequestedRecommendationScope = Exclude<RecommendationScope, 'all'>;
+
 const getFoodEmoji = (name: string) => {
   if (name.includes('샐러드') || name.includes('야채')) return '🥗';
   if (name.includes('스테이크') || name.includes('고기') || name.includes('장조림')) return '🍖';
@@ -96,6 +99,14 @@ const getApiBaseUrl = () => {
 const buildApiUrl = (path: string) => {
   const baseUrl = getApiBaseUrl();
   return baseUrl ? `${baseUrl}${path}` : path;
+};
+
+const getHomeRecommendationApiPath = (scope: RequestedRecommendationScope) => {
+  if (scope === 'workout') {
+    return '/api/v1/home/recommendations/workout';
+  }
+
+  return '/api/v1/home/recommendations/diet';
 };
 
 const getAuthHeaders = () => {
@@ -448,12 +459,42 @@ export default function Home() {
     recommendationHistoryRef.current = recommendationHistory;
   }, [recommendationHistory]);
 
-  const fetchHomeRecommendations = useCallback(async (scope: RecommendationScope) => {
-    if (!userData?.user_id) return;
+  const applyIncomingRecommendations = useCallback((
+    incoming: HomeRecommendations,
+    scope: RecommendationScope
+  ) => {
+    const currentRecommendations =
+      homeRecommendationsRawRef.current.date === incoming.date
+        ? homeRecommendationsRawRef.current
+        : createEmptyRecommendations(incoming.date);
+    const nextRaw = mergeRecommendations(currentRecommendations, incoming, scope);
+    const nextAdded = resetAddedStateForScope(recommendationAddedRef.current, scope);
+    const nextHistory = appendRecommendationHistory(
+      recommendationHistoryRef.current,
+      incoming,
+      scope
+    );
 
-    if (scope === 'all') {
-      setIsRecommendationLoading(true);
-    } else {
+    setHomeRecommendationsRaw(nextRaw);
+    setAiRecommendations(mapRecommendationsToLegacyCards(nextRaw));
+    setRecommendationAdded(nextAdded);
+    setRecommendationHistory(nextHistory);
+    persistHomeRecommendationCache(nextRaw, nextAdded, nextHistory);
+  }, [persistHomeRecommendationCache]);
+
+  const fetchRecommendationScope = useCallback(async (
+    scope: RequestedRecommendationScope,
+    options?: {
+      suppressSectionLoading?: boolean;
+      suppressAlert?: boolean;
+    }
+  ) => {
+    if (!userData?.user_id) return false;
+
+    const suppressSectionLoading = options?.suppressSectionLoading ?? false;
+    const suppressAlert = options?.suppressAlert ?? false;
+
+    if (!suppressSectionLoading) {
       setRecommendationRefresh((prev) => ({ ...prev, [scope]: true }));
     }
 
@@ -462,11 +503,10 @@ export default function Home() {
       let incoming: HomeRecommendations | null = null;
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
-        const response = await fetch(buildApiUrl('/api/v1/home/recommendations'), {
+        const response = await fetch(buildApiUrl(getHomeRecommendationApiPath(scope)), {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            type: scope,
             recent_recommendations: currentHistory,
           }),
         });
@@ -487,24 +527,50 @@ export default function Home() {
         throw new Error('Failed to load home recommendations.');
       }
 
-      const currentRecommendations =
-        scope === 'all'
-          ? createEmptyRecommendations(incoming.date)
-          : homeRecommendationsRawRef.current;
-      const nextRaw = mergeRecommendations(currentRecommendations, incoming, scope);
-      const nextAdded = resetAddedStateForScope(recommendationAddedRef.current, scope);
-      const nextHistory = appendRecommendationHistory(
-        recommendationHistoryRef.current,
-        incoming,
-        scope
-      );
+      applyIncomingRecommendations(incoming, scope);
+      return true;
+    } catch (error) {
+      console.error('Failed to fetch home recommendations', error);
+      if (!suppressAlert) {
+        setAlertPopup({
+          isOpen: true,
+          message: 'AI 異붿쿇??遺덈윭?ㅼ? 紐삵뻽?듬땲?? ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??',
+        });
+      }
+      return false;
+    } finally {
+      if (!suppressSectionLoading) {
+        setRecommendationRefresh((prev) => ({ ...prev, [scope]: false }));
+      }
+    }
+  }, [applyIncomingRecommendations, userData?.user_id]);
 
-      setHomeRecommendationsRaw(nextRaw);
-      setAiRecommendations(mapRecommendationsToLegacyCards(nextRaw));
-      setRecommendationAdded(nextAdded);
-      setRecommendationHistory(nextHistory);
+  const fetchHomeRecommendations = useCallback(async (scope: RecommendationScope) => {
+    if (!userData?.user_id) return;
 
-      persistHomeRecommendationCache(nextRaw, nextAdded, nextHistory);
+    if (scope !== 'all') {
+      await fetchRecommendationScope(scope);
+      return;
+    }
+
+    setIsRecommendationLoading(true);
+
+    try {
+      const workoutLoaded = await fetchRecommendationScope('workout', {
+        suppressSectionLoading: true,
+        suppressAlert: true,
+      });
+      const dietLoaded = await fetchRecommendationScope('diet', {
+        suppressSectionLoading: true,
+        suppressAlert: true,
+      });
+
+      if (!workoutLoaded || !dietLoaded) {
+        setAlertPopup({
+          isOpen: true,
+          message: 'AI 異붿쿇??遺덈윭?ㅼ? 紐삵뻽?듬땲?? ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??',
+        });
+      }
     } catch (error) {
       console.error('Failed to fetch home recommendations', error);
       setAlertPopup({
@@ -512,13 +578,9 @@ export default function Home() {
         message: 'AI 추천을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
       });
     } finally {
-      if (scope === 'all') {
-        setIsRecommendationLoading(false);
-      } else {
-        setRecommendationRefresh((prev) => ({ ...prev, [scope]: false }));
-      }
+      setIsRecommendationLoading(false);
     }
-  }, [persistHomeRecommendationCache, userData?.user_id]);
+  }, [fetchRecommendationScope, userData?.user_id]);
 
   const openWorkoutRecommendationPopup = (slot: WorkoutSlot, workout: LegacyWorkoutCard) => {
     closeAllModals();
@@ -860,7 +922,10 @@ export default function Home() {
           history?: RecommendationHistoryState;
         };
 
-        if (parsed.recommendations?.date === todayStr) {
+        if (
+          parsed.recommendations?.date === todayStr &&
+          isRecommendationScopeComplete(parsed.recommendations, 'all')
+        ) {
           const nextRecommendations = parsed.recommendations;
           const nextAdded = parsed.added || createEmptyAddedState();
           const nextHistory = parsed.history || createEmptyRecommendationHistory();

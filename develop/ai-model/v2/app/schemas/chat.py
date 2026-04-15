@@ -19,4 +19,5 @@ class ChatResponse(BaseModel):
     intent: Optional[str] = None
     emotion: Optional[dict[str, Any]] = None
     draft_response: Optional[str] = None
+    plan_sync_applied: Optional[bool] = None
     debug_state: Optional[dict[str, Any]] = None

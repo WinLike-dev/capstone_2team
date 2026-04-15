@@ -7,6 +7,13 @@ const {
   toOptionalNumber,
   toOptionalString,
 } = require('../utils/profileFields');
+const {
+  buildProfileRowForUpsert,
+  ensureUserHealthProfile,
+  ensureUserHealthProfileRow,
+} = require('../services/profileService');
+const { loadExercisePlansWithItems } = require('../services/exercisePlanReadService');
+const planMutationService = require('../services/planMutationService');
 
 function normalizePlanType(value) {
   const text = String(value || '').trim().toLowerCase();
@@ -329,14 +336,7 @@ async function loadExistingConflictDates(userId, planType, targetDates) {
 exports.getProfile = async (req, res) => {
   try {
     const { user_id: userId } = req.params;
-
-    const { data: profile, error } = await supabase
-      .from('user_health_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) throw error;
+    const profile = await ensureUserHealthProfile(supabase, userId);
     if (!profile) {
       return res.status(404).json({ error: 'Profile not found.' });
     }
@@ -358,7 +358,7 @@ exports.getProfile = async (req, res) => {
       mbti: profile.mbti ?? null,
     });
   } catch (error) {
-    logger.error('Internal getProfile error: %s', error.message);
+    logger.error(`Internal getProfile error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to load profile.' });
   }
 };
@@ -369,14 +369,10 @@ exports.getTodayPlan = async (req, res) => {
     const { user_id: userId } = req.params;
     const today = formatKstDate();
 
-    const { data: exercises, error: exerciseError } = await supabase
-      .from('user_exercise_plans')
-      .select('*, exercise_items(*)')
-      .eq('user_id', userId)
-      .eq('target_date', today)
-      .order('created_at', { ascending: true });
-
-    if (exerciseError) throw exerciseError;
+    const exercises = await loadExercisePlansWithItems(supabase, {
+      userId,
+      targetDate: today,
+    });
 
     const { data: meals, error: mealError } = await supabase
       .from('user_meal_plans')
@@ -427,7 +423,7 @@ exports.getTodayPlan = async (req, res) => {
 
     return res.json(planItems);
   } catch (error) {
-    logger.error('Internal getTodayPlan error: %s', error.message);
+    logger.error(`Internal getTodayPlan error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to load today plan.' });
   }
 };
@@ -460,31 +456,17 @@ exports.updateProfile = async (req, res) => {
       return res.status(400).json({ error: 'No valid profile fields provided.' });
     }
 
-    const { data: existingProfile, error: existingError } = await supabase
-      .from('user_health_profiles')
-      .select('weight, height')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (existingError) throw existingError;
-
-    const bmi = calculateBmi(
-      filteredUpdate.weight ?? existingProfile?.weight ?? null,
-      filteredUpdate.height ?? existingProfile?.height ?? null
-    );
-    if (bmi !== null) {
-      filteredUpdate.bmi = bmi;
+    const existingProfile = await ensureUserHealthProfileRow(supabase, userId);
+    if (!existingProfile) {
+      return res.status(404).json({ error: 'User not found.' });
     }
+
+    const profilePayload = buildProfileRowForUpsert(userId, existingProfile, filteredUpdate);
+    profilePayload.bmi = calculateBmi(profilePayload.weight, profilePayload.height) ?? 0;
 
     const { data: updatedProfile, error } = await supabase
       .from('user_health_profiles')
-      .upsert(
-        {
-          user_id: userId,
-          ...filteredUpdate,
-        },
-        { onConflict: 'user_id' }
-      )
+      .upsert(profilePayload, { onConflict: 'user_id' })
       .select('*')
       .single();
 
@@ -496,7 +478,7 @@ exports.updateProfile = async (req, res) => {
       profile: updatedProfile,
     });
   } catch (error) {
-    logger.error('Internal updateProfile error: %s', error.message);
+    logger.error(`Internal updateProfile error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to update profile.' });
   }
 };
@@ -518,7 +500,12 @@ exports.createPlan = async (req, res) => {
     }
 
     const targetDates = dedupeDates(normalizedItems);
-    const conflictDates = await loadExistingConflictDates(userId, planType, targetDates);
+    const conflictDates = await planMutationService.loadExistingConflictDates(
+      supabase,
+      userId,
+      planType,
+      targetDates
+    );
 
     if (conflictDates.length > 0) {
       return res.status(409).json({
@@ -529,8 +516,8 @@ exports.createPlan = async (req, res) => {
     }
 
     const created = planType === 'workout'
-      ? await createWorkoutPlans(userId, normalizedItems)
-      : await createDietPlans(userId, normalizedItems);
+      ? await planMutationService.createWorkoutPlans(supabase, userId, normalizedItems)
+      : await planMutationService.createDietPlans(supabase, userId, normalizedItems);
 
     return res.status(201).json({
       status: 'success',
@@ -539,7 +526,7 @@ exports.createPlan = async (req, res) => {
       items: created,
     });
   } catch (error) {
-    logger.error('Internal createPlan error: %s', error.message);
+    logger.error(`Internal createPlan error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to create plan.' });
   }
 };
@@ -562,22 +549,18 @@ exports.updatePlan = async (req, res) => {
 
     const targetDates = dedupeDates(normalizedItems);
 
-    if (planType === 'workout') {
-      await deleteWorkoutPlansForDates(userId, targetDates);
-      await createWorkoutPlans(userId, normalizedItems);
-    } else {
-      await deleteDietPlansForDates(userId, targetDates);
-      await createDietPlans(userId, normalizedItems);
-    }
+    const updated = planType === 'workout'
+      ? await planMutationService.replaceWorkoutPlans(supabase, userId, normalizedItems)
+      : await planMutationService.replaceDietPlans(supabase, userId, normalizedItems);
 
     return res.json({
       status: 'success',
       plan_type: planType,
       replaced_dates: targetDates,
-      updated_count: normalizedItems.length,
+      updated_count: updated.length,
     });
   } catch (error) {
-    logger.error('Internal updatePlan error: %s', error.message);
+    logger.error(`Internal updatePlan error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to update plan.' });
   }
 };
@@ -670,7 +653,7 @@ exports.checkPlan = async (req, res) => {
       checked: true,
     });
   } catch (error) {
-    logger.error('Internal checkPlan error: %s', error.message);
+    logger.error(`Internal checkPlan error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to check plan item.' });
   }
 };
@@ -679,15 +662,7 @@ exports.checkPlan = async (req, res) => {
 exports.getFullWorkoutPlan = async (req, res) => {
   try {
     const { user_id: userId } = req.params;
-
-    const { data: exercises, error } = await supabase
-      .from('user_exercise_plans')
-      .select('*, exercise_items(*)')
-      .eq('user_id', userId)
-      .order('target_date', { ascending: true })
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
+    const exercises = await loadExercisePlansWithItems(supabase, { userId });
 
     return res.json({
       plan_type: 'workout',
@@ -706,7 +681,7 @@ exports.getFullWorkoutPlan = async (req, res) => {
       })),
     });
   } catch (error) {
-    logger.error('Internal getFullWorkoutPlan error: %s', error.message);
+    logger.error(`Internal getFullWorkoutPlan error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to load workout plans.' });
   }
 };
@@ -736,7 +711,7 @@ exports.getFullDietPlan = async (req, res) => {
       })),
     });
   } catch (error) {
-    logger.error('Internal getFullDietPlan error: %s', error.message);
+    logger.error(`Internal getFullDietPlan error: ${error.message}`);
     return res.status(500).json({ error: 'Failed to load diet plans.' });
   }
 };

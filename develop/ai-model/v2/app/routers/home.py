@@ -6,6 +6,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request
 
+from app.core.conversation_state import empty_context_resolution, empty_recent_dialogue
 from app.core.internal_auth import require_internal_api_key
 from app.core.trace_store import bind_trace, reset_trace, timed_ms
 from app.schemas.home import HomeRecommendationRequest, HomeRecommendationResponse
@@ -25,6 +26,11 @@ def _build_home_initial_state(req: HomeRecommendationRequest) -> GraphState:
         "turn_count": 0,
         "is_session_start": True,
         "intent": "",
+        "action_intent": None,
+        "domain": "general",
+        "support_mode": "normal",
+        "ambiguous": False,
+        "context_resolution": empty_context_resolution(),
         "confidence": 0.0,
         "emotion": None,
         "previous_intent": None,
@@ -45,6 +51,8 @@ def _build_home_initial_state(req: HomeRecommendationRequest) -> GraphState:
         "search_query": None,
         "pending_writes": [],
         "awaiting_plan_confirmation": False,
+        "active_proposal": None,
+        "recent_dialogue": empty_recent_dialogue(),
         "draft_response": None,
         "draft_components": None,
         "proposed_plan": None,
@@ -61,18 +69,10 @@ def _build_home_initial_state(req: HomeRecommendationRequest) -> GraphState:
         "self_eval_failure_reason": None,
         "fallback_count": 0,
         "needs_clarification": False,
-        "summary": None,
-        "last_assistant_message": None,
-        "messages": [],
     }
 
 
-@router.post(
-    "/recommendations",
-    response_model=HomeRecommendationResponse,
-    dependencies=[Depends(require_internal_api_key)],
-)
-async def recommend_home_items(
+async def _run_home_recommendations(
     req: HomeRecommendationRequest,
     request: Request,
 ) -> HomeRecommendationResponse:
@@ -108,6 +108,11 @@ async def recommend_home_items(
         payload = result.get("home_recommendations") or empty_home_recommendations(
             date=date,
             scope=req.type,
+            user_profile=result.get("user_profile") or {},
+            today_plan=result.get("today_plan") or [],
+            recent_recommendations=req.recent_recommendations.model_dump()
+            if req.recent_recommendations
+            else {},
         ).model_dump()
         response = HomeRecommendationResponse.model_validate(payload)
 
@@ -140,3 +145,49 @@ async def recommend_home_items(
         return response
     finally:
         reset_trace(token)
+
+
+@router.post(
+    "/recommendations",
+    response_model=HomeRecommendationResponse,
+    dependencies=[Depends(require_internal_api_key)],
+)
+async def recommend_home_items(
+    req: HomeRecommendationRequest,
+    request: Request,
+) -> HomeRecommendationResponse:
+    return await _run_home_recommendations(req, request)
+
+
+@router.post(
+    "/recommendations/workout",
+    response_model=HomeRecommendationResponse,
+    dependencies=[Depends(require_internal_api_key)],
+)
+async def recommend_workout_items(
+    req: HomeRecommendationRequest,
+    request: Request,
+) -> HomeRecommendationResponse:
+    scoped_req = HomeRecommendationRequest(
+        user_id=req.user_id,
+        type="workout",
+        recent_recommendations=req.recent_recommendations,
+    )
+    return await _run_home_recommendations(scoped_req, request)
+
+
+@router.post(
+    "/recommendations/diet",
+    response_model=HomeRecommendationResponse,
+    dependencies=[Depends(require_internal_api_key)],
+)
+async def recommend_diet_items(
+    req: HomeRecommendationRequest,
+    request: Request,
+) -> HomeRecommendationResponse:
+    scoped_req = HomeRecommendationRequest(
+        user_id=req.user_id,
+        type="diet",
+        recent_recommendations=req.recent_recommendations,
+    )
+    return await _run_home_recommendations(scoped_req, request)

@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const supabase = require('../config/db');
+const { bootstrapProfileRow } = require('../services/profileService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'capstone_jwt_secret_key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -57,6 +58,12 @@ exports.signup = async (req, res) => {
 
         if (error) throw error;
 
+        try {
+            await bootstrapProfileRow(supabase, newUser.user_id);
+        } catch (profileError) {
+            console.error('Signup profile bootstrap warning:', profileError);
+        }
+
         res.status(201).json({
             message: '회원가입이 성공적으로 완료되었습니다.',
             user: newUser
@@ -101,7 +108,7 @@ exports.login = async (req, res) => {
             .from('user_health_profiles')
             .select('user_id')
             .eq('user_id', user.user_id)
-            .single();
+            .maybeSingle();
 
         user.has_health_profile = !!profile;
 
@@ -150,7 +157,7 @@ exports.getMe = async (req, res) => {
             .from('user_health_profiles')
             .select('user_id')
             .eq('user_id', userId)
-            .single();
+            .maybeSingle();
 
         user.has_health_profile = !!profile;
 

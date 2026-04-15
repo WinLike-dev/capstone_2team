@@ -20,12 +20,17 @@ class ValidationError(AppError):
 
 
 class ExternalServiceError(AppError):
-    def __init__(self, service: str, message: str) -> None:
+    def __init__(self, service: str, message: str, *, status_code: int | None = None) -> None:
+        self.service = service
+        self.external_status_code = status_code
         super().__init__(
             status_code=502,
             error_code="EXTERNAL_SERVICE_ERROR",
             message=f"{service}: {message}",
         )
+
+    def is_http_status(self, *codes: int) -> bool:
+        return self.external_status_code in set(codes)
 
 
 class GraphExecutionError(AppError):
