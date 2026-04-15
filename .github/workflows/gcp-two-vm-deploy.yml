@@ -34,13 +34,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.service }}" = "backend" ]; then
-            cat > develop/deploy/gcp-two-vm/backend/.env.backend <<'EOF'
-            ${{ secrets.GCP_BACKEND_ENV }}
-            EOF
+            printf '%s\n' "${{ secrets.GCP_BACKEND_ENV }}" > develop/deploy/gcp-two-vm/backend/.env.backend
           else
-            cat > develop/deploy/gcp-two-vm/ai/.env.ai <<'EOF'
-            ${{ secrets.GCP_AI_ENV }}
-            EOF
+            printf '%s\n' "${{ secrets.GCP_AI_ENV }}" > develop/deploy/gcp-two-vm/ai/.env.ai
           fi
 
       - name: Build deploy archive
