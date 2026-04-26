@@ -1,7 +1,10 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const supabase = require('../config/db');
-const { bootstrapProfileRow } = require('../services/profileService');
+const {
+    bootstrapProfileRow,
+    hasCompletedHealthProfile,
+} = require('../services/profileService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'capstone_jwt_secret_key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -106,11 +109,11 @@ exports.login = async (req, res) => {
         // 3. 온보딩(건강 프로필) 작성 여부 확인
         const { data: profile } = await supabase
             .from('user_health_profiles')
-            .select('user_id')
+            .select('user_id, gender, age, height, weight, goal, activity_level, mbti, allergies, medical_history')
             .eq('user_id', user.user_id)
             .maybeSingle();
 
-        user.has_health_profile = !!profile;
+        user.has_health_profile = hasCompletedHealthProfile(profile);
 
         // 4. JWT 토큰 생성
         const payload = {
@@ -155,11 +158,11 @@ exports.getMe = async (req, res) => {
         // 온보딩(건강 프로필) 작성 여부 확인
         const { data: profile } = await supabase
             .from('user_health_profiles')
-            .select('user_id')
+            .select('user_id, gender, age, height, weight, goal, activity_level, mbti, allergies, medical_history')
             .eq('user_id', userId)
             .maybeSingle();
 
-        user.has_health_profile = !!profile;
+        user.has_health_profile = hasCompletedHealthProfile(profile);
 
         res.json(user);
     } catch (err) {

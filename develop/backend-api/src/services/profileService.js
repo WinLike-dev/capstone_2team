@@ -61,6 +61,37 @@ function buildNormalizedProfile(userId, profile = {}, nickname = null) {
   return normalized;
 }
 
+function hasCompletedHealthProfile(profile = {}) {
+  const normalized = normalizeProfileRow(profile);
+
+  const age = Number(normalized.age || 0);
+  const height = Number(normalized.height || 0);
+  const weight = Number(normalized.weight || 0);
+  const gender = String(normalized.gender || '').trim().toLowerCase();
+  const goal = toOptionalString(normalized.goal);
+  const activityLevel = toOptionalString(normalized.activity_level);
+  const mbti = toOptionalString(normalized.mbti);
+  const allergies = Array.isArray(normalized.allergies) ? normalized.allergies : [];
+  const conditions = Array.isArray(normalized.medical_history)
+    ? normalized.medical_history
+    : Array.isArray(normalized.conditions)
+      ? normalized.conditions
+      : [];
+
+  return (
+    age > 0 &&
+    height > 0 &&
+    weight > 0 &&
+    !!goal &&
+    !!activityLevel &&
+    !!mbti &&
+    !!gender &&
+    gender !== 'unknown' &&
+    allergies.length > 0 &&
+    conditions.length > 0
+  );
+}
+
 async function loadUserSnapshot(supabase, userId) {
   const { data, error } = await supabase
     .from('users')
@@ -158,5 +189,6 @@ module.exports = {
   bootstrapProfileRow,
   ensureUserHealthProfile,
   ensureUserHealthProfileRow,
+  hasCompletedHealthProfile,
   loadUserSnapshot,
 };
