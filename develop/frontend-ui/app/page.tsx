@@ -410,6 +410,7 @@ export default function Home() {
   const recommendationAddedRef = useRef(recommendationAdded);
   const recommendationHistoryRef = useRef(recommendationHistory);
   const isMountedRef = useRef(false);
+  const isLeavingHomeRef = useRef(false);
   const recommendationAbortControllersRef = useRef<Set<AbortController>>(new Set());
 
   const persistNutritionSnapshot = (
@@ -457,19 +458,43 @@ export default function Home() {
     };
   }, []);
 
+  const hasNavigatedAwayFromHome = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.location.pathname !== '/';
+  }, []);
+
   const isRecommendationRequestCancelled = useCallback((error: unknown, signal?: AbortSignal) => {
-    if (!isMountedRef.current || signal?.aborted) {
+    if (
+      !isMountedRef.current ||
+      isLeavingHomeRef.current ||
+      hasNavigatedAwayFromHome() ||
+      signal?.aborted
+    ) {
       return true;
     }
 
     return error instanceof DOMException && error.name === 'AbortError';
-  }, []);
+  }, [hasNavigatedAwayFromHome]);
 
   useEffect(() => {
     isMountedRef.current = true;
+    isLeavingHomeRef.current = false;
+
+    const markLeavingHome = () => {
+      isLeavingHomeRef.current = true;
+    };
+
+    window.addEventListener('beforeunload', markLeavingHome);
+    window.addEventListener('pagehide', markLeavingHome);
 
     return () => {
+      markLeavingHome();
       isMountedRef.current = false;
+      window.removeEventListener('beforeunload', markLeavingHome);
+      window.removeEventListener('pagehide', markLeavingHome);
       recommendationAbortControllersRef.current.forEach((controller) => controller.abort());
       recommendationAbortControllersRef.current.clear();
     };
@@ -562,7 +587,12 @@ export default function Home() {
         throw new Error('Failed to load home recommendations.');
       }
 
-      if (requestSignal?.aborted || !isMountedRef.current) {
+      if (
+        requestSignal?.aborted ||
+        !isMountedRef.current ||
+        isLeavingHomeRef.current ||
+        hasNavigatedAwayFromHome()
+      ) {
         return false;
       }
 
@@ -584,12 +614,18 @@ export default function Home() {
     } finally {
       unregisterAbortController?.();
 
-      if (!suppressSectionLoading && isMountedRef.current) {
+      if (
+        !suppressSectionLoading &&
+        isMountedRef.current &&
+        !isLeavingHomeRef.current &&
+        !hasNavigatedAwayFromHome()
+      ) {
         setRecommendationRefresh((prev) => ({ ...prev, [scope]: false }));
       }
     }
   }, [
     applyIncomingRecommendations,
+    hasNavigatedAwayFromHome,
     isRecommendationRequestCancelled,
     registerRecommendationAbortController,
     userData?.user_id,
@@ -619,7 +655,12 @@ export default function Home() {
         signal: requestController.signal,
       });
 
-      if (requestController.signal.aborted || !isMountedRef.current) {
+      if (
+        requestController.signal.aborted ||
+        !isMountedRef.current ||
+        isLeavingHomeRef.current ||
+        hasNavigatedAwayFromHome()
+      ) {
         return;
       }
 
@@ -642,12 +683,17 @@ export default function Home() {
     } finally {
       unregisterAbortController();
 
-      if (isMountedRef.current) {
+      if (
+        isMountedRef.current &&
+        !isLeavingHomeRef.current &&
+        !hasNavigatedAwayFromHome()
+      ) {
         setIsRecommendationLoading(false);
       }
     }
   }, [
     fetchRecommendationScope,
+    hasNavigatedAwayFromHome,
     isRecommendationRequestCancelled,
     registerRecommendationAbortController,
     userData?.user_id,
