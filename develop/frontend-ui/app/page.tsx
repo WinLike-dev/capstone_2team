@@ -409,6 +409,8 @@ export default function Home() {
   const homeRecommendationsRawRef = useRef(homeRecommendationsRaw);
   const recommendationAddedRef = useRef(recommendationAdded);
   const recommendationHistoryRef = useRef(recommendationHistory);
+  const isMountedRef = useRef(false);
+  const recommendationAbortControllersRef = useRef<Set<AbortController>>(new Set());
 
   const persistNutritionSnapshot = (
     nextTargets = targets,
@@ -446,6 +448,32 @@ export default function Home() {
       })
     );
   }, [userData?.user_id]);
+
+  const registerRecommendationAbortController = useCallback((controller: AbortController) => {
+    recommendationAbortControllersRef.current.add(controller);
+
+    return () => {
+      recommendationAbortControllersRef.current.delete(controller);
+    };
+  }, []);
+
+  const isRecommendationRequestCancelled = useCallback((error: unknown, signal?: AbortSignal) => {
+    if (!isMountedRef.current || signal?.aborted) {
+      return true;
+    }
+
+    return error instanceof DOMException && error.name === 'AbortError';
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      recommendationAbortControllersRef.current.forEach((controller) => controller.abort());
+      recommendationAbortControllersRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     homeRecommendationsRawRef.current = homeRecommendationsRaw;
@@ -487,12 +515,18 @@ export default function Home() {
     options?: {
       suppressSectionLoading?: boolean;
       suppressAlert?: boolean;
+      signal?: AbortSignal;
     }
   ) => {
     if (!userData?.user_id) return false;
 
     const suppressSectionLoading = options?.suppressSectionLoading ?? false;
     const suppressAlert = options?.suppressAlert ?? false;
+    const requestController = options?.signal ? null : new AbortController();
+    const requestSignal = options?.signal ?? requestController?.signal;
+    const unregisterAbortController = requestController
+      ? registerRecommendationAbortController(requestController)
+      : null;
 
     if (!suppressSectionLoading) {
       setRecommendationRefresh((prev) => ({ ...prev, [scope]: true }));
@@ -509,6 +543,7 @@ export default function Home() {
           body: JSON.stringify({
             recent_recommendations: currentHistory,
           }),
+          signal: requestSignal,
         });
 
         if (!response.ok) {
@@ -527,9 +562,17 @@ export default function Home() {
         throw new Error('Failed to load home recommendations.');
       }
 
+      if (requestSignal?.aborted || !isMountedRef.current) {
+        return false;
+      }
+
       applyIncomingRecommendations(incoming, scope);
       return true;
     } catch (error) {
+      if (isRecommendationRequestCancelled(error, requestSignal)) {
+        return false;
+      }
+
       console.error('Failed to fetch home recommendations', error);
       if (!suppressAlert) {
         setAlertPopup({
@@ -539,11 +582,18 @@ export default function Home() {
       }
       return false;
     } finally {
-      if (!suppressSectionLoading) {
+      unregisterAbortController?.();
+
+      if (!suppressSectionLoading && isMountedRef.current) {
         setRecommendationRefresh((prev) => ({ ...prev, [scope]: false }));
       }
     }
-  }, [applyIncomingRecommendations, userData?.user_id]);
+  }, [
+    applyIncomingRecommendations,
+    isRecommendationRequestCancelled,
+    registerRecommendationAbortController,
+    userData?.user_id,
+  ]);
 
   const fetchHomeRecommendations = useCallback(async (scope: RecommendationScope) => {
     if (!userData?.user_id) return;
@@ -554,16 +604,24 @@ export default function Home() {
     }
 
     setIsRecommendationLoading(true);
+    const requestController = new AbortController();
+    const unregisterAbortController = registerRecommendationAbortController(requestController);
 
     try {
       const workoutLoaded = await fetchRecommendationScope('workout', {
         suppressSectionLoading: true,
         suppressAlert: true,
+        signal: requestController.signal,
       });
       const dietLoaded = await fetchRecommendationScope('diet', {
         suppressSectionLoading: true,
         suppressAlert: true,
+        signal: requestController.signal,
       });
+
+      if (requestController.signal.aborted || !isMountedRef.current) {
+        return;
+      }
 
       if (!workoutLoaded || !dietLoaded) {
         setAlertPopup({
@@ -572,15 +630,28 @@ export default function Home() {
         });
       }
     } catch (error) {
+      if (isRecommendationRequestCancelled(error, requestController.signal)) {
+        return;
+      }
+
       console.error('Failed to fetch home recommendations', error);
       setAlertPopup({
         isOpen: true,
         message: 'AI 추천을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
       });
     } finally {
-      setIsRecommendationLoading(false);
+      unregisterAbortController();
+
+      if (isMountedRef.current) {
+        setIsRecommendationLoading(false);
+      }
     }
-  }, [fetchRecommendationScope, userData?.user_id]);
+  }, [
+    fetchRecommendationScope,
+    isRecommendationRequestCancelled,
+    registerRecommendationAbortController,
+    userData?.user_id,
+  ]);
 
   const openWorkoutRecommendationPopup = (slot: WorkoutSlot, workout: LegacyWorkoutCard) => {
     closeAllModals();
