@@ -37,6 +37,7 @@ from app.graph.nodes.intent import INTENT_INFO, INTENT_RECORD
 from app.routers.chat import router as chat_router
 
 MSG_CREATE_WORKOUT = "\uc624\ub298 \uc6b4\ub3d9 \uacc4\ud68d \uc9dc\uc918"
+MSG_CREATE_MIXED_PLAN = "\uc624\ub298 \uc6b4\ub3d9 \uacc4\ud68d\uacfc \uc2dd\ub2e8 \uacc4\ud68d\uc744 \uac19\uc774 \uc9dc\uc918"
 MSG_MODIFY_WORKOUT = "\uadf8\uac70 \uc880 \ub35c \ube61\uc138\uac8c \ubc14\uafd4\uc918"
 MSG_INFO_REASON = "\uc65c \uadf8\ub807\uac8c \uc9f0\uc5b4?"
 MSG_APPROVAL = "\uc88b\uc544 \uadf8\uac78\ub85c \uc9c4\ud589\ud574\uc918"
@@ -219,7 +220,11 @@ class FakeWAS:
             normalized["type"] = "meal" if plan_type == "diet" else "exercise"
             items.append(normalized)
         self.full_plans[user_id][plan_type] = {"items": items}
-        self.today_plans[user_id] = [dict(item) for item in items]
+        combined_items: list[dict[str, Any]] = []
+        for stored_plan_type in ("workout", "diet"):
+            for stored_item in self.full_plans[user_id][stored_plan_type]["items"]:
+                combined_items.append(dict(stored_item))
+        self.today_plans[user_id] = combined_items
         self.write_log.append((f"plan_{mode}", user_id, {"plan_type": plan_type, "count": len(items)}))
 
 
@@ -396,6 +401,46 @@ class FakeRouter:
                 "search_grounding_summary": "",
                 "proposed_plan": [],
                 "proposed_plan_type": None,
+            }
+
+        if "\uc6b4\ub3d9" in message and "\uc2dd\ub2e8" in message:
+            return {
+                "core_message": "Here is a combined workout and meal plan.",
+                "reason_points": ["I balanced movement, recovery, and meal timing together."],
+                "suggested_action": "If you want, tell me whether to proceed with this combined plan.",
+                "safety_notes": [],
+                "approval_question": "Should I proceed with this combined plan?",
+                "search_grounding_summary": "I applied both workout and diet guidance.",
+                "proposed_plan": [
+                    {
+                        "name": "Morning Workout",
+                        "detail": "Short strength and cardio session",
+                        "day": "2026-04-16",
+                        "ex_list": [
+                            {"exercise_name": "Leg Press", "sets": 3, "calories": 80},
+                            {"exercise_name": "Treadmill Walk", "duration_minutes": 20, "calories": 90},
+                        ],
+                    },
+                    {
+                        "name": "Breakfast",
+                        "detail": "Greek yogurt and berries",
+                        "day": "2026-04-16",
+                        "ex_list": [{"exercise_name": "Greek yogurt and berries", "sets": 3, "calories": 0}],
+                    },
+                    {
+                        "name": "Lunch",
+                        "detail": "Chicken salad bowl",
+                        "day": "2026-04-16",
+                        "ex_list": [{"exercise_name": "Chicken salad bowl", "sets": 3, "calories": 0}],
+                    },
+                    {
+                        "name": "Dinner",
+                        "detail": "Salmon and vegetables",
+                        "day": "2026-04-16",
+                        "ex_list": [{"exercise_name": "Salmon and vegetables", "sets": 3, "calories": 0}],
+                    },
+                ],
+                "proposed_plan_type": "workout",
             }
 
         if any(token in message for token in ("\uc2dd\ub2e8", "\uce7c\ub85c\ub9ac", "\uc2dd\uc0ac")):
@@ -582,6 +627,7 @@ async def main() -> None:
     try:
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
             flow_user = f"e2e-flow-{uuid.uuid4().hex[:6]}"
+            mixed_user = f"e2e-mixed-{uuid.uuid4().hex[:6]}"
             profile_user = f"e2e-profile-{uuid.uuid4().hex[:6]}"
             plancheck_user = f"e2e-check-{uuid.uuid4().hex[:6]}"
             care_user = f"e2e-care-{uuid.uuid4().hex[:6]}"
@@ -618,6 +664,27 @@ async def main() -> None:
             saved = await graph.aget_state({"configurable": {"thread_id": session_id}})
             require(not saved.values.get("active_proposal"), "active proposal should be cleared after approval write")
 
+            mixed_create = await run_request(client, mixed_user, MSG_CREATE_MIXED_PLAN)
+            mixed_session_id = mixed_create["session_id"]
+            mixed_create_debug = mixed_create["debug_state"]
+            require(mixed_create_debug["action_intent"] == "create", "mixed create action_intent mismatch")
+            require(mixed_create_debug["proposed_plan_count"] == 4, "mixed plan should contain workout and meal items")
+
+            mixed_approval = await run_request(client, mixed_user, MSG_APPROVAL, session_id=mixed_session_id)
+            require(bool(mixed_approval.get("plan_sync_applied")), "mixed approval should trigger synchronous WAS write")
+            mixed_workout_items = fake_was.full_plans[mixed_user]["workout"]["items"]
+            mixed_diet_items = fake_was.full_plans[mixed_user]["diet"]["items"]
+            require(len(mixed_workout_items) == 1, "mixed approval should keep workout items in workout plan")
+            require(len(mixed_diet_items) == 3, "mixed approval should keep meal items in diet plan")
+            require(
+                [item["name"] for item in mixed_diet_items] == ["Breakfast", "Lunch", "Dinner"],
+                "mixed approval should preserve meal rows separately",
+            )
+            require(
+                {item["type"] for item in fake_was.today_plans[mixed_user]} == {"exercise", "meal"},
+                "mixed approval should expose both exercise and meal items in today plan",
+            )
+
             profile = await run_request(client, profile_user, MSG_RECORD_WEIGHT)
             profile_debug = profile["debug_state"]
             require(profile_debug["action_intent"] == "record", "profile record action_intent mismatch")
@@ -639,9 +706,10 @@ async def main() -> None:
             require(safety_debug["action_intent"] == "safety", "safety action_intent mismatch")
             require(bool(safety["response"]), "safety response should not be empty")
 
-            print("[e2e] 8/8 passed")
+            print("[e2e] 9/9 passed")
             print(f"  create session_id={session_id}")
             print(f"  approval plan_sync_applied={approval.get('plan_sync_applied')}")
+            print(f"  mixed plan split=workout:{len(mixed_workout_items)} diet:{len(mixed_diet_items)}")
             print(f"  profile weight={fake_was.profiles[profile_user]['weight']}")
             print(f"  plan_check completed={exercise_items[0]['completed']}")
     finally:

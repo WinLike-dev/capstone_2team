@@ -7,47 +7,47 @@ from typing import Any, TypedDict
 
 from app.core.exceptions import ExternalServiceError
 from app.graph.deps import NodeDeps
-from app.graph.nodes.intent import INTENT_APPROVAL
+from app.graph.nodes.intent import INTENT_APPROVAL, INTENT_RECORD
 from app.schemas.llm_responses import PlanExtractResponse, PlanModifyResponse
 from app.schemas.state import PendingWrite
-from app.schemas.was import to_plan_create, to_plan_update
+from app.schemas.was import to_plan_create_batches, to_plan_update_batches
 
 logger = logging.getLogger(__name__)
 
 _PLAN_EXTRACT_PROMPT = """\
-아래 AI 응답에서 운동/식단 계획 데이터를 JSON으로 추출하세요.
-응답에 구체적인 계획이 없으면 has_plan: false를 반환하세요.
+Extract a structured workout or diet plan from the AI response below.
+If there is no concrete plan, return has_plan as false.
 
-JSON 형식:
+Return JSON in this format:
 {
   "has_plan": true/false,
   "plan_type": "workout" | "diet",
   "items": [
     {
-      "name": "항목명",
-      "detail": "상세 내용",
-      "day": "YYYY-MM-DD 날짜",
-      "ex_list": [{"exercise_name": "운동명", "sets": 3}]
+      "name": "Plan item name",
+      "detail": "Short description",
+      "day": "YYYY-MM-DD date",
+      "ex_list": [{"exercise_name": "Exercise name", "sets": 3}]
     }
   ]
 }
 """
 
 _PLAN_MODIFY_PROMPT = """\
-아래 원본 계획과 AI 수정 응답을 비교하여, 수정이 반영된 최종 계획을 JSON으로 반환하세요.
-변경된 부분만이 아니라 수정 후 전체 계획을 반환해야 합니다.
-실질적인 수정이 없으면 has_changes: false를 반환하세요.
+Compare the original plan with the AI revision response below and return the fully updated plan as JSON.
+Do not return only changed fields. Return the complete final plan.
+If there are no meaningful changes, return has_changes as false.
 
-JSON 형식:
+Return JSON in this format:
 {
   "has_changes": true/false,
   "plan_type": "workout" | "diet",
   "items": [
     {
-      "name": "항목명",
-      "detail": "상세 내용",
-      "day": "YYYY-MM-DD 날짜",
-      "ex_list": [{"exercise_name": "운동명", "sets": 3}]
+      "name": "Plan item name",
+      "detail": "Short description",
+      "day": "YYYY-MM-DD date",
+      "ex_list": [{"exercise_name": "Exercise name", "sets": 3}]
     }
   ]
 }
@@ -76,10 +76,12 @@ async def execute_was_writes(
 ) -> WriteExecutionResult:
     """Execute WAS writes and return pending retries plus approval success state."""
 
+    del response, today_plan, search_results, modify_plan_context
+
     pending: list[PendingWrite] = []
     write_succeeded = False
 
-    if intent == "기록" and profile_changes:
+    if intent == INTENT_RECORD and profile_changes:
         if record_type == "plan_check":
             item_id = profile_changes.get("item_id")
             if item_id:
@@ -109,38 +111,51 @@ async def execute_was_writes(
 
         try:
             if write_type == "plan_update":
-                plan_payload = to_plan_update(
+                plan_payloads = to_plan_update_batches(
                     {
                         "has_changes": True,
                         **raw_payload,
                     }
                 )
             else:
-                plan_payload = to_plan_create(
+                plan_payloads = to_plan_create_batches(
                     {
                         "has_plan": True,
                         **raw_payload,
                     }
                 )
         except Exception as exc:
-            logger.exception("계획_승인 WAS payload 변환 실패: %s", exc)
+            logger.exception("approval WAS payload generation failed: %s", exc)
             return {"pending": pending, "write_succeeded": False}
 
-        if not plan_payload:
-            logger.warning("계획_승인 WAS write skipped: plan payload generation returned empty")
+        if not plan_payloads:
+            logger.warning("approval WAS write skipped: plan payload generation returned empty")
             return {"pending": pending, "write_succeeded": False}
 
-        write = {"write_type": write_type, "payload": plan_payload}
-        try:
-            if write_type == "plan_update":
-                await deps.was.put_plan_update(user_id, plan_payload)
-            else:
-                await deps.was.post_plan_create(user_id, plan_payload)
-            logger.info("계획_승인 WAS write succeeded (%s)", write_type)
-            write_succeeded = True
-        except ExternalServiceError as exc:
-            logger.warning("계획_승인 WAS write failed: %s", exc)
-            pending.append(write)
+        successful_writes = 0
+        for plan_payload in plan_payloads:
+            write = {"write_type": write_type, "payload": plan_payload}
+            try:
+                if write_type == "plan_update":
+                    await deps.was.put_plan_update(user_id, plan_payload)
+                else:
+                    await deps.was.post_plan_create(user_id, plan_payload)
+                logger.info(
+                    "approval WAS write succeeded (%s:%s)",
+                    write_type,
+                    plan_payload.get("plan_type"),
+                )
+                successful_writes += 1
+            except ExternalServiceError as exc:
+                logger.warning(
+                    "approval WAS write failed (%s:%s): %s",
+                    write_type,
+                    plan_payload.get("plan_type"),
+                    exc,
+                )
+                pending.append(write)
+
+        write_succeeded = successful_writes == len(plan_payloads) and successful_writes > 0
 
     return {"pending": pending, "write_succeeded": write_succeeded}
 
@@ -151,7 +166,7 @@ async def _extract_plan_from_response(deps: NodeDeps, response: str) -> dict | N
     try:
         raw = await deps.router.generate(
             system_prompt=_PLAN_EXTRACT_PROMPT,
-            user_content=f"AI 응답:\n{response}",
+            user_content=f"AI response:\n{response}",
             response_schema=PlanExtractResponse,
         )
         result = PlanExtractResponse.model_validate_json(raw)
@@ -172,7 +187,7 @@ async def _extract_modified_plan(
     try:
         raw = await deps.router.generate(
             system_prompt=_PLAN_MODIFY_PROMPT,
-            user_content=f"원본 계획:\n{original_json}\n\nAI 수정 응답:\n{response}",
+            user_content=f"Original plan:\n{original_json}\n\nAI revision response:\n{response}",
             response_schema=PlanModifyResponse,
         )
         result = PlanModifyResponse.model_validate_json(raw)

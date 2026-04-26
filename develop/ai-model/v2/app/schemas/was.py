@@ -14,6 +14,35 @@ logger = logging.getLogger(__name__)
 _DATE_INPUT_FORMATS = ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d")
 _SETS_PATTERN = re.compile(r"(\d+)")
 _KST = ZoneInfo("Asia/Seoul")
+_MEAL_KEYWORDS = {
+    "breakfast",
+    "lunch",
+    "dinner",
+    "snack",
+    "brunch",
+    "meal",
+    "아침",
+    "점심",
+    "저녁",
+    "간식",
+    "야식",
+    "식단",
+    "식사",
+}
+_WORKOUT_KEYWORDS = {
+    "workout",
+    "exercise",
+    "cardio",
+    "strength",
+    "stretch",
+    "session",
+    "routine",
+    "운동",
+    "유산소",
+    "근력",
+    "스트레칭",
+    "루틴",
+}
 _WEEKDAY_KEYWORDS = {
     "월요일": 0,
     "화요일": 1,
@@ -121,39 +150,29 @@ def to_profile_update(changes: dict[str, Any]) -> dict[str, Any]:
 def to_plan_create(extracted: dict[str, Any]) -> dict[str, Any] | None:
     """Convert a proposed new plan into the WAS create payload."""
 
-    if not extracted.get("has_plan") or not extracted.get("items"):
+    payloads = to_plan_create_batches(extracted)
+    if not payloads:
         return None
 
-    plan_type = _normalize_plan_type(extracted.get("plan_type"))
-    items = _normalize_plan_items(extracted.get("items"), plan_type)
-    if not items:
-        logger.warning("Plan create normalization produced no valid items")
+    if len(payloads) > 1:
+        logger.warning("Plan create normalization produced multiple payloads; use to_plan_create_batches")
         return None
 
-    req = WASPlanCreateRequest(plan_type=plan_type, items=items)
-    return req.model_dump(
-        exclude_none=True,
-        exclude={"items": {"__all__": {"id", "completed"}}},
-    )
+    return payloads[0]
 
 
 def to_plan_update(extracted: dict[str, Any]) -> dict[str, Any] | None:
     """Convert a proposed updated plan into the WAS update payload."""
 
-    if not extracted.get("has_changes") or not extracted.get("items"):
+    payloads = to_plan_update_batches(extracted)
+    if not payloads:
         return None
 
-    plan_type = _normalize_plan_type(extracted.get("plan_type"))
-    items = _normalize_plan_items(extracted.get("items"), plan_type)
-    if not items:
-        logger.warning("Plan update normalization produced no valid items")
+    if len(payloads) > 1:
+        logger.warning("Plan update normalization produced multiple payloads; use to_plan_update_batches")
         return None
 
-    req = WASPlanUpdateRequest(plan_type=plan_type, items=items)
-    return req.model_dump(
-        exclude_none=True,
-        exclude={"items": {"__all__": {"id", "completed"}}},
-    )
+    return payloads[0]
 
 
 def to_plan_check(item_id: str) -> dict[str, Any]:
@@ -161,6 +180,18 @@ def to_plan_check(item_id: str) -> dict[str, Any]:
 
     req = WASPlanCheckRequest(item_id=item_id)
     return req.model_dump()
+
+
+def to_plan_create_batches(extracted: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert a proposed new plan into one or more WAS create payloads."""
+
+    return _build_plan_payload_batches(extracted, update_mode=False)
+
+
+def to_plan_update_batches(extracted: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert a proposed updated plan into one or more WAS update payloads."""
+
+    return _build_plan_payload_batches(extracted, update_mode=True)
 
 
 def _normalize_plan_type(value: Any) -> str:
@@ -182,6 +213,58 @@ def _normalize_plan_items(items: Any, plan_type: str) -> list[dict[str, Any]]:
         else:
             logger.warning("Dropped invalid proposed plan item at index=%d", index)
     return normalized
+
+
+def _build_plan_payload_batches(extracted: dict[str, Any], *, update_mode: bool) -> list[dict[str, Any]]:
+    required_flag = "has_changes" if update_mode else "has_plan"
+    if not extracted.get(required_flag) or not extracted.get("items"):
+        return []
+
+    plan_type = _normalize_plan_type(extracted.get("plan_type"))
+    grouped_items = _normalize_plan_items_by_type(extracted.get("items"), plan_type)
+    if not grouped_items:
+        logger.warning(
+            "Plan %s normalization produced no valid items",
+            "update" if update_mode else "create",
+        )
+        return []
+
+    request_type = WASPlanUpdateRequest if update_mode else WASPlanCreateRequest
+    payloads: list[dict[str, Any]] = []
+    for grouped_plan_type, items in grouped_items:
+        req = request_type(plan_type=grouped_plan_type, items=items)
+        payloads.append(
+            req.model_dump(
+                exclude_none=True,
+                exclude={"items": {"__all__": {"id", "completed"}}},
+            )
+        )
+    return payloads
+
+
+def _normalize_plan_items_by_type(items: Any, default_plan_type: str) -> list[tuple[str, list[dict[str, Any]]]]:
+    if not isinstance(items, list):
+        return []
+
+    grouped: dict[str, list[dict[str, Any]]] = {"workout": [], "diet": []}
+    ordered_types: list[str] = []
+
+    for index, item in enumerate(items):
+        plan_type = _infer_item_plan_type(item, default_plan_type)
+        normalized_item = _normalize_plan_item(item, plan_type)
+        if not normalized_item:
+            logger.warning("Dropped invalid proposed plan item at index=%d", index)
+            continue
+
+        if plan_type not in ordered_types:
+            ordered_types.append(plan_type)
+        grouped[plan_type].append(normalized_item)
+
+    return [
+        (plan_type, grouped[plan_type])
+        for plan_type in ordered_types
+        if grouped[plan_type]
+    ]
 
 
 def _normalize_plan_item(item: Any, plan_type: str) -> dict[str, Any] | None:
@@ -222,6 +305,43 @@ def _normalize_plan_item(item: Any, plan_type: str) -> dict[str, Any] | None:
         ex_list=ex_list,
     )
     return normalized.model_dump(exclude_none=True)
+
+
+def _infer_item_plan_type(item: Any, default_plan_type: str) -> str:
+    if not isinstance(item, dict):
+        return default_plan_type
+
+    name = _first_non_empty(
+        item.get("name"),
+        item.get("title"),
+        item.get("meal_name"),
+        item.get("category"),
+        default="",
+    ) or ""
+    detail = _first_non_empty(
+        item.get("detail"),
+        item.get("description"),
+        item.get("summary"),
+        default="",
+    ) or ""
+    combined = f"{name} {detail}".strip().lower()
+
+    if any(keyword in combined for keyword in _MEAL_KEYWORDS):
+        return "diet"
+
+    if any(keyword in combined for keyword in _WORKOUT_KEYWORDS):
+        return "workout"
+
+    raw_ex_list = item.get("ex_list")
+    if raw_ex_list is None:
+        raw_ex_list = item.get("exercise_list")
+    if raw_ex_list is None:
+        raw_ex_list = item.get("exercises")
+
+    if _normalize_exercises(raw_ex_list):
+        return "workout"
+
+    return default_plan_type
 
 
 def _normalize_exercises(raw_exercises: Any) -> list[dict[str, Any]]:
