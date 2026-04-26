@@ -1,9 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { HeartPulse, Loader2, ArrowRight } from 'lucide-react';
+import {
+  AUTH_TOKEN_STORAGE_KEY,
+  AUTH_USER_STORAGE_KEY,
+  clearClientAuthState,
+} from '@/lib/auth';
 import { usePlan } from '../context/PlanContext';
 
 export default function LoginPage() {
@@ -13,6 +18,13 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const { fetchUserProfile } = usePlan();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reason') === 'session-expired') {
+      setErrorMsg('세션이 만료되었어요. 다시 로그인해주세요.');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,13 +59,15 @@ export default function LoginPage() {
         throw new Error(data.error || '아이디 또는 비밀번호가 올바르지 않습니다.');
       }
 
+      clearClientAuthState();
+
       if (data.token) {
-        localStorage.setItem('healthAppToken', data.token);
+        localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.token);
       }
 
       if (data.user) {
         localStorage.setItem(
-          'healthAppUser',
+          AUTH_USER_STORAGE_KEY,
           JSON.stringify({
             user_id: data.user.user_id,
             login_id: data.user.login_id,

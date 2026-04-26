@@ -8,6 +8,11 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import {
+  AUTH_TOKEN_STORAGE_KEY,
+  AUTH_USER_STORAGE_KEY,
+  redirectToLoginForExpiredSession,
+} from "@/lib/auth";
 import { formatKstDate } from "@/lib/date";
 
 export type WorkoutItem = {
@@ -143,7 +148,7 @@ function buildApiUrl(path: string) {
 function getAuthHeaders() {
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("healthAppToken")
+      ? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
       : null;
 
   return {
@@ -314,7 +319,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
   const fetchPlans = useCallback(async () => {
     if (typeof window === "undefined") return;
 
-    const token = localStorage.getItem("healthAppToken");
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
     if (!token) {
       setPlans([]);
       setCompletedTasks({});
@@ -334,6 +339,11 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
           headers: getAuthHeaders(),
         }
       );
+
+      if (response.status === 401) {
+        redirectToLoginForExpiredSession();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to fetch calendar.");
@@ -358,8 +368,8 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const token = localStorage.getItem("healthAppToken");
-    const stored = localStorage.getItem("healthAppUser");
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    const stored = localStorage.getItem(AUTH_USER_STORAGE_KEY);
 
     if (stored) {
       try {
@@ -384,6 +394,11 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
         headers: getAuthHeaders(),
       });
 
+      if (response.status === 401) {
+        redirectToLoginForExpiredSession();
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Failed to fetch profile.");
       }
@@ -401,7 +416,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
       };
 
       setUserData(mergedData);
-      localStorage.setItem("healthAppUser", JSON.stringify(mergedData));
+      localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(mergedData));
     } catch (error) {
       console.error("Failed to sync profile", error);
     } finally {
@@ -413,7 +428,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
     setUserData((previous) => {
       const next = { ...previous, ...data };
       if (typeof window !== "undefined") {
-        localStorage.setItem("healthAppUser", JSON.stringify(next));
+        localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(next));
       }
       return next;
     });
@@ -440,6 +455,11 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
           headers: getAuthHeaders(),
           body: JSON.stringify({ item_id: target.itemId }),
         });
+
+        if (response.status === 401) {
+          redirectToLoginForExpiredSession();
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to check plan item.");
@@ -486,6 +506,11 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
           }
         );
 
+        if (response.status === 401) {
+          redirectToLoginForExpiredSession();
+          return false;
+        }
+
         if (!response.ok) {
           throw new Error("Failed to add recommended exercise.");
         }
@@ -516,6 +541,11 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
             }),
           }
         );
+
+        if (response.status === 401) {
+          redirectToLoginForExpiredSession();
+          return false;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to replace recommended meal.");

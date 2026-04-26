@@ -14,6 +14,12 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  AUTH_TOKEN_STORAGE_KEY,
+  CHAT_MESSAGES_STORAGE_KEY,
+  CHAT_SESSION_STORAGE_KEY,
+  redirectToLoginForExpiredSession,
+} from "@/lib/auth";
 import { usePlan } from "../context/PlanContext";
 
 type FeedbackRating = "up" | "down";
@@ -40,8 +46,6 @@ type Message = {
   feedbackComment?: string | null;
 };
 
-const CHAT_SESSION_STORAGE_KEY = "healthAppChatSessionId";
-const CHAT_MESSAGES_STORAGE_KEY = "healthAppChatMessages";
 const FEEDBACK_REASON_OPTIONS: { code: FeedbackReasonCode; label: string }[] = [
   { code: "not_helpful", label: "도움이 안 됐어요" },
   { code: "not_personalized", label: "내 상황에 안 맞아요" },
@@ -103,6 +107,12 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const storedToken = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    if (!storedToken) {
+      router.replace("/login");
+      return;
+    }
+
     const storedSessionId = window.sessionStorage.getItem(
       CHAT_SESSION_STORAGE_KEY
     );
@@ -127,7 +137,7 @@ export default function ChatPage() {
         console.error("Failed to restore chat messages:", error);
       }
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     const persistedMessages =
@@ -219,8 +229,9 @@ export default function ChatPage() {
       return false;
     }
 
-    const token = localStorage.getItem("healthAppToken");
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
     if (!token) {
+      redirectToLoginForExpiredSession();
       return false;
     }
 
@@ -251,6 +262,11 @@ export default function ChatPage() {
           intent: message.intent || null,
         }),
       });
+
+      if (response.status === 401) {
+        redirectToLoginForExpiredSession();
+        return false;
+      }
 
       if (!response.ok) {
         throw new Error("Feedback API request failed.");
@@ -395,7 +411,12 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem("healthAppToken");
+      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      if (!token) {
+        redirectToLoginForExpiredSession();
+        return;
+      }
+
       const endpoint = buildApiUrl("/api/v1/chat");
 
       const response = await fetch(endpoint, {
@@ -410,6 +431,11 @@ export default function ChatPage() {
           ...(sessionId ? { session_id: sessionId } : {}),
         }),
       });
+
+      if (response.status === 401) {
+        redirectToLoginForExpiredSession();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Chat API request failed.");

@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Edit3, Target, Bell, LogOut, ChevronRight, CheckCircle2, HeadphonesIcon, Info, X, User } from 'lucide-react';
 import { motion } from 'framer-motion';
+import {
+  AUTH_TOKEN_STORAGE_KEY,
+  clearClientAuthState,
+  redirectToLoginForExpiredSession,
+} from '@/lib/auth';
 import { usePlan, UserData } from '../context/PlanContext';
 
 type EditProfileForm = Partial<UserData> & { otherAllergy?: string };
@@ -20,10 +25,7 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleLogout = () => {
-    localStorage.removeItem('healthAppToken');
-    localStorage.removeItem('healthAppUser');
-    sessionStorage.removeItem('healthAppChatSessionId');
-    sessionStorage.removeItem('healthAppChatMessages');
+    clearClientAuthState();
     router.push('/login');
   };
 
@@ -72,10 +74,15 @@ export default function ProfilePage() {
         headers: { 
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
-          'Authorization': `Bearer ${localStorage.getItem('healthAppToken')}`
+          'Authorization': `Bearer ${localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)}`
         },
         body: JSON.stringify(payload)
       });
+
+      if (res.status === 401) {
+        redirectToLoginForExpiredSession();
+        return;
+      }
       
       if (!res.ok) {
         throw new Error('Failed to save profile.');
