@@ -85,12 +85,15 @@ def make_preprocess_node(deps: NodeDeps):
         should_refresh_profile = current_profile_version > state_profile_version
 
         if is_session_start:
+            profile_override = state.get("user_profile") if state.get("profile_override_applied") else None
             profile, profile_loaded = await _load_user_profile_with_fallback(
                 deps=deps,
                 user_id=user_id,
                 fallback=state.get("user_profile"),
                 context="initial",
             )
+            if profile_override:
+                profile = _normalize_user_profile({**profile, **profile_override})
             today_plan, today_plan_loaded = await _load_today_plan_with_fallback(
                 deps=deps,
                 user_id=user_id,

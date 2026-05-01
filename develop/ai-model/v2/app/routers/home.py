@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from app.core.conversation_state import empty_context_resolution, empty_recent_dialogue
 from app.core.internal_auth import require_internal_api_key
@@ -12,6 +12,10 @@ from app.core.trace_store import bind_trace, reset_trace, timed_ms
 from app.schemas.home import HomeRecommendationRequest, HomeRecommendationResponse
 from app.schemas.state import GraphState
 from app.services.home_recommendations import empty_home_recommendations, kst_today_iso
+from app.services.langsmith_quality import (
+    export_quality_trace,
+    record_quality_for_trace,
+)
 
 router = APIRouter(prefix="/home", tags=["home"])
 
@@ -75,6 +79,7 @@ def _build_home_initial_state(req: HomeRecommendationRequest) -> GraphState:
 async def _run_home_recommendations(
     req: HomeRecommendationRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
 ) -> HomeRecommendationResponse:
     graph = request.app.state.graph
     trace_store = request.app.state.trace_store
@@ -138,10 +143,26 @@ async def _run_home_recommendations(
             response=response.model_dump(),
             state_summary={
                 "intent": result.get("intent"),
+                "action_intent": result.get("action_intent"),
+                "domain": result.get("domain"),
+                "search_quality": result.get("search_quality"),
+                "search_results_count": len(result.get("search_results") or []),
                 "request_kind": result.get("request_kind"),
                 "scope": req.type,
+                "proposed_plan_count": len(result.get("proposed_plan") or []),
+                "pending_writes_count": len(result.get("pending_writes") or []),
+                "needs_clarification": result.get("needs_clarification"),
             },
         )
+        record_quality_for_trace(trace_store, trace_id)
+        exporter = getattr(request.app.state, "langsmith_quality", None)
+        if exporter and exporter.configured:
+            background_tasks.add_task(
+                export_quality_trace,
+                exporter=exporter,
+                trace_store=trace_store,
+                trace_id=trace_id,
+            )
         return response
     finally:
         reset_trace(token)
@@ -155,8 +176,9 @@ async def _run_home_recommendations(
 async def recommend_home_items(
     req: HomeRecommendationRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
 ) -> HomeRecommendationResponse:
-    return await _run_home_recommendations(req, request)
+    return await _run_home_recommendations(req, request, background_tasks)
 
 
 @router.post(
@@ -167,13 +189,14 @@ async def recommend_home_items(
 async def recommend_workout_items(
     req: HomeRecommendationRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
 ) -> HomeRecommendationResponse:
     scoped_req = HomeRecommendationRequest(
         user_id=req.user_id,
         type="workout",
         recent_recommendations=req.recent_recommendations,
     )
-    return await _run_home_recommendations(scoped_req, request)
+    return await _run_home_recommendations(scoped_req, request, background_tasks)
 
 
 @router.post(
@@ -184,10 +207,11 @@ async def recommend_workout_items(
 async def recommend_diet_items(
     req: HomeRecommendationRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
 ) -> HomeRecommendationResponse:
     scoped_req = HomeRecommendationRequest(
         user_id=req.user_id,
         type="diet",
         recent_recommendations=req.recent_recommendations,
     )
-    return await _run_home_recommendations(scoped_req, request)
+    return await _run_home_recommendations(scoped_req, request, background_tasks)

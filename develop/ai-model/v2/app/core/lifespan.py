@@ -21,6 +21,7 @@ from app.core.profile_sync import ProfileSyncTracker
 from app.core.trace_store import TraceLogHandler, TraceStore
 from app.graph.builder import build_graph
 from app.graph.deps import NodeDeps
+from app.services.langsmith_quality import LangSmithQualityExporter
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,15 @@ async def lifespan(app: FastAPI):
     app.state.trace_store = trace_store
     app.state._trace_log_handler = trace_handler
     logger.info("TraceStore initialized")
+
+    langsmith_quality = LangSmithQualityExporter.from_settings(settings)
+    app.state.langsmith_quality = langsmith_quality
+    logger.info(
+        "LangSmith quality export initialized (enabled=%s, configured=%s, project=%s)",
+        langsmith_quality.enabled,
+        langsmith_quality.configured,
+        langsmith_quality.project_name,
+    )
 
     http_client = httpx.AsyncClient(timeout=httpx.Timeout(settings.WAS_TIMEOUT))
     was_client = WASClient(

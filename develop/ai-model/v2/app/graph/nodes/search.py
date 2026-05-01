@@ -64,12 +64,28 @@ def make_search_node(deps: NodeDeps):
             stage="search",
             status="info",
             title="Search started",
-            detail={"intent": intent, "targets": targets, "retry_count": retry_count},
+            detail={
+                "intent": intent,
+                "raw_query": query,
+                "targets": targets,
+                "retry_count": retry_count,
+            },
         )
 
         query = _augment_query(query, state)
         targets = _normalize_targets(state, query, targets)
         external_filter, relaxed_external_filter = _build_external_filters(state, query)
+        deps.trace.record_current_event(
+            stage="search",
+            status="info",
+            title="Search query prepared",
+            detail={
+                "query": query,
+                "targets": targets,
+                "external_filter": external_filter,
+                "relaxed_external_filter": relaxed_external_filter,
+            },
+        )
 
         if intent in _WEB_ENABLED_INTENTS and "vdb_external" in targets and "web" not in targets:
             targets.append("web")
@@ -118,7 +134,11 @@ def make_search_node(deps: NodeDeps):
                 stage="search",
                 status="ok",
                 title="Search completed with lightweight policy",
-                detail={"results": len(merged_results), "reason": _skip_eval_reason(state, merged_results)},
+                detail={
+                    "results": len(merged_results),
+                    "reason": _skip_eval_reason(state, merged_results),
+                    "top_results": _preview_results(merged_results),
+                },
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
             return {
@@ -136,7 +156,12 @@ def make_search_node(deps: NodeDeps):
                 stage="search",
                 status="ok",
                 title="Search completed",
-                detail={"score": score, "accept_score": accept_score, "results": len(merged_results)},
+                detail={
+                    "score": score,
+                    "accept_score": accept_score,
+                    "results": len(merged_results),
+                    "top_results": _preview_results(merged_results),
+                },
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
             return {
@@ -190,8 +215,25 @@ def _augment_query(query: str, state: GraphState) -> str:
 
     if profile.get("goal"):
         additions.append(f"목표:{profile['goal']}")
+    if profile.get("age"):
+        additions.append(f"나이:{profile['age']}")
+    if profile.get("exercise_level") or profile.get("fitness_level") or profile.get("activity_level"):
+        additions.append(
+            "운동수준:"
+            f"{profile.get('exercise_level') or profile.get('fitness_level') or profile.get('activity_level')}"
+        )
+    if profile.get("available_time_minutes"):
+        additions.append(f"가능시간:{profile['available_time_minutes']}분")
+    if profile.get("lifestyle") or profile.get("schedule"):
+        additions.append(f"생활패턴:{profile.get('lifestyle') or profile.get('schedule')}")
     if profile.get("injury_history"):
         additions.append(f"부상:{profile['injury_history']}")
+    if profile.get("medical_conditions") or profile.get("conditions"):
+        additions.append(f"질환:{profile.get('medical_conditions') or profile.get('conditions')}")
+    if profile.get("pain_points"):
+        additions.append(f"통증:{profile['pain_points']}")
+    if profile.get("allergies") or profile.get("dietary_restrictions"):
+        additions.append(f"식이제약:{profile.get('allergies') or profile.get('dietary_restrictions')}")
 
     if not additions:
         return query
@@ -364,6 +406,9 @@ def _external_populations_for_profile(state: GraphState) -> list[str]:
     age = profile.get("age")
     if isinstance(age, (int, float)) and age >= 65:
         populations.append("older_adults")
+    level = str(profile.get("exercise_level") or profile.get("fitness_level") or profile.get("activity_level") or "").lower()
+    if any(keyword in level for keyword in ("beginner", "초보", "low", "낮")):
+        populations.append("novice")
 
     allergy_value = profile.get("allergies") or profile.get("allergy") or []
     if isinstance(allergy_value, list):
@@ -505,6 +550,21 @@ def _merge_results(results: list[dict]) -> list[dict]:
             unique.append(result)
 
     return unique[:5]
+
+
+def _preview_results(results: list[dict], *, limit: int = 5) -> list[dict[str, Any]]:
+    preview: list[dict[str, Any]] = []
+    for result in results[:limit]:
+        preview.append(
+            {
+                "id": result.get("id"),
+                "source": result.get("source"),
+                "score": result.get("score"),
+                "metadata": result.get("metadata") or {},
+                "text": str(result.get("text") or "")[:240],
+            }
+        )
+    return preview
 
 
 async def _evaluate(deps: NodeDeps, query: str, results: list[dict]) -> float:

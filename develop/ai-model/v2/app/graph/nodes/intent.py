@@ -28,7 +28,8 @@ INTENT_HOME_RECOMMENDATION = "home_recommendation"
 _SAFETY_PATTERNS = re.compile(
     r"자해|자살|죽고\s*싶|극단적\s*선택|위험|실행|마약|과다\s*복용|과복용|"
     r"가슴.*조여|가슴.*아파|숨.*차|호흡.*힘들|어지럽|심한.*알레르기|기절|"
-    r"약을.*많이.*먹",
+    r"약을.*많이.*먹|굶는?\s*식단|굶어서|단식.*살|일주일.*[5-9]\s*kg|"
+    r"[5-9]\s*kg.*일주일|극단적.*다이어트|초저칼로리",
     re.IGNORECASE,
 )
 _CASUAL_PATTERNS = re.compile(
@@ -72,6 +73,11 @@ _PLAN_DOMAIN_KEYWORDS = (
     "workout",
     "diet",
     "meal",
+    "클라이밍",
+    "러닝",
+    "수영",
+    "자전거",
+    "걷기",
 )
 _PLAN_REQUEST_KEYWORDS = (
     "추천",
@@ -85,6 +91,10 @@ _PLAN_REQUEST_KEYWORDS = (
     "추천해줘",
     "정리해줘",
     "제안",
+    "뭐 하면",
+    "뭐하면",
+    "하면 돼",
+    "하면 되",
 )
 _PLAN_EXCLUDE_KEYWORDS = (
     "수정",
@@ -274,6 +284,33 @@ _CARE_SUPPORT_MARKERS = (
     "버겁",
     "외롭",
     "외로워",
+    "실패",
+    "못 하겠",
+    "못하겠",
+    "하기 싫",
+    "하기싫",
+    "망쳐",
+    "망했",
+    "부담",
+    "겁나",
+    "조급",
+)
+_INFO_REQUEST_MARKERS = (
+    "왜",
+    "이유",
+    "근거",
+    "알려줘",
+    "어떤",
+    "뭘",
+    "무엇",
+    "피해야",
+    "괜찮",
+    "가능",
+    "해야",
+    "해도 돼",
+    "쉬어야",
+    "어떻게",
+    "대신",
 )
 
 
@@ -313,6 +350,21 @@ def make_intent_node(deps: NodeDeps):
         if _looks_like_context_dependent_fallback(message, state):
             return _build_result(INTENT_FALLBACK, state, confidence=0.9)
 
+        if _looks_like_context_setup(message) and not _looks_like_plan_request(routing_message):
+            return _build_result(INTENT_CASUAL, state, confidence=0.82)
+
+        if (
+            _looks_like_question_followup(routing_message)
+            and not _looks_like_plan_request(routing_message)
+            and not _matches_hardcoded_confirmation_approval(message)
+        ):
+            return _build_result(
+                INTENT_INFO,
+                state,
+                confidence=0.9,
+                search_targets=["vdb_external"],
+            )
+
         awaiting_plan_confirmation = _has_pending_plan_confirmation_v2(state)
         if awaiting_plan_confirmation:
             deps.trace.record_current_event(
@@ -339,6 +391,14 @@ def make_intent_node(deps: NodeDeps):
             )
             return _build_result(INTENT_APPROVAL, state, confidence=0.99)
 
+        if awaiting_plan_confirmation and _looks_like_explicit_plan_change(message, state):
+            return _build_result(
+                INTENT_MODIFY,
+                state,
+                confidence=0.93,
+                search_targets=["vdb_external", "web"],
+            )
+
         if awaiting_plan_confirmation:
             decision = await _classify_plan_confirmation(deps, state, message)
             if decision is not None and decision.approved:
@@ -360,8 +420,19 @@ def make_intent_node(deps: NodeDeps):
                 },
             )
 
+        if awaiting_plan_confirmation and _looks_like_explicit_plan_change(routing_message, state):
+            return _build_result(
+                INTENT_MODIFY,
+                state,
+                confidence=0.93,
+                search_targets=["vdb_external", "web"],
+            )
+
         if not awaiting_plan_confirmation and _looks_like_plan_approval(routing_message, state):
             return _build_result(INTENT_APPROVAL, state, confidence=0.94)
+
+        if _looks_like_care_request(routing_message):
+            return _build_result(INTENT_CARE, state, confidence=0.88)
 
         if _looks_like_profile_record(routing_message):
             return _build_result(INTENT_RECORD, state, confidence=0.9)
@@ -380,6 +451,14 @@ def make_intent_node(deps: NodeDeps):
                 state,
                 confidence=0.92,
                 search_targets=["vdb_external", "vdb_user_important", "web"],
+            )
+
+        if _looks_like_info_request(routing_message):
+            return _build_result(
+                INTENT_INFO,
+                state,
+                confidence=0.88,
+                search_targets=["vdb_external"],
             )
 
         context = _build_context_v3(state)
@@ -787,6 +866,34 @@ def _looks_like_plan_request(message: str) -> bool:
     has_request_keyword = any(keyword in normalized for keyword in _PLAN_REQUEST_KEYWORDS)
     has_excluded_keyword = any(keyword in normalized for keyword in _PLAN_EXCLUDE_KEYWORDS)
     return has_domain_keyword and has_request_keyword and not has_excluded_keyword
+
+
+def _looks_like_care_request(message: str) -> bool:
+    normalized = message.strip().lower()
+    return any(marker in normalized for marker in _CARE_SUPPORT_MARKERS)
+
+
+def _looks_like_context_setup(message: str) -> bool:
+    normalized = message.strip().lower()
+    return any(marker in normalized for marker in ("내 상황 기억", "내 조건 기억", "내 상황 고려", "내 조건 고려", "기억하고 답"))
+
+
+def _looks_like_question_followup(message: str) -> bool:
+    normalized = message.strip().lower()
+    if any(marker in normalized for marker in ("왜", "이유", "근거", "설명", "어떻게", "피해야", "해도 돼", "괜찮", "쉬어야")):
+        return True
+    return normalized.endswith("?")
+
+
+def _looks_like_info_request(message: str) -> bool:
+    normalized = message.strip().lower()
+    has_domain_keyword = any(keyword in normalized for keyword in _PLAN_DOMAIN_KEYWORDS) or any(
+        keyword in normalized for keyword in _PROFILE_FIELD_KEYWORDS
+    )
+    if "내 조건" in normalized or "내 상황" in normalized:
+        has_domain_keyword = True
+    has_info_marker = any(marker in normalized for marker in _INFO_REQUEST_MARKERS)
+    return has_domain_keyword and has_info_marker
 
 
 def _looks_like_modify_request(message: str) -> bool:

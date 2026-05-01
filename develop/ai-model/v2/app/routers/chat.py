@@ -28,6 +28,10 @@ from app.graph.nodes.intent import INTENT_APPROVAL
 from app.graph.nodes.was_write import execute_was_writes
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.schemas.state import GraphState
+from app.services.langsmith_quality import (
+    export_quality_trace,
+    record_quality_for_trace,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,7 @@ def _build_initial_state(req: ChatRequest) -> GraphState:
         "user_message": req.user_message,
         "request_kind": "chat",
         "user_profile": None,
+        "profile_override_applied": False,
         "today_plan": None,
         "turn_count": 0,
         "is_session_start": True,
@@ -91,6 +96,7 @@ def _build_initial_state(req: ChatRequest) -> GraphState:
     }
     if req.user_profile_override:
         initial_state["user_profile"] = req.user_profile_override
+        initial_state["profile_override_applied"] = True
     return initial_state
 
 
@@ -99,8 +105,9 @@ def _build_resumed_state(req: ChatRequest, saved_values: dict[str, Any]) -> Grap
     hydrated_active_proposal = _hydrate_active_proposal(saved_values)
     resumed_state.update(
         {
-            "user_profile": saved_values.get("user_profile"),
-            "today_plan": saved_values.get("today_plan"),
+        "user_profile": saved_values.get("user_profile"),
+        "profile_override_applied": False,
+        "today_plan": saved_values.get("today_plan"),
             "turn_count": int(saved_values.get("turn_count", 0) or 0),
             "is_session_start": False,
             "previous_intent": saved_values.get("previous_intent"),
@@ -159,6 +166,7 @@ def _build_state_summary(result: GraphState) -> dict[str, Any]:
         "modify_target": result.get("modify_target"),
         "resolved_persona_id": result.get("resolved_persona_id"),
         "profile_sync_version": result.get("profile_sync_version"),
+        "search_results_count": len(result.get("search_results") or []),
         "proposed_plan_type": result.get("proposed_plan_type"),
         "proposed_plan_action": result.get("proposed_plan_action"),
         "proposed_plan_count": len(result.get("proposed_plan") or []),
@@ -166,8 +174,93 @@ def _build_state_summary(result: GraphState) -> dict[str, Any]:
         "active_proposal_present": bool(result.get("active_proposal")),
         "recent_dialogue_turns": len((result.get("recent_dialogue") or {}).get("recent_turns") or []),
         "pending_writes_count": len(result.get("pending_writes") or []),
+        "needs_clarification": result.get("needs_clarification"),
         "draft_components": result.get("draft_components"),
+        "profile_signal_summary": _profile_signal_summary(result.get("user_profile") or {}),
+        "search_results_preview": _preview_search_results(result.get("search_results") or []),
+        "proposed_plan_preview": _preview_proposed_plan(result.get("proposed_plan") or []),
     }
+
+
+def _profile_signal_summary(profile: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "age",
+        "gender",
+        "sex",
+        "weight",
+        "height",
+        "activity_level",
+        "exercise_level",
+        "fitness_level",
+        "goal",
+        "lifestyle",
+        "schedule",
+        "available_time_minutes",
+        "injury_history",
+        "medical_conditions",
+        "conditions",
+        "pain_points",
+        "allergies",
+        "dietary_restrictions",
+        "selected_ai_persona",
+    )
+    return {key: profile.get(key) for key in keys if profile.get(key) not in (None, "", [])}
+
+
+def _preview_search_results(results: list[dict[str, Any]], *, limit: int = 5) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": item.get("id"),
+            "source": item.get("source"),
+            "score": item.get("score"),
+            "metadata": item.get("metadata") or {},
+            "text": str(item.get("text") or "")[:240],
+        }
+        for item in results[:limit]
+    ]
+
+
+def _preview_proposed_plan(plan: list[dict[str, Any]], *, limit: int = 6) -> list[dict[str, Any]]:
+    preview: list[dict[str, Any]] = []
+    for item in plan[:limit]:
+        exercises = []
+        for exercise in item.get("ex_list") or []:
+            exercises.append(
+                {
+                    "exercise_name": exercise.get("exercise_name"),
+                    "sets": exercise.get("sets"),
+                    "reps": exercise.get("reps"),
+                    "duration_minutes": exercise.get("duration_minutes"),
+                    "calories": exercise.get("calories"),
+                }
+            )
+        preview.append(
+            {
+                "name": item.get("name"),
+                "detail": item.get("detail"),
+                "day": item.get("day"),
+                "ex_list": exercises[:5],
+            }
+        )
+    return preview
+
+
+def _record_quality_and_schedule_export(
+    *,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    trace_store,
+    trace_id: str,
+) -> None:
+    record_quality_for_trace(trace_store, trace_id)
+    exporter = getattr(request.app.state, "langsmith_quality", None)
+    if exporter and exporter.configured:
+        background_tasks.add_task(
+            export_quality_trace,
+            exporter=exporter,
+            trace_store=trace_store,
+            trace_id=trace_id,
+        )
 
 
 def _hydrate_active_proposal(saved_values: dict[str, Any]) -> dict[str, Any] | None:
@@ -261,6 +354,7 @@ async def _persist_bounded_state(
 def _checkpoint_cleanup_updates(result: GraphState) -> dict[str, Any]:
     return {
         "user_message": "",
+        "profile_override_applied": False,
         "intent": "",
         "action_intent": None,
         "domain": "general",
@@ -372,6 +466,12 @@ async def chat(
                 status="timeout",
                 response={"response": timeout_message},
             )
+            _record_quality_and_schedule_export(
+                request=request,
+                background_tasks=background_tasks,
+                trace_store=trace_store,
+                trace_id=trace_id,
+            )
             return ChatResponse(session_id=session_id, response=timeout_message)
         except Exception as exc:
             logger.exception("Graph request failed: session=%s", session_id)
@@ -386,6 +486,12 @@ async def chat(
                 trace_id,
                 status="failed",
                 response={"response": fallback_message},
+            )
+            _record_quality_and_schedule_export(
+                request=request,
+                background_tasks=background_tasks,
+                trace_store=trace_store,
+                trace_id=trace_id,
             )
             return ChatResponse(session_id=session_id, response=fallback_message)
 
@@ -479,6 +585,12 @@ async def chat(
                 "plan_sync_applied": plan_sync_applied,
             },
             state_summary=_build_state_summary(result),
+        )
+        _record_quality_and_schedule_export(
+            request=request,
+            background_tasks=background_tasks,
+            trace_store=trace_store,
+            trace_id=trace_id,
         )
 
         return ChatResponse(

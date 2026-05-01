@@ -636,6 +636,8 @@ async def main() -> None:
             create = await run_request(client, flow_user, MSG_CREATE_WORKOUT)
             session_id = create["session_id"]
             create_debug = create["debug_state"]
+            create_trace = deps.trace.get_trace(create_debug["trace_id"])
+            require(create_trace and create_trace.get("quality"), "chat trace should include quality report")
             require(create_debug["action_intent"] == "create", "create action_intent mismatch")
             require(create_debug["domain"] == "workout", "create domain mismatch")
             require(create_debug["proposed_plan_count"] >= 1, "create proposal missing")

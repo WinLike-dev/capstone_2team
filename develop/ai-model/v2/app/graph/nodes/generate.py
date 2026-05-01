@@ -28,6 +28,7 @@ INTENT_MODIFY = "수정"
 INTENT_APPROVAL = "계획_승인"
 INTENT_INFO = "정보"
 INTENT_SAFETY = "안전경고"
+INTENT_CASUAL = "casual"
 
 _MENTAL_HEALTH_SAFETY_PATTERNS = re.compile(
     r"자해|자살|죽고\s*싶|극단적\s*선택|충동|해치고\s*싶|살고\s*싶지",
@@ -35,6 +36,10 @@ _MENTAL_HEALTH_SAFETY_PATTERNS = re.compile(
 _PHYSICAL_SAFETY_PATTERNS = re.compile(
     r"가슴.*조여|숨이?\s*차|호흡.*힘들|어지럽|쓰러질\s*것\s*같|실신|기절|"
     r"과다\s*복용|심한\s*통증|출혈|피가\s*멈추지",
+)
+_EXTREME_DIET_SAFETY_PATTERNS = re.compile(
+    r"굶는?\s*식단|굶어서|단식.*살|일주일.*[5-9]\s*kg|[5-9]\s*kg.*일주일|"
+    r"극단적.*다이어트|초저칼로리",
 )
 
 MAX_SELF_EVAL = 1
@@ -110,7 +115,16 @@ def make_generate_node(deps: NodeDeps):
                 title="Safety draft shortcut used",
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
-            return _build_safety_draft(state)
+            safety_draft = _build_safety_draft(state)
+            safety_components, _ = _apply_profile_quality_guardrails(
+                safety_draft["draft_components"],
+                [],
+                None,
+                state,
+            )
+            safety_draft["draft_components"] = safety_components
+            safety_draft["draft_response"] = render_draft_preview(safety_components)
+            return safety_draft
 
         if intent == INTENT_APPROVAL:
             deps.trace.record_current_event(
@@ -120,6 +134,24 @@ def make_generate_node(deps: NodeDeps):
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
             return _build_approval_draft_v2(state)
+
+        if intent == INTENT_CARE:
+            deps.trace.record_current_event(
+                stage="generate",
+                status="ok",
+                title="Care draft shortcut used",
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
+            return _build_care_draft(state)
+
+        if intent == INTENT_CASUAL:
+            deps.trace.record_current_event(
+                stage="generate",
+                status="ok",
+                title="Casual draft shortcut used",
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
+            return _build_casual_draft(state)
 
         direct_memory_draft = _build_direct_short_term_memory_draft(state)
         if direct_memory_draft is not None:
@@ -189,6 +221,20 @@ def make_generate_node(deps: NodeDeps):
                 message="Create draft returned no structured plan; starter fallback applied",
                 detail={"domain": proposed_plan_type},
             )
+
+        if intent in {INTENT_PLAN, INTENT_MODIFY}:
+            draft_components, proposed_plan = _apply_profile_quality_guardrails(
+                draft_components,
+                proposed_plan,
+                proposed_plan_type,
+                state,
+            )
+            if proposed_plan:
+                draft_components["plan_preview"] = _render_plan_preview_from_items(proposed_plan)
+            draft_text = render_draft_preview(draft_components)
+        elif intent == INTENT_INFO:
+            draft_components = _apply_info_profile_guardrails(draft_components, state)
+            draft_text = render_draft_preview(draft_components)
 
         if intent in _SELF_EVAL_INTENTS:
             passed, reason = await _self_evaluate(deps, state, draft_text)
@@ -484,6 +530,275 @@ def _build_components_from_result(draft_result: DraftResponse, state: GraphState
         components["search_grounding_summary"] = "검색 결과를 참고해 핵심 근거만 정리했다."
 
     return components
+
+
+def _apply_profile_quality_guardrails(
+    components: DraftComponents,
+    proposed_plan: list[dict],
+    proposed_plan_type: str | None,
+    state: GraphState,
+) -> tuple[DraftComponents, list[dict]]:
+    profile = state.get("user_profile") or {}
+    patched = normalize_draft_components(dict(components))
+    plan = [dict(item) for item in (proposed_plan or [])]
+
+    profile_note = _profile_fit_note(profile)
+    if profile_note:
+        _append_unique(patched["reason_points"], profile_note)
+
+    empathy_note = _empathy_note(profile, state)
+    if empathy_note:
+        if empathy_note not in patched["core_message"]:
+            patched["core_message"] = f"{empathy_note} {patched['core_message']}"
+
+    safety_notes = _profile_safety_notes(profile, proposed_plan_type)
+    for note in safety_notes:
+        _append_unique(patched["safety_notes"], note)
+
+    constraint_note = _constraint_grounding_note(profile, proposed_plan_type)
+    if constraint_note:
+        if patched["search_grounding_summary"]:
+            if constraint_note not in patched["search_grounding_summary"]:
+                patched["search_grounding_summary"] = f"{patched['search_grounding_summary']} {constraint_note}"
+        else:
+            patched["search_grounding_summary"] = constraint_note
+
+    if proposed_plan_type == "workout":
+        plan = _adjust_workout_plan_for_profile(plan, profile)
+    elif proposed_plan_type == "diet":
+        plan = _adjust_diet_plan_for_profile(plan, profile)
+
+    return patched, plan
+
+
+def _apply_info_profile_guardrails(components: DraftComponents, state: GraphState) -> DraftComponents:
+    profile = state.get("user_profile") or {}
+    patched = normalize_draft_components(dict(components))
+    patched["approval_question"] = None
+    patched["plan_preview"] = ""
+    message = str(state.get("user_message") or "")
+    constraints = [
+        *_as_text_list(profile.get("injury_history")),
+        *_as_text_list(profile.get("medical_conditions") or profile.get("conditions")),
+        *_as_text_list(profile.get("pain_points")),
+        *_as_text_list(profile.get("allergies") or profile.get("dietary_restrictions")),
+    ]
+
+    if any(keyword in message for keyword in ("통증", "부상", "아픔", "무릎", "허리", "어깨", "손목", "손가락", "피해야", "내 조건", "내 상황")):
+        target = ", ".join(constraints) if constraints else "통증 부위"
+        if profile.get("allergies") and not (profile.get("injury_history") or profile.get("pain_points") or profile.get("medical_conditions") or profile.get("conditions")):
+            patched["core_message"] = f"{target} 제약이 있으면 해당 재료는 제외하고 안전한 대체 식품으로 구성하는 편이 좋아요."
+            patched["reason_points"] = [
+                "알레르기나 식이 제약은 소량 노출도 문제가 될 수 있어 계획에서 명확히 빼는 게 안전합니다.",
+                "단백질, 칼슘, 지방 같은 영양 목표는 다른 식품으로 대체할 수 있어요.",
+            ]
+            patched["suggested_action"] = "식품 라벨을 확인하고, 반응 이력이 있으면 전문가 상담을 우선하세요."
+        elif profile.get("medical_conditions") or profile.get("conditions"):
+            patched["core_message"] = f"{target}가 있으면 무리한 강도나 증상을 악화시킬 수 있는 방식은 피하는 편이 안전해요."
+            patched["reason_points"] = [
+                "질환이나 복용약이 있으면 운동 강도와 식사 제한에 대한 반응이 달라질 수 있어요.",
+                "증상이 있거나 조절 중인 상태라면 낮은 강도와 안정적인 식사 패턴부터 확인하는 게 안전합니다.",
+            ]
+            patched["suggested_action"] = "증상 변화가 있거나 약을 조절 중이면 전문가 확인을 우선하세요."
+        else:
+            patched["core_message"] = f"{target}가 있으면 통증을 키우는 고충격 동작과 깊은 가동범위 동작은 피하는 편이 안전해요."
+            patched["reason_points"] = [
+                "통증이 있는 부위에 반복 충격이나 비틀림이 들어가면 회복이 늦어질 수 있어요.",
+                "대신 통증 없는 범위의 걷기, 가벼운 근력, 안정화 운동부터 확인하는 게 안전합니다.",
+            ]
+            patched["suggested_action"] = "통증이 생기면 즉시 중단하고, 지속되거나 붓기/불안정감이 있으면 전문가 상담을 권장해요."
+        for note in _profile_safety_notes(profile, "workout"):
+            _append_unique(patched["safety_notes"], note)
+        if constraints:
+            patched["search_grounding_summary"] = f"사용자 제약({', '.join(constraints)})을 기준으로 피해야 할 운동을 좁혔어요."
+    else:
+        profile_note = _profile_fit_note(profile)
+        if profile_note:
+            _append_unique(patched["reason_points"], profile_note)
+        for note in _profile_safety_notes(profile, None):
+            _append_unique(patched["safety_notes"], note)
+
+    return patched
+
+
+def _append_unique(items: list[str], value: str) -> None:
+    text = value.strip()
+    if text and text not in items:
+        items.append(text)
+
+
+def _profile_fit_note(profile: dict) -> str:
+    parts: list[str] = []
+    age = profile.get("age")
+    if age:
+        parts.append(f"{age}세")
+    level = profile.get("exercise_level") or profile.get("fitness_level") or profile.get("activity_level")
+    if level:
+        parts.append(f"운동 수준 {level}")
+    goal = profile.get("goal")
+    if goal:
+        parts.append(f"목표 {goal}")
+    available = profile.get("available_time_minutes")
+    if available:
+        parts.append(f"가능 시간 {available}분")
+    lifestyle = profile.get("lifestyle") or profile.get("schedule")
+    if lifestyle:
+        parts.append(f"생활패턴 {lifestyle}")
+    context_notes = _as_text_list(profile.get("context_notes"))
+    if context_notes:
+        parts.append(f"추가 맥락 {', '.join(context_notes)}")
+    if not parts:
+        return ""
+    return "사용자 프로필(" + ", ".join(str(item) for item in parts) + ")에 맞춰 강도와 분량을 조정했어요."
+
+
+def _empathy_note(profile: dict, state: GraphState) -> str:
+    text = " ".join(
+        str(value)
+        for value in (
+            profile.get("emotional_context"),
+            state.get("support_mode"),
+            (state.get("emotion") or {}).get("label") if state.get("emotion") else None,
+        )
+        if value
+    ).lower()
+    if not text or text == "normal":
+        return ""
+    if any(marker in text for marker in ("fail", "실패", "discouraged", "desperate", "burden", "burnout", "지쳐", "힘들", "불안", "걱정", "overwhelmed", "anxious", "worried", "stress", "body image")):
+        return "못 한 게 문제가 아니라 다시 시작할 수 있게 부담을 줄이는 게 우선이에요."
+    if "care" in text:
+        return "지금은 의지를 더 짜내기보다 부담을 낮춰 다시 이어갈 수 있게 잡을게요."
+    return ""
+
+
+def _profile_safety_notes(profile: dict, proposed_plan_type: str | None) -> list[str]:
+    notes: list[str] = []
+    injuries = _as_text_list(profile.get("injury_history"))
+    conditions = _as_text_list(profile.get("medical_conditions") or profile.get("conditions"))
+    pain_points = _as_text_list(profile.get("pain_points"))
+    allergies = _as_text_list(profile.get("allergies") or profile.get("dietary_restrictions"))
+    context_notes = _as_text_list(profile.get("context_notes"))
+
+    if injuries or pain_points:
+        target = ", ".join([*injuries, *pain_points])
+        notes.append(f"{target} 관련 통증이 생기면 즉시 중단하고 강도를 낮추세요.")
+    if conditions:
+        notes.append(f"질환 정보({', '.join(conditions)})가 있으므로 증상이 있거나 약을 복용 중이면 전문가 상담을 우선하세요.")
+    if (proposed_plan_type == "diet" or (proposed_plan_type is None and allergies)) and allergies:
+        notes.append(f"알레르기/식이 제약({', '.join(allergies)})은 제외하고 안전한 대체 식품으로 바꾸세요.")
+    if context_notes:
+        notes.append(f"추가 맥락({', '.join(context_notes)})을 반영해 무리한 방식은 피하세요.")
+    goal = str(profile.get("goal") or "").lower()
+    if "extreme" in goal or "급" in goal:
+        notes.append("단기간에 큰 폭으로 감량하거나 굶는 방식은 피하고, 지속 가능한 감량 속도로 조정하세요.")
+    return notes
+
+
+def _constraint_grounding_note(profile: dict, proposed_plan_type: str | None) -> str:
+    injuries = _as_text_list(profile.get("injury_history"))
+    conditions = _as_text_list(profile.get("medical_conditions") or profile.get("conditions"))
+    pain_points = _as_text_list(profile.get("pain_points"))
+    allergies = _as_text_list(profile.get("allergies") or profile.get("dietary_restrictions"))
+    context_notes = _as_text_list(profile.get("context_notes"))
+    constraints = [
+        *injuries,
+        *conditions,
+        *pain_points,
+        *allergies,
+        *context_notes,
+    ]
+    if not constraints:
+        return ""
+    if proposed_plan_type == "diet" or (proposed_plan_type is None and allergies and not (injuries or pain_points)):
+        label = "식단 제약"
+    elif proposed_plan_type is None:
+        label = "건강 제약"
+    else:
+        label = "운동 제약"
+    return f"{label}({', '.join(constraints)})을 반영해 위험 요소를 낮췄어요."
+
+
+def _adjust_workout_plan_for_profile(plan: list[dict], profile: dict) -> list[dict]:
+    if not plan:
+        return plan
+    available = _safe_int(profile.get("available_time_minutes"))
+    level = str(profile.get("exercise_level") or profile.get("fitness_level") or profile.get("activity_level") or "").lower()
+    beginner = any(marker in level for marker in ("beginner", "초보", "low", "낮"))
+    older = (_safe_int(profile.get("age")) or 0) >= 65
+    constraints = [
+        *_as_text_list(profile.get("injury_history")),
+        *_as_text_list(profile.get("pain_points")),
+        *_as_text_list(profile.get("medical_conditions") or profile.get("conditions")),
+    ]
+    cap_sets = 2 if beginner or older or constraints else 3
+    duration_cap = max(8, min(20, available or 20)) if beginner or older or constraints or (available and available <= 20) else None
+
+    adjusted: list[dict] = []
+    for item in plan:
+        next_item = dict(item)
+        detail = str(next_item.get("detail") or "").strip()
+        detail_parts = [detail] if detail else []
+        if beginner:
+            detail_parts.append("초보자 기준 저강도")
+        if available:
+            detail_parts.append(f"가능 시간 {available}분 안에서 진행")
+        if constraints:
+            detail_parts.append(f"제약({', '.join(constraints)}) 고려")
+        next_item["detail"] = " / ".join(dict.fromkeys(part for part in detail_parts if part))
+
+        ex_list = []
+        for exercise in next_item.get("ex_list") or []:
+            next_exercise = dict(exercise)
+            sets = next_exercise.get("sets")
+            if isinstance(sets, int) and sets > cap_sets:
+                next_exercise["sets"] = cap_sets
+            duration = next_exercise.get("duration_minutes")
+            if duration_cap and isinstance(duration, int) and duration > duration_cap:
+                next_exercise["duration_minutes"] = duration_cap
+            ex_list.append(next_exercise)
+        next_item["ex_list"] = ex_list
+        adjusted.append(next_item)
+    return adjusted
+
+
+def _adjust_diet_plan_for_profile(plan: list[dict], profile: dict) -> list[dict]:
+    if not plan:
+        return plan
+    allergies = _as_text_list(profile.get("allergies") or profile.get("dietary_restrictions"))
+    conditions = _as_text_list(profile.get("medical_conditions") or profile.get("conditions"))
+    goal = str(profile.get("goal") or "").lower()
+    adjusted: list[dict] = []
+    for item in plan:
+        next_item = dict(item)
+        detail = str(next_item.get("detail") or "").strip()
+        notes: list[str] = []
+        if allergies:
+            notes.append(f"알레르기({', '.join(allergies)}) 제외/대체")
+        if conditions:
+            notes.append(f"질환({', '.join(conditions)}) 고려")
+        if "extreme" in goal or "급" in goal:
+            notes.append("굶지 않는 지속 가능한 감량")
+        if notes:
+            next_item["detail"] = f"{detail} / " + " / ".join(notes) if detail else " / ".join(notes)
+        adjusted.append(next_item)
+    return adjusted
+
+
+def _as_text_list(value: object) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [str(value).strip()]
+
+
+def _safe_int(value: object) -> int | None:
+    try:
+        if value is None or value == "":
+            return None
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
 
 
 def _render_plan_preview(draft_result: DraftResponse, state: GraphState) -> str:
@@ -898,6 +1213,57 @@ def _build_approval_draft_v2(state: GraphState) -> dict:
     }
 
 
+def _build_care_draft(state: GraphState) -> dict:
+    profile = state.get("user_profile") or {}
+    components = normalize_draft_components(
+        {
+            "core_message": "못 한 게 문제가 아니라 다시 시작할 수 있게 부담을 줄이는 게 우선이에요.",
+            "reason_points": [
+                _profile_fit_note(profile) or "지금은 큰 계획보다 바로 할 수 있는 작은 행동이 더 잘 맞아요.",
+                "오늘은 운동이나 식단을 완벽히 맞추기보다 5~10분 산책, 물 한 컵, 한 끼 균형처럼 낮은 기준으로 충분해요.",
+            ],
+            "suggested_action": "오늘 할 일은 하나만 고르세요. 너무 버거우면 쉬는 것도 계획의 일부로 둘게요.",
+            "safety_notes": _profile_safety_notes(profile, None),
+            "approval_question": None,
+            "search_grounding_summary": _constraint_grounding_note(profile, None),
+        }
+    )
+    return {
+        "draft_response": render_draft_preview(components),
+        "draft_components": components,
+        "proposed_plan": [],
+        "proposed_plan_type": None,
+        "proposed_plan_action": None,
+        "self_eval_count": 0,
+        "self_eval_failure_reason": None,
+    }
+
+
+def _build_casual_draft(state: GraphState) -> dict:
+    profile = state.get("user_profile") or {}
+    components = normalize_draft_components(
+        {
+            "core_message": "알겠어요. 지금 알려준 상황과 제약을 기준으로 답할게요.",
+            "reason_points": [
+                _profile_fit_note(profile) or "다음 질문에서는 현재 맥락을 이어서 반영할게요.",
+            ],
+            "suggested_action": "운동, 식단, 통증, 피해야 할 것 중 궁금한 걸 바로 물어봐 주세요.",
+            "safety_notes": _profile_safety_notes(profile, None),
+            "approval_question": None,
+            "search_grounding_summary": _constraint_grounding_note(profile, None),
+        }
+    )
+    return {
+        "draft_response": render_draft_preview(components),
+        "draft_components": components,
+        "proposed_plan": [],
+        "proposed_plan_type": None,
+        "proposed_plan_action": None,
+        "self_eval_count": 0,
+        "self_eval_failure_reason": None,
+    }
+
+
 def _build_safety_draft(state: GraphState) -> dict:
     safety_kind = _classify_safety_kind(state["user_message"])
 
@@ -917,6 +1283,23 @@ def _build_safety_draft(state: GraphState) -> dict:
                     "혼자 있지 말고 주변 사람이나 보호자와 함께 있으세요.",
                     "위험한 물건이나 약물이 손에 닿지 않게 멀리하세요.",
                     "당장 위험이 크면 119 또는 가까운 응급실로 바로 도움을 요청하세요.",
+                ],
+                "approval_question": None,
+                "search_grounding_summary": "",
+            }
+        )
+    elif safety_kind == "extreme_diet":
+        components = normalize_draft_components(
+            {
+                "core_message": "식사를 거르거나 단기간에 큰 폭으로 감량하는 방식은 안전하지 않아서 도와드릴 수 없어요.",
+                "reason_points": [
+                    "극단적인 제한은 어지럼, 폭식 반동, 근손실, 컨디션 저하 위험을 키울 수 있습니다.",
+                    "감량은 식사를 유지하면서 작은 칼로리 조정과 활동량 조절로 가는 편이 안전합니다.",
+                ],
+                "suggested_action": "오늘은 끼니를 거르지 않는 균형 식사와 10~20분 가벼운 걷기부터 잡아볼게요.",
+                "safety_notes": [
+                    "최근 어지럼, 실신감, 폭식/절식 반복, 월경 이상, 복용약이나 질환이 있으면 전문가 상담을 우선하세요.",
+                    "일주일에 큰 폭의 감량을 목표로 굶는 계획은 피하세요.",
                 ],
                 "approval_question": None,
                 "search_grounding_summary": "",
@@ -958,6 +1341,8 @@ def _build_safety_draft(state: GraphState) -> dict:
 def _classify_safety_kind(message: str) -> str:
     if _MENTAL_HEALTH_SAFETY_PATTERNS.search(message):
         return "mental_health_crisis"
+    if _EXTREME_DIET_SAFETY_PATTERNS.search(message):
+        return "extreme_diet"
     if _PHYSICAL_SAFETY_PATTERNS.search(message):
         return "physical_emergency"
     return "physical_emergency"

@@ -36,8 +36,14 @@ class Settings(BaseSettings):
     LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com"
     LANGCHAIN_API_KEY: Optional[str] = None
     LANGCHAIN_PROJECT: str = "capstone-v2"
+    LANGSMITH_TRACING: str = "false"
+    LANGSMITH_ENDPOINT: Optional[str] = None
+    LANGSMITH_API_KEY: Optional[str] = None
+    LANGSMITH_PROJECT: Optional[str] = None
+    LANGSMITH_QUALITY_ENABLED: bool = False
+    LANGSMITH_SEND_FULL_TEXT: bool = False
 
-    model_config = {"env_file": ENV_FILE, "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ENV_FILE, "env_file_encoding": "utf-8-sig"}
 
 
 @lru_cache

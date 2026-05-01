@@ -58,12 +58,15 @@ def _build_list_summary(trace: dict[str, Any]) -> dict[str, Any]:
     return {
         "intent": state_summary.get("intent"),
         "search_quality": state_summary.get("search_quality"),
+        "search_results_count": state_summary.get("search_results_count"),
         "modify_target": state_summary.get("modify_target"),
         "resolved_persona_id": state_summary.get("resolved_persona_id"),
         "proposed_plan_type": state_summary.get("proposed_plan_type"),
         "proposed_plan_action": state_summary.get("proposed_plan_action"),
         "proposed_plan_count": state_summary.get("proposed_plan_count"),
         "pending_writes_count": state_summary.get("pending_writes_count"),
+        "quality_score": (trace.get("quality") or {}).get("score"),
+        "quality_grade": (trace.get("quality") or {}).get("grade"),
         "slowest_label": slowest_label,
         "slowest_duration_ms": slowest_duration_ms,
     }
@@ -113,6 +116,8 @@ class TraceStore:
             },
             "state_summary": None,
             "response": None,
+            "quality": None,
+            "langsmith_export": None,
         }
         with self._lock:
             self._traces[trace_id] = trace
@@ -148,6 +153,13 @@ class TraceStore:
                 return
             for key, value in fields.items():
                 trace[key] = deepcopy(value)
+
+    def record_quality(self, trace_id: str, quality: dict[str, Any]) -> None:
+        with self._lock:
+            trace = self._traces.get(trace_id)
+            if not trace:
+                return
+            trace["quality"] = deepcopy(quality)
 
     def record_event(
         self,

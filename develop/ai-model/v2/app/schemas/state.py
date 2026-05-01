@@ -100,6 +100,7 @@ class GraphState(TypedDict):
     request_kind: RequestKind
 
     user_profile: Optional[dict[str, Any]]
+    profile_override_applied: bool
     today_plan: Optional[list[dict[str, Any]]]
 
     turn_count: int

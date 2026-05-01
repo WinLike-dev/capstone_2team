@@ -232,6 +232,7 @@ HTML = """
           <div class="card"><h3>WAS Workout Full Plan</h3><div id="workoutPlanData" class="event-pre empty">No trace selected.</div></div>
           <div class="card"><h3>WAS Diet Full Plan</h3><div id="dietPlanData" class="event-pre empty">No trace selected.</div></div>
         </div>
+        <div class="card"><h3>Quality Report</h3><div id="qualityReport" class="event-pre empty">No trace selected.</div></div>
         <div class="card"><h3>State Summary</h3><div id="stateSummary" class="event-pre empty">No trace selected.</div></div>
         <div class="card"><h3>Response</h3><div id="responseSummary" class="event-pre empty">No trace selected.</div></div>
         <div class="card"><h3>Trace Logs</h3><div id="traceLogs" class="event-pre empty">No trace selected.</div></div>
@@ -252,6 +253,7 @@ HTML = """
     const todayPlanDataEl = document.getElementById('todayPlanData');
     const workoutPlanDataEl = document.getElementById('workoutPlanData');
     const dietPlanDataEl = document.getElementById('dietPlanData');
+    const qualityReportEl = document.getElementById('qualityReport');
     const stateSummaryEl = document.getElementById('stateSummary');
     const responseSummaryEl = document.getElementById('responseSummary');
     const traceLogsEl = document.getElementById('traceLogs');
@@ -357,9 +359,20 @@ HTML = """
       const planLabel = summary.proposed_plan_count
         ? `${summary.proposed_plan_type || 'plan'} ${summary.proposed_plan_action || 'create'} x${summary.proposed_plan_count}`
         : null;
+      const qualityLabel = summary.quality_score !== null && summary.quality_score !== undefined
+        ? `${summary.quality_grade || 'score'} ${Number(summary.quality_score).toFixed(2)}`
+        : null;
+      const qualityKind = summary.quality_grade === 'pass'
+        ? 'ok'
+        : summary.quality_grade === 'fail'
+        ? 'error'
+        : qualityLabel
+        ? 'warn'
+        : 'muted';
 
       return [
         chip('intent', summary.intent, 'info'),
+        chip('quality', qualityLabel, qualityKind),
         chip('search', summary.search_quality, summary.search_quality === 'degraded' ? 'warn' : summary.search_quality ? 'ok' : 'muted'),
         chip('modify', summary.modify_target, 'warn'),
         chip('plan', planLabel, planLabel ? 'ok' : 'muted'),
@@ -443,6 +456,11 @@ HTML = """
     function renderOverview(trace){
       const responseText = trace.response?.response || '-';
       const summary = trace.state_summary || {};
+      const debugSummary = {
+        ...summary,
+        quality_score: trace.quality?.score,
+        quality_grade: trace.quality?.grade,
+      };
       const slowest = findSlowest(trace);
       const durationMs = computeDurationMs(trace);
 
@@ -463,7 +481,7 @@ HTML = """
         </div>
         <div class="card">
           <h3>Debug Signals</h3>
-          <div class="chip-row">${renderSummaryChips(summary) || '<span class="empty">No state summary yet.</span>'}</div>
+          <div class="chip-row">${renderSummaryChips(debugSummary) || '<span class="empty">No state summary yet.</span>'}</div>
         </div>
         <div class="metrics">
           <div class="metric-card">
@@ -559,6 +577,10 @@ HTML = """
       todayPlanDataEl.textContent = pretty(trace.was_data?.today_plan);
       workoutPlanDataEl.textContent = pretty(trace.was_data?.workout_full_plan);
       dietPlanDataEl.textContent = pretty(trace.was_data?.diet_full_plan);
+      qualityReportEl.textContent = pretty({
+        quality: trace.quality,
+        langsmith_export: trace.langsmith_export,
+      });
       stateSummaryEl.textContent = pretty(trace.state_summary);
       responseSummaryEl.textContent = pretty(trace.response);
       traceLogsEl.textContent = trace.logs?.length

@@ -34,6 +34,16 @@ _PHYSICAL_EMERGENCY_RESPONSE = (
     "가슴 통증, 숨참, 심한 어지럼, 의식 저하, 과다 복용 의심이 있으면 "
     "운동을 다시 하지 말고 바로 진료를 받으세요."
 )
+_EXTREME_DIET_SAFETY_PATTERNS = re.compile(
+    r"굶는?\s*식단|굶어서|단식.*살|일주일.*[5-9]\s*kg|[5-9]\s*kg.*일주일|"
+    r"극단적.*다이어트|초저칼로리"
+)
+_EXTREME_DIET_RESPONSE = (
+    "식사를 거르거나 단기간에 큰 폭으로 감량하는 방식은 안전하지 않아서 도와드릴 수 없어요.\n\n"
+    "극단적인 제한은 어지럼, 폭식 반동, 근손실, 컨디션 저하 위험을 키울 수 있습니다. "
+    "감량은 식사를 유지하면서 작은 칼로리 조정과 활동량 조절로 가는 편이 안전합니다.\n\n"
+    "최근 어지럼, 실신감, 폭식/절식 반복, 월경 이상, 복용약이나 질환이 있으면 전문가 상담을 우선하세요."
+)
 
 _ESCALATION_INTENSITY_THRESHOLD = 0.8
 
@@ -45,11 +55,10 @@ def make_safety_node(deps: NodeDeps):
         user_id = state["user_id"]
         message = state["user_message"]
         safety_kind = _classify_safety_kind(message)
-        response = (
-            _MENTAL_HEALTH_RESPONSE
-            if safety_kind == "mental_health_crisis"
-            else _PHYSICAL_EMERGENCY_RESPONSE
-        )
+        response = _response_for_safety_kind(safety_kind)
+        profile_note = _profile_safety_context(state.get("user_profile") or {})
+        if profile_note:
+            response = f"{response}\n\n{profile_note}"
 
         logger.warning(
             "SAFETY_BLOCK | user_id=%s | kind=%s | message=%r | emotion_intensity=%.2f | timestamp=%s",
@@ -78,6 +87,37 @@ def make_safety_node(deps: NodeDeps):
 def _classify_safety_kind(message: str) -> str:
     if _MENTAL_HEALTH_SAFETY_PATTERNS.search(message):
         return "mental_health_crisis"
+    if _EXTREME_DIET_SAFETY_PATTERNS.search(message):
+        return "extreme_diet"
     if _PHYSICAL_SAFETY_PATTERNS.search(message):
         return "physical_emergency"
     return "physical_emergency"
+
+
+def _response_for_safety_kind(safety_kind: str) -> str:
+    if safety_kind == "mental_health_crisis":
+        return _MENTAL_HEALTH_RESPONSE
+    if safety_kind == "extreme_diet":
+        return _EXTREME_DIET_RESPONSE
+    return _PHYSICAL_EMERGENCY_RESPONSE
+
+
+def _profile_safety_context(profile: dict) -> str:
+    constraints: list[str] = []
+    for key in ("injury_history", "medical_conditions", "conditions", "pain_points", "allergies", "dietary_restrictions"):
+        value = profile.get(key)
+        if isinstance(value, list):
+            constraints.extend(str(item).strip() for item in value if str(item).strip())
+        elif value:
+            constraints.append(str(value).strip())
+
+    parts: list[str] = []
+    if profile.get("age"):
+        parts.append(f"나이 {profile['age']}세")
+    if profile.get("exercise_level") or profile.get("activity_level"):
+        parts.append(f"운동 수준 {profile.get('exercise_level') or profile.get('activity_level')}")
+    if constraints:
+        parts.append(f"제약({', '.join(constraints)})")
+    if not parts:
+        return ""
+    return "프로필 기준으로도 " + ", ".join(parts) + "이 확인되므로 무리하지 말고 전문가 확인 전에는 강한 운동이나 극단적 식단을 피하세요."
