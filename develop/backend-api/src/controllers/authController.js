@@ -5,9 +5,14 @@ const {
     bootstrapProfileRow,
     hasCompletedHealthProfile,
 } = require('../services/profileService');
+const {
+    isValidBcryptHash,
+    verifyPassword,
+} = require('../utils/passwordHash');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'capstone_jwt_secret_key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const INVALID_CREDENTIALS_ERROR = '아이디 또는 비밀번호가 올바르지 않습니다.';
 
 // @route   POST /api/v1/auth/signup
 // @desc    회원가입
@@ -97,13 +102,16 @@ exports.login = async (req, res) => {
             .single();
 
         if (error || !user) {
-            return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+            return res.status(401).json({ error: INVALID_CREDENTIALS_ERROR });
         }
 
         // 2. 비밀번호 검증
-        const isMatch = await bcrypt.compare(password, user.password_hash);
+        const isMatch = await verifyPassword(password, user.password_hash);
         if (!isMatch) {
-            return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+            if (!isValidBcryptHash(user.password_hash)) {
+                console.warn(`Invalid password hash format for login_id=${user.login_id}`);
+            }
+            return res.status(401).json({ error: INVALID_CREDENTIALS_ERROR });
         }
 
         // 3. 온보딩(건강 프로필) 작성 여부 확인

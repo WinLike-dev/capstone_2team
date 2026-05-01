@@ -1,10 +1,15 @@
 const assert = require('assert/strict');
+const bcrypt = require('bcrypt');
 
 const {
   buildProfileRowForUpsert,
   DEFAULT_SELECTED_AI_PERSONA,
   ensureUserHealthProfile,
 } = require('../src/services/profileService');
+const {
+  isValidBcryptHash,
+  verifyPassword,
+} = require('../src/utils/passwordHash');
 const {
   loadExercisePlansWithItems,
 } = require('../src/services/exercisePlanReadService');
@@ -495,6 +500,21 @@ async function testReplaceWorkoutPlansSwapsPlansOnSuccess() {
   assert.equal(supabase.tables.exercise_items[0].exercise_name, 'pushup');
 }
 
+async function testPasswordHashValidationRejectsBadHashes() {
+  assert.equal(isValidBcryptHash(null), false);
+  assert.equal(isValidBcryptHash(''), false);
+  assert.equal(isValidBcryptHash('not-a-bcrypt-hash'), false);
+  assert.equal(await verifyPassword('secret', null), false);
+  assert.equal(await verifyPassword('secret', 'not-a-bcrypt-hash'), false);
+}
+
+async function testPasswordVerificationHandlesValidHashes() {
+  const hash = await bcrypt.hash('secret', 10);
+  assert.equal(isValidBcryptHash(hash), true);
+  assert.equal(await verifyPassword('secret', hash), true);
+  assert.equal(await verifyPassword('wrong', hash), false);
+}
+
 async function main() {
   await testExistingProfileNormalization();
   await testMissingProfileBootstrap();
@@ -505,7 +525,9 @@ async function main() {
   await testCreateWorkoutPlansRollsBackOnChildInsertFailure();
   await testReplaceWorkoutPlansKeepsOldPlanWhenNewCreateFails();
   await testReplaceWorkoutPlansSwapsPlansOnSuccess();
-  console.log('[internal-contracts] 9/9 passed');
+  await testPasswordHashValidationRejectsBadHashes();
+  await testPasswordVerificationHandlesValidHashes();
+  console.log('[internal-contracts] 11/11 passed');
 }
 
 main().catch((error) => {
