@@ -115,29 +115,44 @@ exports.login = async (req, res) => {
         }
 
         // 3. 온보딩(건강 프로필) 작성 여부 확인
-        const { data: profile } = await supabase
-            .from('user_health_profiles')
-            .select('user_id, gender, age, height, weight, goal, activity_level, mbti, allergies, medical_history')
-            .eq('user_id', user.user_id)
-            .maybeSingle();
+        // Profile status should not break authentication for legacy rows.
+        let hasHealthProfile = false;
+        try {
+            const { data: profile, error: profileError } = await supabase
+                .from('user_health_profiles')
+                .select('user_id, gender, age, height, weight, goal, activity_level, mbti, allergies, medical_history')
+                .eq('user_id', user.user_id)
+                .maybeSingle();
 
-        user.has_health_profile = hasCompletedHealthProfile(profile);
+            if (profileError) {
+                console.warn(`Login profile lookup warning for login_id=${user.login_id}: ${profileError.message}`);
+            } else {
+                hasHealthProfile = hasCompletedHealthProfile(profile || {});
+            }
+        } catch (profileError) {
+            console.warn(`Login profile status warning for login_id=${user.login_id}: ${profileError.message}`);
+        }
 
         // 4. JWT 토큰 생성
         const payload = {
-            user_id: user.user_id,
-            login_id: user.login_id
+            user_id: String(user.user_id),
+            login_id: String(user.login_id)
         };
 
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
-        // 비밀번호 해시는 응답에서 제외
-        delete user.password_hash;
+        const responseUser = {
+            user_id: user.user_id,
+            login_id: user.login_id,
+            nickname: user.nickname,
+            email: user.email,
+            has_health_profile: hasHealthProfile,
+        };
 
         res.json({
             message: '로그인에 성공했습니다.',
             token,
-            user
+            user: responseUser
         });
 
     } catch (err) {
