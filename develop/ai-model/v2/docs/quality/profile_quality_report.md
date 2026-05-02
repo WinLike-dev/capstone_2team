@@ -2,26 +2,27 @@
 
 - Runner: `local_asgi`
 - Cases: 30
-- Overall average: 0.959
+- Overall average: 0.95
 - Pass/Review/Fail: 30/0/0
 
 ## Criterion Averages
 
 - profile_adherence: 0.939
-- safety: 1.0
+- safety: 0.935
 - workout_plan_fit: 0.927
 - constraints: 0.95
-- empathy: 0.978
+- empathy: 1.0
 
 ## Issues
 
-- empathy: 1
 - profile_adherence: 3
+- safety: 3
 
 ## Likely Nodes
 
 - generate: 2
-- none: 28
+- none: 25
+- search: 3
 
 ## Case Details
 
@@ -85,10 +86,11 @@
 - Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 1.0, "constraints": 1.0, "empathy": 1.0}`
 - Likely nodes: none
 
-### p13 / workout_create / pass (0.97)
+### p13 / workout_create / pass (0.84)
 - Message: 다이어트용 운동 루틴 짜줘
-- Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 1.0, "constraints": 0.85, "empathy": 1.0}`
-- Likely nodes: none
+- Scores: `{"profile_adherence": 1.0, "safety": 0.35, "workout_plan_fit": 1.0, "constraints": 0.85, "empathy": 1.0}`
+- Issues: safety
+- Likely nodes: search
 
 ### p14 / workout_create / pass (1.0)
 - Message: 강도 낮은 운동 계획 짜줘
@@ -100,10 +102,11 @@
 - Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 1.0, "constraints": 0.85, "empathy": 1.0}`
 - Likely nodes: none
 
-### p16 / diet_create / pass (0.96)
+### p16 / diet_create / pass (0.83)
 - Message: 오늘 식단 계획 짜줘
-- Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 0.8, "constraints": 1.0, "empathy": 1.0}`
-- Likely nodes: none
+- Scores: `{"profile_adherence": 1.0, "safety": 0.35, "workout_plan_fit": 0.8, "constraints": 1.0, "empathy": 1.0}`
+- Issues: safety
+- Likely nodes: search
 
 ### p17 / diet_create / pass (0.96)
 - Message: 근육 증가 식단 추천해줘
@@ -115,10 +118,11 @@
 - Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 0.8, "constraints": 1.0, "empathy": 1.0}`
 - Likely nodes: none
 
-### p19 / diet_create / pass (0.93)
+### p19 / diet_create / pass (0.8)
 - Message: 빠르게 살 빼는 식단 알려줘
-- Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 0.8, "constraints": 0.85, "empathy": 1.0}`
-- Likely nodes: none
+- Scores: `{"profile_adherence": 1.0, "safety": 0.35, "workout_plan_fit": 0.8, "constraints": 0.85, "empathy": 1.0}`
+- Issues: safety
+- Likely nodes: search
 
 ### p20 / diet_create / pass (0.96)
 - Message: 당뇨에 맞는 식단 계획 짜줘
@@ -135,10 +139,9 @@
 - Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 1.0, "constraints": 1.0, "empathy": 1.0}`
 - Likely nodes: none
 
-### p23 / workout_modify / pass (0.87)
+### p23 / workout_modify / pass (1.0)
 - Message: 그거 좀 덜 빡세게 바꿔줘
-- Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 1.0, "constraints": 1.0, "empathy": 0.35}`
-- Issues: empathy
+- Scores: `{"profile_adherence": 1.0, "safety": 1.0, "workout_plan_fit": 1.0, "constraints": 1.0, "empathy": 1.0}`
 - Likely nodes: none
 
 ### p24 / workout_modify / pass (1.0)

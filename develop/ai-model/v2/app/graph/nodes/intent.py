@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -26,14 +27,23 @@ INTENT_SAFETY = "안전경고"
 INTENT_HOME_RECOMMENDATION = "home_recommendation"
 
 _SAFETY_PATTERNS = re.compile(
-    r"자해|자살|죽고\s*싶|극단적\s*선택|위험|실행|마약|과다\s*복용|과복용|"
-    r"가슴.*조여|가슴.*아파|숨.*차|호흡.*힘들|어지럽|심한.*알레르기|기절|"
-    r"약을.*많이.*먹|굶는?\s*식단|굶어서|단식.*살|일주일.*[5-9]\s*kg|"
-    r"[5-9]\s*kg.*일주일|극단적.*다이어트|초저칼로리",
+    r"자해|자살|죽고\s*싶|살고\s*싶지|살기\s*싫|극단적\s*선택|위험|실행|마약|과다\s*복용|과복용|"
+    r"가슴.*조여|가슴.*조이|가슴.*아파|숨.*차|호흡.*힘들|어지럽|어지러|심한.*알레르기|"
+    r"심한.*통증|출혈|피가.*멈추지|기절|"
+    r"약을.*많이.*먹|굶는?\s*식단|굶어서|단식.*살|물만\s*마시|물만.*식단|"
+    r"일주일.*[5-9]\s*kg|[5-9]\s*kg.*빨리|빨리.*[5-9]\s*kg|"
+    r"[5-9]\s*kg.*일주일|극단적.*다이어트|초저칼로리|"
+    r"(?:[1-9]\d{2}|1000)\s*(?:kcal|칼로리)",
     re.IGNORECASE,
 )
 _CASUAL_PATTERNS = re.compile(
     r"^(안녕|하이|헬로|hello|hi|반가워|고마워|감사|수고|잘가|bye)[\s!?.]*$",
+    re.IGNORECASE,
+)
+_OFFTOPIC_PATTERNS = re.compile(
+    r"주식|주가|코인|비트코인|투자|매수|매도|환율|부동산|로또|복권|"
+    r"날씨|뉴스|정치|선거|맛집|영화\s*추천|드라마\s*추천|게임\s*추천|"
+    r"코딩|파이썬|자바스크립트|번역|수학\s*문제|숙제",
     re.IGNORECASE,
 )
 
@@ -78,6 +88,16 @@ _PLAN_DOMAIN_KEYWORDS = (
     "수영",
     "자전거",
     "걷기",
+    "산책",
+    "스트레칭",
+    "헬스",
+    "근육통",
+    "허리",
+    "무릎",
+    "어깨",
+    "통증",
+    "휴식",
+    "회복",
 )
 _PLAN_REQUEST_KEYWORDS = (
     "추천",
@@ -227,7 +247,14 @@ _MEMORY_QUERY_KEYWORDS = (
     "방금 내가 말한",
     "아까 내가 말한",
     "내 별명",
+    "예전에 말한",
     "이전에 말한",
+    "전에 말한",
+    "지난번에 말한",
+    "저장한",
+    "기억해둔",
+    "내 취향",
+    "내 선호",
     "조금 전에 말한",
 )
 _PLAN_CONFIRMATION_REFERENCE_KEYWORDS = (
@@ -275,6 +302,11 @@ _CARE_SUPPORT_MARKERS = (
     "지쳐",
     "지쳤",
     "힘들",
+    "피곤",
+    "컨디션",
+    "잠을 못",
+    "잠 못",
+    "수면 부족",
     "불안",
     "우울",
     "무기력",
@@ -291,6 +323,10 @@ _CARE_SUPPORT_MARKERS = (
     "하기싫",
     "망쳐",
     "망했",
+    "식욕",
+    "폭식",
+    "배고파",
+    "뻐근",
     "부담",
     "겁나",
     "조급",
@@ -308,9 +344,55 @@ _INFO_REQUEST_MARKERS = (
     "가능",
     "해야",
     "해도 돼",
+    "해도 될",
+    "될까",
+    "좋을까",
+    "하면 좋",
+    "뭐부터",
+    "먹지",
+    "먹어도",
+    "쉴까",
+    "쉬어도",
     "쉬어야",
     "어떻게",
     "대신",
+)
+_HEALTH_CONTEXT_KEYWORDS = (
+    "컨디션",
+    "피곤",
+    "잠을 못",
+    "잠 못",
+    "수면",
+    "식욕",
+    "폭식",
+    "배고",
+    "뻐근",
+    "근육통",
+    "허리",
+    "목",
+    "손목",
+    "무릎",
+    "어깨",
+    "통증",
+    "몸",
+    "회복",
+    "휴식",
+    "쉬어",
+    "쉬고",
+    "걷기",
+    "산책",
+    "스트레칭",
+    "물",
+    "수분",
+    "아침",
+    "점심",
+    "저녁",
+    "간식",
+    "단백질",
+    "먹지",
+    "먹어도",
+    "먹으면",
+    "먹을까",
 )
 
 
@@ -322,6 +404,7 @@ def make_intent_node(deps: NodeDeps):
         message = str(state["user_message"])
         routing_message = _routing_message(state, message)
         previous_intent = state.get("previous_intent")
+        signals = _intent_signal_snapshot(message, routing_message, state)
 
         if _SAFETY_PATTERNS.search(message):
             return _build_result(INTENT_SAFETY, state)
@@ -338,6 +421,15 @@ def make_intent_node(deps: NodeDeps):
             )
 
         if _looks_like_memory_query(routing_message):
+            if not _looks_like_short_term_memory_query(routing_message):
+                return _build_result(
+                    INTENT_INFO,
+                    state,
+                    confidence=0.92,
+                    search_targets=["vdb_memory", "vdb_user_important"],
+                    requires_past_memory=True,
+                    short_term_memory_query=False,
+                )
             return _build_result(
                 INTENT_INFO,
                 state,
@@ -347,7 +439,20 @@ def make_intent_node(deps: NodeDeps):
                 short_term_memory_query=True,
             )
 
+        if _looks_like_offtopic_request(routing_message):
+            _record_intent_fallback(
+                deps,
+                reason="out_of_scope_non_health_request",
+                signals=signals,
+            )
+            return _build_result(INTENT_FALLBACK, state, confidence=0.86)
+
         if _looks_like_context_dependent_fallback(message, state):
+            _record_intent_fallback(
+                deps,
+                reason="unresolved_context_reference",
+                signals=signals,
+            )
             return _build_result(INTENT_FALLBACK, state, confidence=0.9)
 
         if _looks_like_context_setup(message) and not _looks_like_plan_request(routing_message):
@@ -382,6 +487,14 @@ def make_intent_node(deps: NodeDeps):
                 },
             )
 
+        if awaiting_plan_confirmation and _looks_like_explicit_plan_change(message, state):
+            return _build_result(
+                INTENT_MODIFY,
+                state,
+                confidence=0.93,
+                search_targets=["vdb_external", "vdb_memory", "vdb_user_important", "web"],
+            )
+
         if awaiting_plan_confirmation and _matches_hardcoded_confirmation_approval(message):
             deps.trace.record_current_event(
                 stage="confirm_gate",
@@ -390,14 +503,6 @@ def make_intent_node(deps: NodeDeps):
                 detail={"source": "hardcoded_phrase", "user_message": message},
             )
             return _build_result(INTENT_APPROVAL, state, confidence=0.99)
-
-        if awaiting_plan_confirmation and _looks_like_explicit_plan_change(message, state):
-            return _build_result(
-                INTENT_MODIFY,
-                state,
-                confidence=0.93,
-                search_targets=["vdb_external", "web"],
-            )
 
         if awaiting_plan_confirmation:
             decision = await _classify_plan_confirmation(deps, state, message)
@@ -425,13 +530,18 @@ def make_intent_node(deps: NodeDeps):
                 INTENT_MODIFY,
                 state,
                 confidence=0.93,
-                search_targets=["vdb_external", "web"],
+                search_targets=["vdb_external", "vdb_memory", "vdb_user_important", "web"],
             )
 
         if not awaiting_plan_confirmation and _looks_like_plan_approval(routing_message, state):
             return _build_result(INTENT_APPROVAL, state, confidence=0.94)
 
-        if _looks_like_care_request(routing_message):
+        if (
+            _looks_like_care_request(routing_message)
+            and not _looks_like_info_request(routing_message)
+            and not _looks_like_plan_request(routing_message)
+            and not _looks_like_modify_request(routing_message)
+        ):
             return _build_result(INTENT_CARE, state, confidence=0.88)
 
         if _looks_like_profile_record(routing_message):
@@ -442,7 +552,7 @@ def make_intent_node(deps: NodeDeps):
                 INTENT_MODIFY,
                 state,
                 confidence=0.92,
-                search_targets=["vdb_external", "web"],
+                search_targets=["vdb_external", "vdb_memory", "vdb_user_important", "web"],
             )
 
         if _looks_like_plan_request(routing_message):
@@ -450,7 +560,7 @@ def make_intent_node(deps: NodeDeps):
                 INTENT_PLAN,
                 state,
                 confidence=0.92,
-                search_targets=["vdb_external", "vdb_user_important", "web"],
+                search_targets=["vdb_external", "vdb_memory", "vdb_user_important", "web"],
             )
 
         if _looks_like_info_request(routing_message):
@@ -467,6 +577,15 @@ def make_intent_node(deps: NodeDeps):
             if context
             else f"[Original User Message]\n{message}\n\n[Resolved User Message]\n{routing_message}"
         )
+        deps.trace.record_current_event(
+            stage="intent",
+            status="info",
+            title="Intent heuristic pass-through",
+            detail={
+                "reason": "no_heuristic_match_before_llm",
+                "signals": signals,
+            },
+        )
 
         try:
             raw = await deps.router.generate(
@@ -477,12 +596,31 @@ def make_intent_node(deps: NodeDeps):
             output = IntentOutput.model_validate_json(raw)
         except Exception as exc:
             logger.warning("Intent analysis failed, using fallback: %s", exc)
+            _record_intent_fallback(
+                deps,
+                reason="intent_llm_exception",
+                signals={**signals, "error_type": type(exc).__name__},
+            )
             return _build_result(INTENT_FALLBACK, state)
 
         profile_changes_dict = None
         if output.profile_changes:
             profile_changes_dict = {item.field: item.value for item in output.profile_changes}
         output_intent = _coerce_llm_intent(output.intent, state, routing_message)
+        deps.trace.record_current_event(
+            stage="intent",
+            status="warn" if output_intent == INTENT_FALLBACK else "ok",
+            title="LLM intent decision",
+            detail={
+                "raw_intent": output.intent,
+                "coerced_intent": output_intent,
+                "confidence": output.confidence,
+                "signals": signals,
+                "fallback_reason": "llm_or_coercion_returned_fallback"
+                if output_intent == INTENT_FALLBACK
+                else None,
+            },
+        )
 
         return {
             "intent": output_intent,
@@ -555,6 +693,43 @@ def _build_result(
     }
 
 
+def _record_intent_fallback(deps: NodeDeps, *, reason: str, signals: dict[str, Any]) -> None:
+    deps.trace.record_current_event(
+        stage="intent",
+        status="warn",
+        title="Intent fallback selected",
+        detail={
+            "reason": reason,
+            "signals": signals,
+        },
+    )
+
+
+def _intent_signal_snapshot(message: str, routing_message: str, state: GraphState) -> dict[str, Any]:
+    normalized = routing_message.strip().lower()
+    resolution = state.get("context_resolution") or {}
+    return {
+        "message_length": len(message),
+        "routing_message_length": len(routing_message),
+        "inferred_domain": infer_domain(routing_message),
+        "resolved_reference": resolution.get("resolved_reference"),
+        "resolved_domain": resolution.get("resolved_domain"),
+        "context_ambiguous": bool(resolution.get("ambiguous")),
+        "context_confidence": resolution.get("confidence"),
+        "safety_match": bool(_SAFETY_PATTERNS.search(message)),
+        "care_match": _looks_like_care_request(routing_message),
+        "health_context_match": _looks_like_health_context(routing_message),
+        "offtopic_match": _looks_like_offtopic_request(routing_message),
+        "question_followup_match": _looks_like_question_followup(routing_message),
+        "plan_request_match": _looks_like_plan_request(routing_message),
+        "info_request_match": _looks_like_info_request(routing_message),
+        "modify_request_match": _looks_like_modify_request(routing_message),
+        "profile_record_match": _looks_like_profile_record(routing_message),
+        "memory_query_match": _looks_like_memory_query(routing_message),
+        "has_question_mark": "?" in normalized,
+    }
+
+
 def _contract_fields(
     intent: str,
     state: GraphState,
@@ -581,7 +756,7 @@ def _contract_fields(
         domain = "profile"
     elif modify_target in {"workout", "diet"}:
         domain = modify_target
-    elif resolved_domain in {"workout", "diet", "profile", "general"} and resolved_domain != "none":
+    elif resolved_domain in {"workout", "diet", "profile"}:
         domain = resolved_domain
     elif action_intent in {"create", "modify", "approval"} and inferred_domain in {"workout", "diet"}:
         domain = inferred_domain
@@ -589,7 +764,9 @@ def _contract_fields(
         domain = str(state.get("proposed_plan_type"))
     elif resolved_reference == "active_proposal" and active_proposal.get("domain") in {"workout", "diet"}:
         domain = str(active_proposal["domain"])
-    elif inferred_domain in {"workout", "diet", "profile"}:
+    elif inferred_domain in {"workout", "diet"}:
+        domain = inferred_domain
+    elif inferred_domain == "profile" and action_intent != "casual":
         domain = inferred_domain
     else:
         domain = "general"
@@ -818,7 +995,17 @@ def _looks_like_explicit_plan_change(message: str, state: GraphState | dict) -> 
     has_modify_keyword = any(keyword in normalized for keyword in _MODIFY_KEYWORDS)
     has_commitment_keyword = any(keyword in normalized for keyword in _APPROVAL_COMMITMENT_KEYWORDS)
     has_confirmation_reference = any(keyword in normalized for keyword in _PLAN_CONFIRMATION_REFERENCE_KEYWORDS)
-    looks_like_referential_acceptance = has_confirmation_reference and has_commitment_keyword
+    looks_like_referential_acceptance = has_confirmation_reference and has_commitment_keyword and not (
+        has_change_marker or has_modify_keyword
+    )
+    looks_like_modified_plan_acceptance = (
+        has_commitment_keyword
+        and any(marker in normalized for marker in ("수정한 계획", "수정된 계획", "수정안", "방금 수정"))
+        and not any(marker in normalized for marker in ("말고", "대신", "다시 바꿔", "다시 수정", "변경해"))
+    )
+
+    if looks_like_modified_plan_acceptance:
+        return False
 
     if has_modify_keyword and not looks_like_referential_acceptance:
         return True
@@ -873,6 +1060,27 @@ def _looks_like_care_request(message: str) -> bool:
     return any(marker in normalized for marker in _CARE_SUPPORT_MARKERS)
 
 
+def _looks_like_health_context(message: str) -> bool:
+    normalized = message.strip().lower()
+    return any(marker in normalized for marker in _HEALTH_CONTEXT_KEYWORDS)
+
+
+def _looks_like_offtopic_request(message: str) -> bool:
+    normalized = message.strip().lower()
+    if not normalized:
+        return False
+    if _SAFETY_PATTERNS.search(normalized):
+        return False
+    if (
+        any(keyword in normalized for keyword in _PLAN_DOMAIN_KEYWORDS)
+        or any(keyword in normalized for keyword in _PROFILE_FIELD_KEYWORDS)
+        or _looks_like_health_context(normalized)
+        or _looks_like_care_request(normalized)
+    ):
+        return False
+    return bool(_OFFTOPIC_PATTERNS.search(normalized))
+
+
 def _looks_like_context_setup(message: str) -> bool:
     normalized = message.strip().lower()
     return any(marker in normalized for marker in ("내 상황 기억", "내 조건 기억", "내 상황 고려", "내 조건 고려", "기억하고 답"))
@@ -880,7 +1088,30 @@ def _looks_like_context_setup(message: str) -> bool:
 
 def _looks_like_question_followup(message: str) -> bool:
     normalized = message.strip().lower()
-    if any(marker in normalized for marker in ("왜", "이유", "근거", "설명", "어떻게", "피해야", "해도 돼", "괜찮", "쉬어야")):
+    if any(
+        marker in normalized
+        for marker in (
+            "왜",
+            "이유",
+            "근거",
+            "설명",
+            "어떻게",
+            "피해야",
+            "해도 돼",
+            "해도 될",
+            "괜찮",
+            "쉬어야",
+            "쉬어도",
+            "쉴까",
+            "될까",
+            "좋을까",
+            "하면 좋",
+            "뭐부터",
+            "먹지",
+            "먹어도",
+            "마셔야",
+        )
+    ):
         return True
     return normalized.endswith("?")
 
@@ -891,6 +1122,8 @@ def _looks_like_info_request(message: str) -> bool:
         keyword in normalized for keyword in _PROFILE_FIELD_KEYWORDS
     )
     if "내 조건" in normalized or "내 상황" in normalized:
+        has_domain_keyword = True
+    if _looks_like_health_context(normalized):
         has_domain_keyword = True
     has_info_marker = any(marker in normalized for marker in _INFO_REQUEST_MARKERS)
     return has_domain_keyword and has_info_marker
@@ -957,6 +1190,21 @@ def _looks_like_memory_query(message: str) -> bool:
         or normalized.endswith("기억나")
     )
     return has_memory_keyword and has_question_shape
+
+
+def _looks_like_short_term_memory_query(message: str) -> bool:
+    normalized = message.strip().lower()
+    return any(
+        marker in normalized
+        for marker in (
+            "방금",
+            "아까",
+            "조금 전",
+            "좀 전에",
+            "이번 대화",
+            "내 별명",
+        )
+    )
 
 
 def _looks_like_context_dependent_fallback(message: str, state: GraphState) -> bool:

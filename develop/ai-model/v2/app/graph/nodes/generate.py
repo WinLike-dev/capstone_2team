@@ -34,12 +34,13 @@ _MENTAL_HEALTH_SAFETY_PATTERNS = re.compile(
     r"자해|자살|죽고\s*싶|극단적\s*선택|충동|해치고\s*싶|살고\s*싶지",
 )
 _PHYSICAL_SAFETY_PATTERNS = re.compile(
-    r"가슴.*조여|숨이?\s*차|호흡.*힘들|어지럽|쓰러질\s*것\s*같|실신|기절|"
+    r"가슴.*조여|가슴.*조이|숨이?\s*차|호흡.*힘들|어지럽|쓰러질\s*것\s*같|실신|기절|"
     r"과다\s*복용|심한\s*통증|출혈|피가\s*멈추지",
 )
 _EXTREME_DIET_SAFETY_PATTERNS = re.compile(
-    r"굶는?\s*식단|굶어서|단식.*살|일주일.*[5-9]\s*kg|[5-9]\s*kg.*일주일|"
-    r"극단적.*다이어트|초저칼로리",
+    r"굶는?\s*식단|굶어서|단식.*살|물만\s*마시|물만.*식단|"
+    r"일주일.*[5-9]\s*kg|[5-9]\s*kg.*일주일|[5-9]\s*kg.*빨리|빨리.*[5-9]\s*kg|"
+    r"극단적.*다이어트|초저칼로리|(?:[1-9]\d{2}|1000)\s*(?:kcal|칼로리)",
 )
 
 MAX_SELF_EVAL = 1
@@ -163,6 +164,17 @@ def make_generate_node(deps: NodeDeps):
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
             return direct_memory_draft
+
+        direct_past_memory_draft = _build_direct_past_memory_draft(state)
+        if direct_past_memory_draft is not None:
+            deps.trace.record_current_event(
+                stage="generate",
+                status="ok",
+                title="Direct past-memory draft used",
+                detail={"intent": intent, "memory_results": len(_memory_results(state))},
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
+            return direct_past_memory_draft
 
         context = _build_draft_context(state)
         system_prompt = _build_draft_system_prompt(state, failure_reason)
@@ -545,6 +557,9 @@ def _apply_profile_quality_guardrails(
     profile_note = _profile_fit_note(profile)
     if profile_note:
         _append_unique(patched["reason_points"], profile_note)
+    memory_note = _memory_grounding_note(state)
+    if memory_note:
+        _append_unique(patched["reason_points"], memory_note)
 
     empathy_note = _empathy_note(profile, state)
     if empathy_note:
@@ -615,8 +630,15 @@ def _apply_info_profile_guardrails(components: DraftComponents, state: GraphStat
         profile_note = _profile_fit_note(profile)
         if profile_note:
             _append_unique(patched["reason_points"], profile_note)
+        memory_note = _memory_grounding_note(state)
+        if memory_note:
+            _append_unique(patched["reason_points"], memory_note)
         for note in _profile_safety_notes(profile, None):
             _append_unique(patched["safety_notes"], note)
+
+    memory_note = _memory_grounding_note(state)
+    if memory_note:
+        _append_unique(patched["reason_points"], memory_note)
 
     return patched
 
@@ -627,11 +649,131 @@ def _append_unique(items: list[str], value: str) -> None:
         items.append(text)
 
 
+def _profile_frequency(profile: dict) -> int | None:
+    for key in (
+        "exercise_frequency",
+        "workout_frequency",
+        "frequency_per_week",
+        "weekly_workouts",
+        "target_workouts_per_week",
+        "preferred_workout_days",
+    ):
+        value = profile.get(key)
+        if not value:
+            continue
+        if isinstance(value, (int, float)):
+            count = int(value)
+        elif isinstance(value, list):
+            count = len(value)
+        else:
+            text = str(value).strip().lower()
+            if any(marker in text for marker in ("daily", "every day", "매일")):
+                count = 7
+            elif "평일" in text:
+                count = 5
+            elif "주말" in text:
+                count = 2
+            else:
+                match = re.search(r"([1-7])", text)
+                if not match:
+                    continue
+                count = int(match.group(1))
+        if 1 <= count <= 7:
+            return count
+    return None
+
+
+def _profile_social_orientation(profile: dict) -> str | None:
+    for key in (
+        "social_orientation",
+        "personality_axis",
+        "personality_type",
+        "personality",
+        "exercise_style",
+        "introversion_extroversion",
+    ):
+        value = profile.get(key)
+        if not value:
+            continue
+        text = str(value).strip().lower()
+        if text in {"e", "extrovert", "extroverted", "extravert", "extraverted", "외향", "외향형"}:
+            return "extrovert"
+        if text in {"i", "introvert", "introverted", "내향", "내향형"}:
+            return "introvert"
+        if any(marker in text for marker in ("외향", "extro", "extra", "social", "group", "함께")):
+            return "extrovert"
+        if any(marker in text for marker in ("내향", "intro", "solo", "quiet", "혼자", "조용")):
+            return "introvert"
+
+    mbti = str(profile.get("mbti") or "").strip().lower()
+    if re.fullmatch(r"[ei][ns][tf][jp]", mbti):
+        return "extrovert" if mbti.startswith("e") else "introvert"
+    return None
+
+
+def _social_orientation_label(profile: dict) -> str:
+    orientation = _profile_social_orientation(profile)
+    if orientation == "extrovert":
+        return "외향형"
+    if orientation == "introvert":
+        return "내향형"
+    return ""
+
+
+def _social_workout_note(profile: dict) -> str:
+    orientation = _profile_social_orientation(profile)
+    if orientation == "extrovert":
+        return "외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠"
+    if orientation == "introvert":
+        return "내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심"
+    return ""
+
+
+def _workout_goal_note(profile: dict) -> str:
+    goal_text = " ".join(
+        str(value)
+        for value in (
+            profile.get("goal"),
+            profile.get("diet_goal"),
+            profile.get("diet_type"),
+            profile.get("primary_goal"),
+        )
+        if value
+    ).lower()
+    if any(marker in goal_text for marker in ("fat_loss", "weight_loss", "diet", "다이어트", "감량", "체중 감량")):
+        return "다이어트/감량 목표라 저충격 유산소와 전신 근력 조합"
+    if any(marker in goal_text for marker in ("muscle", "strength", "근육", "근력", "증량", "벌크")):
+        return "근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하"
+    if any(marker in goal_text for marker in ("endurance", "지구력", "러닝", "cardio")):
+        return "지구력 목표라 유산소 시간을 천천히 늘리는 구성"
+    if any(marker in goal_text for marker in ("mobility", "health", "glucose", "혈당", "건강", "가동성")):
+        return "건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심"
+    if any(marker in goal_text for marker in ("consistency", "habit", "지속", "습관")):
+        return "지속성 목표라 실패해도 이어갈 수 있는 낮은 기준"
+    return ""
+
+
+def _workout_frequency_note(frequency: int | None) -> str:
+    if not frequency:
+        return ""
+    if frequency <= 2:
+        return f"주 {frequency}회 기준으로 회복일을 충분히 남김"
+    if frequency >= 5:
+        return f"주 {frequency}회 기준이라 세션별 부담을 나눠 진행"
+    return f"주 {frequency}회 루틴으로 반복 가능하게 구성"
+
+
 def _profile_fit_note(profile: dict) -> str:
     parts: list[str] = []
     age = profile.get("age")
     if age:
         parts.append(f"{age}세")
+    gender = profile.get("gender")
+    if gender:
+        parts.append(f"성별 {gender}")
+    weight = _profile_weight(profile)
+    if weight:
+        parts.append(f"체중 {weight}kg")
     level = profile.get("exercise_level") or profile.get("fitness_level") or profile.get("activity_level")
     if level:
         parts.append(f"운동 수준 {level}")
@@ -641,6 +783,12 @@ def _profile_fit_note(profile: dict) -> str:
     available = profile.get("available_time_minutes")
     if available:
         parts.append(f"가능 시간 {available}분")
+    frequency = _profile_frequency(profile)
+    if frequency:
+        parts.append(f"운동 빈도 주 {frequency}회")
+    social_label = _social_orientation_label(profile)
+    if social_label:
+        parts.append(f"운동 성향 {social_label}")
     lifestyle = profile.get("lifestyle") or profile.get("schedule")
     if lifestyle:
         parts.append(f"생활패턴 {lifestyle}")
@@ -689,8 +837,13 @@ def _profile_safety_notes(profile: dict, proposed_plan_type: str | None) -> list
     if context_notes:
         notes.append(f"추가 맥락({', '.join(context_notes)})을 반영해 무리한 방식은 피하세요.")
     goal = str(profile.get("goal") or "").lower()
+    weight = _profile_weight(profile)
+    age = _safe_int(profile.get("age"))
+    fat_loss_goal = any(marker in goal for marker in ("fat_loss", "weight_loss", "diet", "다이어트", "감량"))
     if "extreme" in goal or "급" in goal:
         notes.append("단기간에 큰 폭으로 감량하거나 굶는 방식은 피하고, 지속 가능한 감량 속도로 조정하세요.")
+    if fat_loss_goal and ((age and age < 19) or (weight and weight <= 50)):
+        notes.append("성장기이거나 낮은 체중에서의 감량 목표는 굶기는 피하고 균형 식사와 체력 유지 중심으로 조정하세요.")
     return notes
 
 
@@ -724,14 +877,30 @@ def _adjust_workout_plan_for_profile(plan: list[dict], profile: dict) -> list[di
     available = _safe_int(profile.get("available_time_minutes"))
     level = str(profile.get("exercise_level") or profile.get("fitness_level") or profile.get("activity_level") or "").lower()
     beginner = any(marker in level for marker in ("beginner", "초보", "low", "낮"))
+    advanced = any(marker in level for marker in ("advanced", "숙련", "상급", "고급"))
+    intermediate = any(marker in level for marker in ("intermediate", "중급"))
     older = (_safe_int(profile.get("age")) or 0) >= 65
+    frequency = _profile_frequency(profile)
     constraints = [
         *_as_text_list(profile.get("injury_history")),
         *_as_text_list(profile.get("pain_points")),
         *_as_text_list(profile.get("medical_conditions") or profile.get("conditions")),
     ]
-    cap_sets = 2 if beginner or older or constraints else 3
+    if beginner or older or constraints:
+        cap_sets = 2
+    elif advanced:
+        cap_sets = 4
+    else:
+        cap_sets = 3
+    if frequency and frequency <= 2 and not advanced:
+        cap_sets = min(cap_sets, 2)
     duration_cap = max(8, min(20, available or 20)) if beginner or older or constraints or (available and available <= 20) else None
+    if duration_cap is None and frequency and frequency <= 2 and available:
+        duration_cap = max(12, min(35, available))
+    goal_note = _workout_goal_note(profile)
+    frequency_note = _workout_frequency_note(frequency)
+    social_note = _social_workout_note(profile)
+    weight_note = _weight_workout_note(profile)
 
     adjusted: list[dict] = []
     for item in plan:
@@ -740,8 +909,20 @@ def _adjust_workout_plan_for_profile(plan: list[dict], profile: dict) -> list[di
         detail_parts = [detail] if detail else []
         if beginner:
             detail_parts.append("초보자 기준 저강도")
+        elif advanced:
+            detail_parts.append("숙련자 기준으로 강도는 유지하되 회복 상태 확인")
+        elif intermediate:
+            detail_parts.append("중급자 기준 기본 볼륨")
         if available:
             detail_parts.append(f"가능 시간 {available}분 안에서 진행")
+        if frequency_note:
+            detail_parts.append(frequency_note)
+        if goal_note:
+            detail_parts.append(goal_note)
+        if social_note:
+            detail_parts.append(social_note)
+        if weight_note:
+            detail_parts.append(weight_note)
         if constraints:
             detail_parts.append(f"제약({', '.join(constraints)}) 고려")
         next_item["detail"] = " / ".join(dict.fromkeys(part for part in detail_parts if part))
@@ -767,21 +948,91 @@ def _adjust_diet_plan_for_profile(plan: list[dict], profile: dict) -> list[dict]
     allergies = _as_text_list(profile.get("allergies") or profile.get("dietary_restrictions"))
     conditions = _as_text_list(profile.get("medical_conditions") or profile.get("conditions"))
     goal = str(profile.get("goal") or "").lower()
+    diet_goal = _diet_goal_note(profile)
     adjusted: list[dict] = []
     for item in plan:
         next_item = dict(item)
-        detail = str(next_item.get("detail") or "").strip()
+        detail = _sanitize_diet_detail_for_profile(str(next_item.get("detail") or "").strip(), allergies)
         notes: list[str] = []
         if allergies:
             notes.append(f"알레르기({', '.join(allergies)}) 제외/대체")
         if conditions:
             notes.append(f"질환({', '.join(conditions)}) 고려")
+        if diet_goal:
+            notes.append(diet_goal)
         if "extreme" in goal or "급" in goal:
             notes.append("굶지 않는 지속 가능한 감량")
         if notes:
             next_item["detail"] = f"{detail} / " + " / ".join(notes) if detail else " / ".join(notes)
         adjusted.append(next_item)
     return adjusted
+
+
+def _sanitize_diet_detail_for_profile(detail: str, allergies: list[str]) -> str:
+    if not detail or not allergies:
+        return detail
+    allergy_text = " ".join(allergies).lower()
+    next_detail = detail
+    if any(marker in allergy_text for marker in ("우유", "유당", "dairy", "milk")):
+        next_detail = re.sub(
+            r"그릭요거트|요거트|우유|유제품|greek\s+yogurts?|greek\s+yoghurts?|yogurts?|yoghurts?|milk|dairy",
+            "무가당 콩요거트 또는 두유 대체식",
+            next_detail,
+            flags=re.IGNORECASE,
+        )
+    if any(marker in allergy_text for marker in ("견과", "땅콩", "캐슈", "nut", "peanut", "cashew")):
+        next_detail = re.sub(
+            r"견과류|땅콩버터|땅콩|캐슈넛|캐슈|nuts?|peanuts?|peanut\s+butter|cashews?",
+            "오트 또는 씨앗류 대체식",
+            next_detail,
+            flags=re.IGNORECASE,
+        )
+    if any(marker in allergy_text for marker in ("계란", "egg")):
+        next_detail = re.sub(r"계란|달걀|egg", "두부 또는 콩 단백질 대체식", next_detail, flags=re.IGNORECASE)
+    if any(marker in allergy_text for marker in ("갑각류", "새우", "shellfish", "shrimp")):
+        next_detail = re.sub(r"새우|갑각류|shrimp|shellfish", "생선 또는 두부 대체식", next_detail, flags=re.IGNORECASE)
+    if any(marker in allergy_text for marker in ("양파", "onion")):
+        next_detail = re.sub(r"양파|onion", "저자극 채소", next_detail, flags=re.IGNORECASE)
+    return next_detail
+
+
+def _profile_weight(profile: dict) -> int | None:
+    for key in ("weight", "body_weight", "body_weight_kg", "current_weight_kg"):
+        value = profile.get(key)
+        if value:
+            return _safe_int(value)
+    return None
+
+
+def _weight_workout_note(profile: dict) -> str:
+    weight = _profile_weight(profile)
+    if not weight:
+        return ""
+    goal_text = " ".join(
+        str(value)
+        for value in (profile.get("goal"), profile.get("diet_goal"), profile.get("primary_goal"))
+        if value
+    ).lower()
+    if weight >= 90:
+        return "체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심"
+    if weight <= 50 and any(marker in goal_text for marker in ("fat_loss", "weight_loss", "diet", "다이어트", "감량")):
+        return "낮은 체중과 감량 목표가 함께 있어 체력 유지와 근손실 방지 중심"
+    return ""
+
+
+def _diet_goal_note(profile: dict) -> str:
+    goal_text = " ".join(
+        str(value)
+        for value in (profile.get("goal"), profile.get("diet_goal"), profile.get("diet_type"), profile.get("primary_goal"))
+        if value
+    ).lower()
+    if any(marker in goal_text for marker in ("glucose", "blood sugar", "혈당", "diabetes", "당뇨")):
+        return "혈당 안정 목표 고려"
+    if any(marker in goal_text for marker in ("muscle", "strength", "근육", "근력", "증량")):
+        return "근육 증가 목표에 맞춰 단백질 포함"
+    if any(marker in goal_text for marker in ("fat_loss", "weight_loss", "diet", "다이어트", "감량")):
+        return "굶지 않는 감량 목표 고려"
+    return ""
 
 
 def _as_text_list(value: object) -> list[str]:
@@ -796,6 +1047,10 @@ def _safe_int(value: object) -> int | None:
     try:
         if value is None or value == "":
             return None
+        if isinstance(value, str):
+            match = re.search(r"-?\d+(?:\.\d+)?", value)
+            if match:
+                return int(float(match.group(0)))
         return int(float(value))
     except (TypeError, ValueError):
         return None
@@ -960,6 +1215,62 @@ def _build_starter_plan_fallback(
     components["plan_preview"] = _render_plan_preview_from_items(proposed_plan)
     draft_text = render_draft_preview(components)
     return components, draft_text, proposed_plan, plan_type, "create"
+
+
+def _memory_results(state: GraphState) -> list[dict]:
+    return [
+        result
+        for result in state.get("search_results") or []
+        if result.get("source") in {"memory", "important"} and str(result.get("text") or "").strip()
+    ]
+
+
+def _memory_grounding_note(state: GraphState) -> str:
+    results = _memory_results(state)
+    if not results:
+        return ""
+    labels = {
+        "memory": "장기 기억",
+        "important": "중요 프로필 기억",
+    }
+    source_labels = sorted({labels.get(str(result.get("source")), "기억") for result in results})
+    snippets = [str(result.get("text") or "").strip()[:60] for result in results[:2]]
+    return f"{'/'.join(source_labels)}에서 확인된 선호와 제약({'; '.join(snippets)})을 함께 반영했어요."
+
+
+def _build_direct_past_memory_draft(state: GraphState) -> dict | None:
+    if not state.get("requires_past_memory"):
+        return None
+
+    results = _memory_results(state)
+    if results:
+        snippets = [str(result.get("text") or "").strip() for result in results[:3]]
+        components = normalize_draft_components(
+            {
+                "core_message": "저장된 기억 기준으로 확인해보면, 아래 내용이 남아 있어요.",
+                "reason_points": [snippet[:140] for snippet in snippets],
+                "suggested_action": "이 기억을 바탕으로 운동이나 식단 계획을 다시 맞춰드릴 수 있어요.",
+                "search_grounding_summary": _memory_grounding_note(state),
+            }
+        )
+    else:
+        components = normalize_draft_components(
+            {
+                "core_message": "저장된 장기 기억에서는 아직 확인되는 내용이 없어요.",
+                "reason_points": ["방금/아까 말한 내용이면 최근 대화에서 다시 확인할 수 있고, 앞으로 남길 내용은 '기억해줘'라고 말하면 됩니다."],
+                "suggested_action": "기억해둘 선호, 제약, 목표가 있으면 한 문장으로 알려주세요.",
+                "search_grounding_summary": "",
+            }
+        )
+    return {
+        "draft_response": render_draft_preview(components),
+        "draft_components": components,
+        "proposed_plan": [],
+        "proposed_plan_type": None,
+        "proposed_plan_action": None,
+        "self_eval_count": 0,
+        "self_eval_failure_reason": None,
+    }
 
 
 def _build_direct_short_term_memory_draft(state: GraphState) -> dict | None:

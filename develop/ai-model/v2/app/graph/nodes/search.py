@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from typing import Any
 
@@ -217,6 +218,11 @@ def _augment_query(query: str, state: GraphState) -> str:
         additions.append(f"목표:{profile['goal']}")
     if profile.get("age"):
         additions.append(f"나이:{profile['age']}")
+    if profile.get("gender"):
+        additions.append(f"성별:{profile['gender']}")
+    weight = _profile_weight_value(profile)
+    if weight:
+        additions.append(f"체중:{weight}kg")
     if profile.get("exercise_level") or profile.get("fitness_level") or profile.get("activity_level"):
         additions.append(
             "운동수준:"
@@ -224,6 +230,17 @@ def _augment_query(query: str, state: GraphState) -> str:
         )
     if profile.get("available_time_minutes"):
         additions.append(f"가능시간:{profile['available_time_minutes']}분")
+    frequency = _profile_frequency_value(profile)
+    if frequency:
+        additions.append(f"운동빈도:주{frequency}회")
+    orientation = _profile_social_orientation(profile)
+    if orientation:
+        additions.append(f"운동성향:{'외향형' if orientation == 'extrovert' else '내향형'}")
+    if profile.get("diet_goal") or profile.get("diet_type") or profile.get("primary_goal"):
+        additions.append(
+            "식단/운동목표:"
+            f"{profile.get('diet_goal') or profile.get('diet_type') or profile.get('primary_goal')}"
+        )
     if profile.get("lifestyle") or profile.get("schedule"):
         additions.append(f"생활패턴:{profile.get('lifestyle') or profile.get('schedule')}")
     if profile.get("injury_history"):
@@ -238,6 +255,85 @@ def _augment_query(query: str, state: GraphState) -> str:
     if not additions:
         return query
     return f"{query} [{', '.join(additions)}]"
+
+
+def _profile_frequency_value(profile: dict) -> int | None:
+    for key in (
+        "exercise_frequency",
+        "workout_frequency",
+        "frequency_per_week",
+        "weekly_workouts",
+        "target_workouts_per_week",
+        "preferred_workout_days",
+    ):
+        value = profile.get(key)
+        if not value:
+            continue
+        if isinstance(value, (int, float)):
+            count = int(value)
+        elif isinstance(value, list):
+            count = len(value)
+        else:
+            text = str(value).strip().lower()
+            if any(marker in text for marker in ("daily", "every day", "매일")):
+                count = 7
+            elif "평일" in text:
+                count = 5
+            elif "주말" in text:
+                count = 2
+            else:
+                match = re.search(r"([1-7])", text)
+                if not match:
+                    continue
+                count = int(match.group(1))
+        if 1 <= count <= 7:
+            return count
+    return None
+
+
+def _profile_weight_value(profile: dict) -> int | None:
+    for key in ("weight", "body_weight", "body_weight_kg", "current_weight_kg"):
+        value = profile.get(key)
+        if not value:
+            continue
+        try:
+            if isinstance(value, str):
+                match = re.search(r"-?\d+(?:\.\d+)?", value)
+                if not match:
+                    continue
+                return int(float(match.group(0)))
+            return int(float(value))
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _profile_social_orientation(profile: dict) -> str | None:
+    for key in (
+        "social_orientation",
+        "personality_axis",
+        "personality_type",
+        "personality",
+        "exercise_style",
+        "introversion_extroversion",
+    ):
+        value = profile.get(key)
+        if not value:
+            continue
+        text = str(value).strip().lower()
+        if text in {"e", "extrovert", "extroverted", "extravert", "extraverted", "외향", "외향형"}:
+            return "extrovert"
+        if text in {"i", "introvert", "introverted", "내향", "내향형"}:
+            return "introvert"
+        if any(marker in text for marker in ("외향", "extro", "extra", "social", "group", "함께")):
+            return "extrovert"
+        if any(marker in text for marker in ("내향", "intro", "solo", "quiet", "혼자", "조용")):
+            return "introvert"
+
+    mbti = str(profile.get("mbti") or "").strip().lower()
+    if re.fullmatch(r"[ei][ns][tf][jp]", mbti):
+        return "extrovert" if mbti.startswith("e") else "introvert"
+    return None
 
 
 def _resolved_query(state: GraphState) -> str:
