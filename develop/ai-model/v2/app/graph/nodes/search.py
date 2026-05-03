@@ -241,6 +241,17 @@ def _augment_query(query: str, state: GraphState) -> str:
             "식단/운동목표:"
             f"{profile.get('diet_goal') or profile.get('diet_type') or profile.get('primary_goal')}"
         )
+    if any(marker in query for marker in ("운동", "루틴", "유산소", "근력", "workout", "exercise")):
+        additions.append("운동구성:스트레칭/유산소/상체/하체")
+        goal_text = " ".join(
+            str(value)
+            for value in (profile.get("goal"), profile.get("diet_goal"), profile.get("primary_goal"))
+            if value
+        ).lower()
+        if orientation == "introvert" and any(
+            marker in goal_text for marker in ("fat_loss", "weight_loss", "diet", "다이어트", "감량")
+        ):
+            additions.append("선호운동:집에서 하는 유산소")
     if profile.get("lifestyle") or profile.get("schedule"):
         additions.append(f"생활패턴:{profile.get('lifestyle') or profile.get('schedule')}")
     if profile.get("injury_history"):

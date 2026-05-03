@@ -30,6 +30,7 @@ from app.core import config as app_config  # noqa: E402
 app_config.Settings.model_config = {"env_file": None}
 app_config.get_settings.cache_clear()
 
+from app.services.home_recommendations import empty_home_recommendations, kst_today_iso  # noqa: E402
 from scripts.test_chat_e2e import build_test_stack  # noqa: E402
 
 
@@ -106,6 +107,24 @@ async def main() -> None:
             require(any(token in ext_text for token in ("그룹", "친구", "함께")), "extrovert plan should include social exercise option")
             require("주 2회" in ext_text, "extrovert plan should reflect weekly frequency")
             require(any(token in ext_text for token in ("다이어트", "감량", "유산소")), "fat-loss workout should mention diet/fat-loss exercise fit")
+            require(all(token in ext_text for token in ("스트레칭", "유산소", "상체", "하체")), "workout plan should expose four exercise categories")
+
+            intro_fat_user = f"social-int-fat-{uuid.uuid4().hex[:6]}"
+            intro_fat = await run_request(
+                client,
+                user_id=intro_fat_user,
+                message="다이어트 위주로 오늘 운동 계획 짜줘",
+                profile=_base_profile(
+                    social_orientation="내향형",
+                    goal="fat_loss",
+                    available_time_minutes=20,
+                    exercise_frequency=3,
+                ),
+            )
+            intro_fat_text = intro_fat["response"]
+            require(all(token in intro_fat_text for token in ("스트레칭", "유산소", "상체", "하체")), "introvert fat-loss plan should include four exercise categories")
+            require(any(token in intro_fat_text for token in ("집에서", "홈트", "실내", "제자리")), "introvert fat-loss plan should prefer home/indoor cardio")
+            require("유산소" in intro_fat_text and intro_fat_text.index("유산소") < intro_fat_text.index("상체"), "fat-loss plan should emphasize cardio before strength")
 
             intro_user = f"social-int-{uuid.uuid4().hex[:6]}"
             introvert = await run_request(
@@ -162,11 +181,26 @@ async def main() -> None:
             require("초저칼로리" in low_kcal["response"], "low kcal safety should address calorie-specific context")
             require(rapid["response"].splitlines()[0] != low_kcal["response"].splitlines()[0], "safety responses should vary by risk context")
 
+            home = empty_home_recommendations(
+                date=kst_today_iso(),
+                scope="workout",
+                user_profile=_base_profile(social_orientation="내향형", goal="fat_loss"),
+                today_plan=[],
+                recent_recommendations={},
+            )
+            workout = home.workout
+            require(
+                all((workout.upper_body, workout.lower_body, workout.cardio, workout.stretching)),
+                "home workout recommendations should fill all four workout slots",
+            )
+            cardio_text = f"{workout.cardio.exercise_name} {workout.cardio.summary}" if workout.cardio else ""
+            require(any(token in cardio_text for token in ("집", "홈", "실내", "제자리")), "introvert home cardio should be indoor/home-friendly")
+
     finally:
         await checkpointer.conn.close()
         app.state._temp_dir.cleanup()
 
-    print("[social-memory-profile] 4/4 passed")
+    print("[social-memory-profile] 6/6 passed")
 
 
 if __name__ == "__main__":

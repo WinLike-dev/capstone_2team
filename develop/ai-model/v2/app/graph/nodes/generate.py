@@ -50,6 +50,72 @@ _PLAN_TYPE_KEYWORDS = {
     "diet": ("식단", "식사", "영양", "칼로리", "다이어트", "meal", "diet", "nutrition", "calorie"),
     "workout": ("운동", "러닝", "달리기", "헬스", "근력", "유산소", "웨이트", "exercise", "workout", "training", "run"),
 }
+_WORKOUT_CATEGORY_LABELS = {
+    "stretching": "스트레칭",
+    "cardio": "유산소",
+    "upper_body": "상체",
+    "lower_body": "하체",
+}
+_WORKOUT_CATEGORY_KEYWORDS = {
+    "stretching": (
+        "스트레칭",
+        "stretch",
+        "mobility",
+        "가동성",
+        "요가",
+        "폼롤",
+        "햄스트링",
+        "고양이",
+    ),
+    "cardio": (
+        "유산소",
+        "cardio",
+        "걷기",
+        "walking",
+        "walk",
+        "러닝",
+        "run",
+        "달리기",
+        "자전거",
+        "bike",
+        "사이클",
+        "treadmill",
+        "트레드밀",
+        "제자리",
+        "인터벌",
+    ),
+    "upper_body": (
+        "상체",
+        "upper",
+        "푸시업",
+        "푸쉬업",
+        "push",
+        "로우",
+        "row",
+        "밴드",
+        "어깨",
+        "가슴",
+        "등",
+        "팔",
+        "벤치",
+        "풀업",
+    ),
+    "lower_body": (
+        "하체",
+        "lower",
+        "스쿼트",
+        "squat",
+        "런지",
+        "lunge",
+        "leg",
+        "bridge",
+        "브릿지",
+        "둔근",
+        "엉덩",
+        "햄스트링",
+        "종아리",
+    ),
+}
 
 _DRAFT_COMMON_PROMPT = "nodes/generate/draft_common.md"
 _DRAFT_DEFAULT_PROMPT = "nodes/generate/draft_default.md"
@@ -579,6 +645,9 @@ def _apply_profile_quality_guardrails(
             patched["search_grounding_summary"] = constraint_note
 
     if proposed_plan_type == "workout":
+        category_note = _workout_category_balance_note(profile)
+        if category_note:
+            _append_unique(patched["reason_points"], category_note)
         plan = _adjust_workout_plan_for_profile(plan, profile)
     elif proposed_plan_type == "diet":
         plan = _adjust_diet_plan_for_profile(plan, profile)
@@ -729,8 +798,8 @@ def _social_workout_note(profile: dict) -> str:
     return ""
 
 
-def _workout_goal_note(profile: dict) -> str:
-    goal_text = " ".join(
+def _profile_goal_text(profile: dict) -> str:
+    return " ".join(
         str(value)
         for value in (
             profile.get("goal"),
@@ -740,6 +809,44 @@ def _workout_goal_note(profile: dict) -> str:
         )
         if value
     ).lower()
+
+
+def _is_fat_loss_goal(profile: dict) -> bool:
+    return any(
+        marker in _profile_goal_text(profile)
+        for marker in ("fat_loss", "weight_loss", "diet", "다이어트", "감량", "체중 감량")
+    )
+
+
+def _is_muscle_goal(profile: dict) -> bool:
+    return any(
+        marker in _profile_goal_text(profile)
+        for marker in ("muscle", "strength", "근육", "근력", "증량", "벌크")
+    )
+
+
+def _is_mobility_or_health_goal(profile: dict) -> bool:
+    return any(
+        marker in _profile_goal_text(profile)
+        for marker in ("mobility", "health", "glucose", "혈당", "건강", "가동성")
+    )
+
+
+def _workout_category_balance_note(profile: dict) -> str:
+    orientation = _profile_social_orientation(profile)
+    if _is_fat_loss_goal(profile) and orientation == "introvert":
+        return "다이어트/감량 목표와 내향형 성향을 함께 반영해 집에서 하는 유산소를 우선하고 스트레칭, 상체, 하체를 보조로 구성했어요."
+    if _is_fat_loss_goal(profile):
+        return "다이어트/감량 목표라 유산소를 우선하되 스트레칭, 상체, 하체를 모두 포함해 균형을 맞췄어요."
+    if orientation == "introvert":
+        return "내향형 성향을 반영해 스트레칭, 유산소, 상체, 하체를 혼자 하기 쉬운 홈트 중심으로 구성했어요."
+    if orientation == "extrovert":
+        return "외향형 성향을 반영해 스트레칭, 유산소, 상체, 하체에 함께 하기 좋은 선택지를 섞었어요."
+    return "운동 구성을 스트레칭, 유산소, 상체, 하체 4종류로 나눠 균형을 맞췄어요."
+
+
+def _workout_goal_note(profile: dict) -> str:
+    goal_text = _profile_goal_text(profile)
     if any(marker in goal_text for marker in ("fat_loss", "weight_loss", "diet", "다이어트", "감량", "체중 감량")):
         return "다이어트/감량 목표라 저충격 유산소와 전신 근력 조합"
     if any(marker in goal_text for marker in ("muscle", "strength", "근육", "근력", "증량", "벌크")):
@@ -871,6 +978,273 @@ def _constraint_grounding_note(profile: dict, proposed_plan_type: str | None) ->
     return f"{label}({', '.join(constraints)})을 반영해 위험 요소를 낮췄어요."
 
 
+def _is_pure_workout_plan(plan: list[dict]) -> bool:
+    if not plan:
+        return False
+    meal_markers = {"breakfast", "lunch", "dinner", "snack", "아침", "점심", "저녁", "간식", "식단", "식사"}
+    for item in plan:
+        name = str(item.get("name") or "").strip().lower()
+        detail = str(item.get("detail") or "").strip().lower()
+        if any(marker in name or marker in detail for marker in meal_markers):
+            return False
+        if not item.get("ex_list"):
+            return False
+    return True
+
+
+def _workout_category_sequence(profile: dict) -> tuple[str, ...]:
+    if _is_fat_loss_goal(profile):
+        return ("cardio", "lower_body", "upper_body", "stretching")
+    if _is_mobility_or_health_goal(profile):
+        return ("stretching", "cardio", "lower_body", "upper_body")
+    if _is_muscle_goal(profile):
+        return ("upper_body", "lower_body", "cardio", "stretching")
+    return ("stretching", "cardio", "upper_body", "lower_body")
+
+
+def _workout_item_category(item: dict) -> str | None:
+    text_parts = [
+        str(item.get("name") or ""),
+        str(item.get("detail") or ""),
+    ]
+    for exercise in item.get("ex_list") or []:
+        if isinstance(exercise, dict):
+            text_parts.append(str(exercise.get("exercise_name") or ""))
+    text = " ".join(text_parts).lower()
+    scores: dict[str, int] = {}
+    for category, keywords in _WORKOUT_CATEGORY_KEYWORDS.items():
+        scores[category] = sum(1 for keyword in keywords if keyword.lower() in text)
+    best_score = max(scores.values() or [0])
+    if best_score <= 0:
+        return None
+    winners = [category for category, score in scores.items() if score == best_score]
+    return winners[0] if len(winners) == 1 else None
+
+
+def _tag_workout_category_item(item: dict, category: str) -> dict:
+    next_item = dict(item)
+    label = _WORKOUT_CATEGORY_LABELS[category]
+    name = str(next_item.get("name") or label).strip()
+    if label not in name:
+        next_item["name"] = f"{label} - {name}"
+    detail = str(next_item.get("detail") or "").strip()
+    category_note = f"운동 종류: {label}"
+    if category_note not in detail:
+        next_item["detail"] = f"{detail} / {category_note}" if detail else category_note
+    return next_item
+
+
+def _adapt_existing_workout_category_item(
+    item: dict,
+    category: str,
+    profile: dict,
+    *,
+    cap_sets: int,
+    duration_cap: int | None,
+    constraints: list[str],
+    beginner: bool,
+    advanced: bool,
+    older: bool,
+) -> dict:
+    next_item = _tag_workout_category_item(item, category)
+    if category == "cardio" and _profile_social_orientation(profile) == "introvert":
+        ex_list_text = " ".join(
+            str(exercise.get("exercise_name") or "")
+            for exercise in next_item.get("ex_list") or []
+            if isinstance(exercise, dict)
+        ).lower()
+        if not any(marker in ex_list_text for marker in ("집", "홈", "실내", "제자리")):
+            next_item["ex_list"] = _category_exercises(
+                category,
+                profile,
+                cap_sets=cap_sets,
+                duration_cap=duration_cap,
+                constraints=constraints,
+                beginner=beginner,
+                advanced=advanced,
+                older=older,
+            )
+            detail = str(next_item.get("detail") or "").strip()
+            indoor_note = "내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정"
+            if indoor_note not in detail:
+                next_item["detail"] = f"{detail} / {indoor_note}" if detail else indoor_note
+    return next_item
+
+
+def _ensure_workout_category_coverage(
+    plan: list[dict],
+    profile: dict,
+    *,
+    cap_sets: int,
+    duration_cap: int | None,
+    constraints: list[str],
+    beginner: bool,
+    advanced: bool,
+    older: bool,
+) -> list[dict]:
+    if not _is_pure_workout_plan(plan):
+        return plan
+
+    first_day = str((plan[0] or {}).get("day") or "").strip() if plan else ""
+    day = first_day or kst_today_iso()
+    existing_by_category: dict[str, dict] = {}
+    for item in plan:
+        category = _workout_item_category(item)
+        if category and category not in existing_by_category:
+            existing_by_category[category] = _adapt_existing_workout_category_item(
+                item,
+                category,
+                profile,
+                cap_sets=cap_sets,
+                duration_cap=duration_cap,
+                constraints=constraints,
+                beginner=beginner,
+                advanced=advanced,
+                older=older,
+            )
+
+    balanced: list[dict] = []
+    for category in _workout_category_sequence(profile):
+        if category in existing_by_category:
+            balanced.append(existing_by_category[category])
+            continue
+        balanced.append(
+            _build_profile_workout_category_item(
+                category,
+                profile,
+                day=day,
+                cap_sets=cap_sets,
+                duration_cap=duration_cap,
+                constraints=constraints,
+                beginner=beginner,
+                advanced=advanced,
+                older=older,
+            )
+        )
+    return balanced
+
+
+def _build_profile_workout_category_item(
+    category: str,
+    profile: dict,
+    *,
+    day: str,
+    cap_sets: int,
+    duration_cap: int | None,
+    constraints: list[str],
+    beginner: bool,
+    advanced: bool,
+    older: bool,
+) -> dict:
+    label = _WORKOUT_CATEGORY_LABELS[category]
+    orientation = _profile_social_orientation(profile)
+    detail_parts = [f"{label} 축"]
+    if category == "cardio" and _is_fat_loss_goal(profile):
+        detail_parts.append("다이어트/감량 목표라 유산소 비중을 가장 크게 둠")
+    elif category in {"upper_body", "lower_body"} and _is_fat_loss_goal(profile):
+        detail_parts.append("감량 중 근손실 방지를 위한 보조 근력")
+    elif category == "stretching":
+        detail_parts.append("부상 예방과 회복을 위한 준비/마무리")
+    if orientation == "introvert":
+        detail_parts.append("내향형 성향에 맞춘 집에서 혼자 가능한 구성")
+    elif orientation == "extrovert":
+        detail_parts.append("외향형 성향에 맞춰 함께 하기 쉬운 선택지")
+    available = profile.get("available_time_minutes")
+    if available:
+        detail_parts.append(f"가능 시간 {available}분 안에서 진행")
+    frequency_note = _workout_frequency_note(_profile_frequency(profile))
+    if frequency_note:
+        detail_parts.append(frequency_note)
+    if beginner or older:
+        detail_parts.append("저강도")
+    elif advanced:
+        detail_parts.append("숙련자도 반복 가능한 기본 강도")
+    if constraints:
+        detail_parts.append(f"제약({', '.join(constraints)}) 고려")
+
+    return {
+        "name": f"{label} 루틴",
+        "detail": " / ".join(dict.fromkeys(part for part in detail_parts if part)),
+        "day": day,
+        "ex_list": _category_exercises(
+            category,
+            profile,
+            cap_sets=cap_sets,
+            duration_cap=duration_cap,
+            constraints=constraints,
+            beginner=beginner,
+            advanced=advanced,
+            older=older,
+        ),
+    }
+
+
+def _category_exercises(
+    category: str,
+    profile: dict,
+    *,
+    cap_sets: int,
+    duration_cap: int | None,
+    constraints: list[str],
+    beginner: bool,
+    advanced: bool,
+    older: bool,
+) -> list[dict]:
+    orientation = _profile_social_orientation(profile)
+    constraint_text = " ".join(constraints).lower()
+    has_knee_or_ankle = any(marker in constraint_text for marker in ("무릎", "knee", "발목", "ankle"))
+    has_back = any(marker in constraint_text for marker in ("허리", "back"))
+    has_shoulder_or_wrist = any(marker in constraint_text for marker in ("어깨", "shoulder", "손목", "wrist"))
+
+    sets = max(1, min(cap_sets, 2 if beginner or older or constraints else 3))
+    if category == "cardio":
+        duration = 25 if _is_fat_loss_goal(profile) else 18
+        if advanced and _is_fat_loss_goal(profile):
+            duration = 30
+        if beginner or older:
+            duration = min(duration, 15)
+        if duration_cap:
+            duration = min(duration, duration_cap)
+        duration = max(8, duration)
+        if has_knee_or_ankle or has_back:
+            name = "실내 자전거" if orientation == "introvert" else "빠른 걷기"
+        elif orientation == "introvert":
+            name = "집에서 제자리 빠른 걷기"
+        elif orientation == "extrovert":
+            name = "친구와 빠른 걷기"
+        else:
+            name = "빠른 걷기"
+        return [{"exercise_name": name, "duration_minutes": duration, "calories": duration * 6}]
+
+    if category == "stretching":
+        name = "고양이-소 스트레칭" if has_back else "전신 스트레칭"
+        return [{"exercise_name": name, "sets": min(sets, 2), "calories": 40}]
+
+    if category == "upper_body":
+        if has_shoulder_or_wrist or beginner or older:
+            names = ["월 푸시업", "밴드 로우"]
+        elif advanced and _is_muscle_goal(profile):
+            names = ["푸시업", "덤벨 로우"]
+        elif orientation == "introvert":
+            names = ["홈트 월 푸시업", "밴드 로우"]
+        else:
+            names = ["푸시업", "밴드 로우"]
+        return [{"exercise_name": name, "sets": sets, "calories": 55} for name in names]
+
+    if category == "lower_body":
+        if has_knee_or_ankle or beginner or older:
+            names = ["의자 스쿼트", "글루트 브릿지"]
+        elif advanced and _is_muscle_goal(profile):
+            names = ["스쿼트", "런지"]
+        elif orientation == "introvert":
+            names = ["홈트 의자 스쿼트", "글루트 브릿지"]
+        else:
+            names = ["스쿼트", "글루트 브릿지"]
+        return [{"exercise_name": name, "sets": sets, "calories": 60} for name in names]
+
+    return []
+
+
 def _adjust_workout_plan_for_profile(plan: list[dict], profile: dict) -> list[dict]:
     if not plan:
         return plan
@@ -939,7 +1313,16 @@ def _adjust_workout_plan_for_profile(plan: list[dict], profile: dict) -> list[di
             ex_list.append(next_exercise)
         next_item["ex_list"] = ex_list
         adjusted.append(next_item)
-    return adjusted
+    return _ensure_workout_category_coverage(
+        adjusted,
+        profile,
+        cap_sets=cap_sets,
+        duration_cap=duration_cap,
+        constraints=constraints,
+        beginner=beginner,
+        advanced=advanced,
+        older=older,
+    )
 
 
 def _adjust_diet_plan_for_profile(plan: list[dict], profile: dict) -> list[dict]:
