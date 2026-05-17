@@ -23,6 +23,17 @@ def make_fallback_node(deps: NodeDeps):
     async def fallback_node(state: GraphState) -> dict:
         count = state.get("fallback_count", 0)
         logger.info("Fallback Clarification 요청: fallback_count=%d", count)
+        deps.trace.record_current_event(
+            stage="fallback",
+            status="warn",
+            title="Fallback clarification returned",
+            detail={
+                "fallback_count": count,
+                "action_intent": state.get("action_intent"),
+                "domain": state.get("domain"),
+                "context_resolution": state.get("context_resolution"),
+            },
+        )
         return {
             "response": _CLARIFICATION_RESPONSE,
             "fallback_count": count + 1,

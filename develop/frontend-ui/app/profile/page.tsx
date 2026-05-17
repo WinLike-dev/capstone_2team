@@ -2,20 +2,40 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Edit3, Target, Bell, LogOut, ChevronRight, CheckCircle2, HeadphonesIcon, Info, X, User } from 'lucide-react';
+import Image from 'next/image';
+import { Edit3, Target, Bell, LogOut, ChevronRight, CheckCircle2, HeadphonesIcon, Info, X, User, Check, Loader2, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   AUTH_TOKEN_STORAGE_KEY,
   clearClientAuthState,
   redirectToLoginForExpiredSession,
 } from '@/lib/auth';
+import {
+  AI_PERSONAS,
+  type AiPersonaId,
+  resolveVisiblePersona,
+} from '@/lib/personas';
 import { usePlan, UserData } from '../context/PlanContext';
 
 type EditProfileForm = Partial<UserData> & { otherAllergy?: string };
 
+function getApiBaseUrl() {
+  const raw =
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    '';
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
+function buildApiUrl(path: string) {
+  const baseUrl = getApiBaseUrl();
+  return baseUrl ? `${baseUrl}${path}` : path;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { userData, updateUserData } = usePlan();
+  const selectedPersona = resolveVisiblePersona(userData?.selected_ai_persona);
   
   // Modals state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -23,6 +43,8 @@ export default function ProfilePage() {
   const [editForm, setEditForm] = useState<EditProfileForm>({});
   const [editGoal, setEditGoal] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isPersonaSaving, setIsPersonaSaving] = useState(false);
+  const [personaError, setPersonaError] = useState('');
 
   const handleLogout = () => {
     clearClientAuthState();
@@ -65,11 +87,7 @@ export default function ProfilePage() {
         allergies: data.allergies || [],
       };
 
-      const rawApiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
-      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
-      const endpoint = baseUrl ? `${baseUrl}/api/v1/users/profile` : '/api/v1/users/profile';
-
-      const res = await fetch(endpoint, {
+      const res = await fetch(buildApiUrl('/api/v1/users/profile'), {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -152,6 +170,61 @@ export default function ProfilePage() {
     });
   };
 
+  const handlePersonaSelect = async (personaId: AiPersonaId) => {
+    if (personaId === selectedPersona.id || isPersonaSaving) return;
+
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    if (!token) {
+      redirectToLoginForExpiredSession();
+      return;
+    }
+
+    const userId = userData?.user_id || userData?.login_id || userData?.email;
+    if (!userId) {
+      setPersonaError('프로필을 불러온 뒤 다시 선택해주세요.');
+      return;
+    }
+
+    const previousPersona = userData?.selected_ai_persona || selectedPersona.id;
+    setIsPersonaSaving(true);
+    setPersonaError('');
+    updateUserData({ selected_ai_persona: personaId });
+
+    try {
+      const response = await fetch(
+        buildApiUrl(
+          `/api/v1/users/${encodeURIComponent(userId)}/settings/persona`
+        ),
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            selected_ai_persona: personaId,
+          }),
+        }
+      );
+
+      if (response.status === 401) {
+        redirectToLoginForExpiredSession();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Persona API request failed.');
+      }
+    } catch (error) {
+      console.error('Persona save error:', error);
+      updateUserData({ selected_ai_persona: previousPersona });
+      setPersonaError('AI 코치 설정 저장에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setIsPersonaSaving(false);
+    }
+  };
+
   const menuItems = [
     { title: '내 정보 수정', icon: Edit3, color: 'text-blue-500', bg: 'bg-blue-50', onClick: handleOpenEdit },
     { title: '운동 목표 설정', icon: Target, color: 'text-purple-500', bg: 'bg-purple-50', onClick: handleOpenGoal },
@@ -224,6 +297,109 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* AI Persona Section */}
+        <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-[0_8px_30px_-6px_rgba(0,0,0,0.08)]">
+          <div className={`relative bg-gradient-to-br ${selectedPersona.accent} px-6 py-7 text-white md:px-8`}>
+            <div className="absolute inset-0 bg-black/5" />
+            <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center">
+              <div className="mx-auto flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-[2rem] bg-white/20 shadow-2xl ring-1 ring-white/30 md:mx-0 md:h-40 md:w-40">
+                <Image
+                  src={selectedPersona.imageSrc}
+                  alt={selectedPersona.imageAlt}
+                  width={160}
+                  height={160}
+                  priority
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0 text-center md:text-left">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-bold ring-1 ring-white/30">
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  현재 나와 함께하는 AI 코치
+                </div>
+                <h2 className="text-3xl font-black tracking-tight md:text-4xl">
+                  {selectedPersona.name}
+                </h2>
+                <p className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-white/90 md:text-base">
+                  “{selectedPersona.intro}”
+                </p>
+                <p className="mt-3 text-xs font-semibold text-white/75 md:text-sm">
+                  {selectedPersona.profileLine}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-5 py-5 md:px-6 md:py-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-black text-gray-900">
+                  AI 코치 바꾸기
+                </h3>
+                <p className="mt-1 text-sm font-medium text-gray-500">
+                  내 취향에 맞는 대화 스타일을 선택해보세요.
+                </p>
+              </div>
+              {isPersonaSaving && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  저장 중
+                </span>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {AI_PERSONAS.map((persona) => {
+                const isSelected = persona.id === selectedPersona.id;
+
+                return (
+                  <button
+                    key={persona.id}
+                    type="button"
+                    onClick={() => handlePersonaSelect(persona.id)}
+                    disabled={isPersonaSaving}
+                    aria-pressed={isSelected}
+                    className={`group flex min-h-[132px] items-center gap-4 rounded-2xl border p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-70 ${
+                      isSelected
+                        ? persona.selectedClass
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${persona.accent} shadow-sm transition-transform group-hover:scale-[1.03]`}
+                    >
+                      <Image
+                        src={persona.imageSrc}
+                        alt={persona.imageAlt}
+                        width={80}
+                        height={80}
+                        unoptimized
+                        className="h-full w-full object-cover"
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2 text-base font-black">
+                        {persona.name}
+                        {isSelected && <Check className="h-4 w-4" />}
+                      </span>
+                      <span className="mt-1 block text-xs font-semibold leading-relaxed opacity-75">
+                        {persona.description}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {personaError && (
+              <p className="mt-3 text-sm font-bold text-rose-500">
+                {personaError}
+              </p>
+            )}
+          </div>
+        </section>
 
         {/* Menu List */}
         <div className="bg-white rounded-3xl shadow-[0_4px_20px_-6px_rgba(0,0,0,0.06)] border border-gray-100 overflow-hidden">

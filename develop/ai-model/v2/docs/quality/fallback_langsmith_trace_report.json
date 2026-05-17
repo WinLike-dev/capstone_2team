@@ -1,0 +1,601 @@
+{
+  "runner": "local_asgi_langsmith_trace_source",
+  "summary": {
+    "case_count": 14,
+    "overall_average": 1.0,
+    "pass_count": 14,
+    "review_count": 0,
+    "fail_count": 0,
+    "fallback_count": 0
+  },
+  "cases": [
+    {
+      "case_id": "nonplan_start_hint",
+      "message": "오늘 뭐부터 하면 좋을까?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "nonplan_start_hint",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "general",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "general",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is a workout plan.\nIf you want, tell me whether to proceed with this plan.\nI applied workout guidance and user constraints."
+      }
+    },
+    {
+      "case_id": "recovery_rest_question",
+      "message": "오늘은 쉬어도 돼?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "recovery_rest_question",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "workout",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "workout",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": true,
+                  "confidence": 0.2
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is a workout plan.\nIf you want, tell me whether to proceed with this plan.\nI applied workout guidance and user constraints."
+      }
+    },
+    {
+      "case_id": "low_condition_statement",
+      "message": "컨디션이 별로야",
+      "expected_action": "casual",
+      "evaluation": {
+        "case_id": "low_condition_statement",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "casual",
+          "domain": "general",
+          "support_mode": "care",
+          "fallback_diagnosis": {
+            "state_action": "casual",
+            "state_domain": "general",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "못 한 게 문제가 아니라 다시 시작할 수 있게 부담을 줄이는 게 우선이에요.\n오늘 할 일은 하나만 고르세요. 너무 버거우면 쉬는 것도 계획의 일부로 둘게요."
+      }
+    },
+    {
+      "case_id": "fatigue_statement",
+      "message": "오늘 너무 피곤해",
+      "expected_action": "casual",
+      "evaluation": {
+        "case_id": "fatigue_statement",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "casual",
+          "domain": "general",
+          "support_mode": "care",
+          "fallback_diagnosis": {
+            "state_action": "casual",
+            "state_domain": "general",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "못 한 게 문제가 아니라 다시 시작할 수 있게 부담을 줄이는 게 우선이에요.\n오늘 할 일은 하나만 고르세요. 너무 버거우면 쉬는 것도 계획의 일부로 둘게요."
+      }
+    },
+    {
+      "case_id": "poor_sleep_statement",
+      "message": "잠을 못 잤어",
+      "expected_action": "casual",
+      "evaluation": {
+        "case_id": "poor_sleep_statement",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "casual",
+          "domain": "general",
+          "support_mode": "care",
+          "fallback_diagnosis": {
+            "state_action": "casual",
+            "state_domain": "general",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "못 한 게 문제가 아니라 다시 시작할 수 있게 부담을 줄이는 게 우선이에요.\n오늘 할 일은 하나만 고르세요. 너무 버거우면 쉬는 것도 계획의 일부로 둘게요."
+      }
+    },
+    {
+      "case_id": "appetite_spike_statement",
+      "message": "식욕이 폭발해서 망한 것 같아",
+      "expected_action": "casual",
+      "evaluation": {
+        "case_id": "appetite_spike_statement",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "casual",
+          "domain": "diet",
+          "support_mode": "care",
+          "fallback_diagnosis": {
+            "state_action": "casual",
+            "state_domain": "diet",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "못 한 게 문제가 아니라 다시 시작할 수 있게 부담을 줄이는 게 우선이에요.\n오늘 할 일은 하나만 고르세요. 너무 버거우면 쉬는 것도 계획의 일부로 둘게요."
+      }
+    },
+    {
+      "case_id": "meal_choice_question",
+      "message": "오늘 뭐 먹지?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "meal_choice_question",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "diet",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "diet",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is a workout plan.\nIf you want, tell me whether to proceed with this plan.\nI applied workout guidance and user constraints."
+      }
+    },
+    {
+      "case_id": "back_stiff_statement",
+      "message": "허리가 뻐근해",
+      "expected_action": "casual",
+      "evaluation": {
+        "case_id": "back_stiff_statement",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "casual",
+          "domain": "workout",
+          "support_mode": "care",
+          "fallback_diagnosis": {
+            "state_action": "casual",
+            "state_domain": "workout",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "못 한 게 문제가 아니라 다시 시작할 수 있게 부담을 줄이는 게 우선이에요.\n오늘 할 일은 하나만 고르세요. 너무 버거우면 쉬는 것도 계획의 일부로 둘게요."
+      }
+    },
+    {
+      "case_id": "muscle_soreness_question",
+      "message": "운동 후 근육통이 심한데 어떻게 해야 해?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "muscle_soreness_question",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "workout",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "workout",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is a workout plan.\nIf you want, tell me whether to proceed with this plan.\nI applied workout guidance and user constraints."
+      }
+    },
+    {
+      "case_id": "walking_allowed_question",
+      "message": "걷기 해도 될까?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "walking_allowed_question",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "workout",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "workout",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is a workout plan.\nIf you want, tell me whether to proceed with this plan.\nI applied workout guidance and user constraints."
+      }
+    },
+    {
+      "case_id": "water_amount_question",
+      "message": "물 얼마나 마셔야 해?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "water_amount_question",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "diet",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "diet",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is the main reason behind that recommendation.\nIf you want, I can explain the reasoning in more detail.\nI summarized the search evidence into the answer."
+      }
+    },
+    {
+      "case_id": "protein_amount_question",
+      "message": "단백질은 어느 정도 먹으면 좋아?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "protein_amount_question",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "diet",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "diet",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is a workout plan.\nIf you want, tell me whether to proceed with this plan.\nI applied workout guidance and user constraints."
+      }
+    },
+    {
+      "case_id": "stretching_only_question",
+      "message": "오늘 스트레칭만 해도 괜찮아?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "stretching_only_question",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "workout",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "workout",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is a workout plan.\nIf you want, tell me whether to proceed with this plan.\nI applied workout guidance and user constraints."
+      }
+    },
+    {
+      "case_id": "snack_allowed_question",
+      "message": "배고픈데 간식 먹어도 돼?",
+      "expected_action": "info",
+      "evaluation": {
+        "case_id": "snack_allowed_question",
+        "overall": 1.0,
+        "grade": "pass",
+        "scores": {
+          "not_fallback": 1.0,
+          "action": 1.0,
+          "domain": 1.0,
+          "support": 1.0,
+          "no_clarification_text": 1.0
+        },
+        "issues": [],
+        "signals": {
+          "action_intent": "info",
+          "domain": "diet",
+          "support_mode": "normal",
+          "fallback_diagnosis": {
+            "state_action": "info",
+            "state_domain": "diet",
+            "events": [
+              {
+                "stage": "context_resolver",
+                "status": "ok",
+                "title": "Context resolution completed",
+                "detail": {
+                  "resolved_reference": "none",
+                  "resolved_domain": "none",
+                  "ambiguous": false,
+                  "confidence": 0.0
+                }
+              }
+            ]
+          },
+          "quality_issues": []
+        },
+        "response_excerpt": "Here is a workout plan.\nIf you want, tell me whether to proceed with this plan.\nI applied workout guidance and user constraints."
+      }
+    }
+  ]
+}

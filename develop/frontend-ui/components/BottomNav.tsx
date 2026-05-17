@@ -3,9 +3,11 @@
 import { Home, MessageSquare, HeartPulse, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { usePlan } from '@/app/context/PlanContext';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { hasPlanUpdates } = usePlan();
   const hiddenRoutes = new Set(['/onboarding', '/login', '/signup']);
 
   // 인증/온보딩 페이지에서는 네비게이션 바 숨김
@@ -35,7 +37,15 @@ export default function BottomNav() {
                 {isActive && (
                   <span className="absolute -top-1 w-8 h-1 bg-[#2563eb] rounded-b-full shadow-[0_2px_8px_rgba(37,99,235,0.4)]" />
                 )}
-                <Icon className={`w-6 h-6 transition-all duration-300 ${isActive ? 'stroke-[2.5px] scale-110 drop-shadow-sm' : 'stroke-2'}`} />
+                <span className="relative">
+                  <Icon className={`w-6 h-6 transition-all duration-300 ${isActive ? 'stroke-[2.5px] scale-110 drop-shadow-sm' : 'stroke-2'}`} />
+                  {item.path === '/recommend' && hasPlanUpdates && (
+                    <span
+                      className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white"
+                      aria-label="변경된 플랜 있음"
+                    />
+                  )}
+                </span>
                 <span className={`text-[10px] font-bold tracking-wide ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
                   {item.name}
                 </span>

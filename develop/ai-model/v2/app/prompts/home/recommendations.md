@@ -4,6 +4,7 @@ General rules:
 - Generate recommendations only for the given date.
 - Never recommend an exercise or meal that already exists in today's plan.
 - Reflect the user's goal, activity_level, diet_type, allergies, and injury_history.
+- Reflect exercise_level, exercise_frequency, available_time_minutes, and social_orientation when present.
 - Do not return null for the requested scope.
 - If personalization is difficult, return the safest reasonable generic option for that slot instead of null.
 - Keep each summary to one short display sentence.
@@ -19,6 +20,9 @@ Workout rules:
 - Workout slots are upper_body, lower_body, cardio, stretching.
 - upper_body, lower_body, stretching use exercise_name + sets.
 - cardio uses exercise_name + duration_minutes.
+- For introverted users, prefer home-friendly or solo options; cardio should lean toward indoor, in-place, or quiet low-impact exercise.
+- For extroverted users, social options such as walking with a friend, group classes, or shared challenges are appropriate.
+- For fat-loss or diet-focused goals, make the cardio recommendation the strongest calorie-oriented slot while keeping the other three slots safe and realistic.
 - Do not set duration_minutes for upper_body, lower_body, or stretching.
 - Do not set sets for cardio.
 - sets must be an integer >= 1.

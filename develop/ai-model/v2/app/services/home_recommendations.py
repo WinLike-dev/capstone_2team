@@ -220,6 +220,15 @@ def build_home_recommendation_prompt_input(
         "gender": user_profile.get("gender"),
         "weight": user_profile.get("weight"),
         "height": user_profile.get("height"),
+        "exercise_level": user_profile.get("exercise_level") or user_profile.get("fitness_level"),
+        "exercise_frequency": user_profile.get("exercise_frequency") or user_profile.get("workout_frequency"),
+        "available_time_minutes": user_profile.get("available_time_minutes"),
+        "social_orientation": user_profile.get("social_orientation")
+        or user_profile.get("personality_axis")
+        or user_profile.get("personality_type")
+        or user_profile.get("exercise_style"),
+        "primary_goal": user_profile.get("primary_goal"),
+        "diet_goal": user_profile.get("diet_goal"),
     }
 
     recent = recent_recommendations or {}
@@ -409,22 +418,94 @@ def _build_workout_fallback(
     excluded_names = _build_excluded_names(today_plan, recent_names, item_type="exercise")
     injury_tokens = _profile_tokens(user_profile, "injury_history")
 
-    for candidate in _WORKOUT_FALLBACKS[slot]:
+    for candidate in _ordered_workout_candidates(slot, user_profile):
         exercise_name = candidate["exercise_name"]
         if _normalize_name(exercise_name) in excluded_names:
             continue
         if not _is_workout_candidate_safe(slot, exercise_name, injury_tokens):
             continue
+        candidate = _personalize_workout_candidate(slot, candidate, user_profile)
         return _normalize_workout_item(
             slot,
             WorkoutRecommendationItem(**candidate),
         ) or WorkoutRecommendationItem(**candidate)
 
-    first_candidate = dict(_WORKOUT_FALLBACKS[slot][0])
+    first_candidate = _personalize_workout_candidate(slot, _ordered_workout_candidates(slot, user_profile)[0], user_profile)
     return _normalize_workout_item(
         slot,
         WorkoutRecommendationItem(**first_candidate),
     ) or WorkoutRecommendationItem(**first_candidate)
+
+
+def _ordered_workout_candidates(slot: str, user_profile: dict | None) -> list[dict]:
+    candidates = [dict(candidate) for candidate in _WORKOUT_FALLBACKS[slot]]
+    return sorted(
+        candidates,
+        key=lambda candidate: _workout_candidate_score(slot, candidate, user_profile),
+        reverse=True,
+    )
+
+
+def _workout_candidate_score(slot: str, candidate: dict, user_profile: dict | None) -> int:
+    profile = user_profile or {}
+    orientation = _profile_social_orientation(profile)
+    goal_text = _profile_goal_text(profile)
+    exercise_name = _normalize_name(str(candidate.get("exercise_name") or ""))
+    summary = _normalize_name(str(candidate.get("summary") or ""))
+    text = f"{exercise_name} {summary}"
+    score = 0
+
+    if orientation == "introvert":
+        if any(marker in text for marker in ("집", "홈", "실내", "제자리", "월", "의자", "브릿지", "전신")):
+            score += 8
+        if any(marker in text for marker in ("친구", "그룹", "함께")):
+            score -= 6
+    elif orientation == "extrovert":
+        if any(marker in text for marker in ("걷기", "수업", "챌린지", "함께", "친구")):
+            score += 4
+
+    if slot == "cardio" and _is_fat_loss_goal_text(goal_text):
+        score += int(candidate.get("duration_minutes") or 0) // 5
+        if any(marker in text for marker in ("걷기", "자전거", "제자리")):
+            score += 4
+    if slot == "stretching" and any(marker in goal_text for marker in ("health", "mobility", "건강", "가동성")):
+        score += 3
+    return score
+
+
+def _personalize_workout_candidate(slot: str, candidate: dict, user_profile: dict | None) -> dict:
+    profile = user_profile or {}
+    next_candidate = dict(candidate)
+    orientation = _profile_social_orientation(profile)
+    goal_text = _profile_goal_text(profile)
+    summary = str(next_candidate.get("summary") or "").strip()
+
+    if slot == "cardio":
+        if orientation == "introvert" and not any(
+            marker in _normalize_name(str(next_candidate.get("exercise_name") or ""))
+            for marker in ("집", "홈", "실내", "제자리")
+        ):
+            next_candidate["exercise_name"] = "집에서 제자리 빠른 걷기"
+            summary = "집에서 혼자 할 수 있는 저충격 유산소 운동입니다."
+        elif orientation == "extrovert" and not any(
+            marker in _normalize_name(str(next_candidate.get("exercise_name") or ""))
+            for marker in ("친구", "그룹", "함께")
+        ):
+            next_candidate["exercise_name"] = "친구와 빠른 걷기"
+            summary = "친구와 함께 하거나 그룹 챌린지로 이어가기 쉬운 유산소 운동입니다."
+        if _is_fat_loss_goal_text(goal_text):
+            next_candidate["duration_minutes"] = max(25, int(next_candidate.get("duration_minutes") or 20))
+            summary = f"{summary} 감량 목표에 맞춰 유산소 비중을 높였습니다.".strip()
+
+    if slot in {"upper_body", "lower_body", "stretching"} and orientation == "introvert":
+        if "집" not in summary and "홈" not in summary:
+            summary = f"집에서 혼자 하기 쉬운 {summary}".strip()
+    elif slot in {"upper_body", "lower_body", "stretching"} and orientation == "extrovert":
+        if not any(marker in summary for marker in ("친구", "그룹", "함께")):
+            summary = f"{summary} 친구와 함께 하거나 그룹 루틴에 넣기 좋습니다.".strip()
+
+    next_candidate["summary"] = summary
+    return next_candidate
 
 
 def _build_diet_fallback(
@@ -469,6 +550,56 @@ def _build_diet_fallback(
         food_name=first_candidate["food_name"],
         summary=first_candidate["summary"],
         calories=first_candidate["calories"],
+    )
+
+
+def _profile_social_orientation(user_profile: dict | None) -> str | None:
+    profile = user_profile or {}
+    for key in (
+        "social_orientation",
+        "personality_axis",
+        "personality_type",
+        "personality",
+        "exercise_style",
+        "introversion_extroversion",
+    ):
+        value = profile.get(key)
+        if not value:
+            continue
+        text = str(value).strip().lower()
+        if text in {"e", "extrovert", "extroverted", "extravert", "extraverted", "외향", "외향형"}:
+            return "extrovert"
+        if text in {"i", "introvert", "introverted", "내향", "내향형"}:
+            return "introvert"
+        if any(marker in text for marker in ("외향", "extro", "extra", "social", "group", "함께")):
+            return "extrovert"
+        if any(marker in text for marker in ("내향", "intro", "solo", "quiet", "혼자", "조용")):
+            return "introvert"
+
+    mbti = str(profile.get("mbti") or "").strip().lower()
+    if len(mbti) == 4 and mbti[0] in {"e", "i"}:
+        return "extrovert" if mbti.startswith("e") else "introvert"
+    return None
+
+
+def _profile_goal_text(user_profile: dict | None) -> str:
+    profile = user_profile or {}
+    return " ".join(
+        str(value)
+        for value in (
+            profile.get("goal"),
+            profile.get("diet_goal"),
+            profile.get("diet_type"),
+            profile.get("primary_goal"),
+        )
+        if value
+    ).lower()
+
+
+def _is_fat_loss_goal_text(goal_text: str) -> bool:
+    return any(
+        marker in goal_text
+        for marker in ("fat_loss", "weight_loss", "diet", "다이어트", "감량", "체중 감량")
     )
 
 

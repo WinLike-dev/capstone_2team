@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -68,10 +69,16 @@ export type UserData = {
 };
 
 type CompletedTasksType = Record<string, { workouts: number[]; diets: number[] }>;
+type PlanItemKind = "workout" | "diet";
+type FetchPlansOptions = {
+  trackChanges?: boolean;
+};
 
 interface PlanContextType {
   plans: DailyPlan[];
   completedTasks: CompletedTasksType;
+  highlightedPlanItemIds: string[];
+  hasPlanUpdates: boolean;
   addWorkout: (dateStr: string, workout: WorkoutItem) => Promise<boolean>;
   replaceDiet: (
     dateStr: string,
@@ -81,14 +88,16 @@ interface PlanContextType {
   completeWorkout: (dateStr: string, idx: number) => Promise<void>;
   completeDiet: (dateStr: string, idx: number) => Promise<void>;
   getPlanByDate: (date: Date | string) => DailyPlan | null;
+  dismissPlanUpdate: (itemId: string) => void;
   userData: UserData | null;
   isUserLoading: boolean;
-  fetchPlans: () => Promise<void>;
+  fetchPlans: (options?: FetchPlansOptions) => Promise<void>;
   fetchUserProfile: () => Promise<void>;
   updateUserData: (data: Partial<UserData>) => void;
 }
 
 const PlanContext = createContext<PlanContextType | undefined>(undefined);
+const PLAN_UPDATE_STORAGE_KEY = "capstone.planUpdates.v1";
 
 const WORKOUT_COLORS = [
   "from-sky-400 to-blue-500",
@@ -171,7 +180,7 @@ function safeParseArray(value: unknown) {
       try {
         const parsed = JSON.parse(trimmed);
         return Array.isArray(parsed) ? parsed.map(String) : [];
-      } catch (error) {
+      } catch {
         return [];
       }
     }
@@ -192,6 +201,78 @@ function formatDateKey(date: Date | string) {
 function parseCalories(value: string) {
   const matched = value.match(/\d+/);
   return matched ? Number(matched[0]) : 0;
+}
+
+export function getPlanItemKey(
+  date: string,
+  kind: PlanItemKind,
+  item: WorkoutItem | DietItem,
+  index: number
+) {
+  const rawId = item.itemId || `${kind}-${index}`;
+  const label = kind === "workout" ? (item as WorkoutItem).title : (item as DietItem).name;
+  return `${date}:${kind}:${rawId}:${label}`;
+}
+
+function buildPlanItemSignature(item: WorkoutItem | DietItem, kind: PlanItemKind) {
+  if (kind === "workout") {
+    const workout = item as WorkoutItem;
+    return [
+      workout.title,
+      workout.time,
+      workout.level,
+      workout.calories,
+      workout.type,
+      workout.targetSets ?? "",
+      workout.durationMinutes ?? "",
+    ].join("|");
+  }
+
+  const diet = item as DietItem;
+  return [diet.type, diet.name, diet.desc, diet.kcal].join("|");
+}
+
+function flattenPlanItems(plans: DailyPlan[]) {
+  return plans.flatMap((plan) => [
+    ...plan.exercises.map((item, index) => ({
+      id: getPlanItemKey(plan.date, "workout", item, index),
+      signature: buildPlanItemSignature(item, "workout"),
+    })),
+    ...plan.diets.map((item, index) => ({
+      id: getPlanItemKey(plan.date, "diet", item, index),
+      signature: buildPlanItemSignature(item, "diet"),
+    })),
+  ]);
+}
+
+function getChangedPlanItemIds(previousPlans: DailyPlan[], nextPlans: DailyPlan[]) {
+  const previousMap = new Map(
+    flattenPlanItems(previousPlans).map((item) => [item.id, item.signature])
+  );
+
+  return flattenPlanItems(nextPlans)
+    .filter((item) => previousMap.get(item.id) !== item.signature)
+    .map((item) => item.id);
+}
+
+function getExistingPlanItemIdSet(plans: DailyPlan[]) {
+  return new Set(flattenPlanItems(plans).map((item) => item.id));
+}
+
+function readStoredPlanUpdates() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PLAN_UPDATE_STORAGE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredPlanUpdates(ids: string[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PLAN_UPDATE_STORAGE_KEY, JSON.stringify(ids));
 }
 
 function buildSummaryMealLabel(mealType?: string) {
@@ -299,8 +380,16 @@ function normalizeCalendarResponse(response: CalendarResponse) {
           lunch,
           dinner,
         },
-        exercises: exercises.map(({ completed, ...item }) => item),
-        diets: diets.map(({ completed, ...item }) => item),
+        exercises: exercises.map((item) => {
+          const itemWithoutCompleted = { ...item };
+          delete itemWithoutCompleted.completed;
+          return itemWithoutCompleted;
+        }),
+        diets: diets.map((item) => {
+          const itemWithoutCompleted = { ...item };
+          delete itemWithoutCompleted.completed;
+          return itemWithoutCompleted;
+        }),
       };
     });
 
@@ -313,16 +402,33 @@ function normalizeCalendarResponse(response: CalendarResponse) {
 export const PlanProvider = ({ children }: { children: ReactNode }) => {
   const [plans, setPlans] = useState<DailyPlan[]>([]);
   const [completedTasks, setCompletedTasks] = useState<CompletedTasksType>({});
+  const [highlightedPlanItemIds, setHighlightedPlanItemIds] = useState<string[]>(readStoredPlanUpdates);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
+  const plansRef = useRef<DailyPlan[]>([]);
 
-  const fetchPlans = useCallback(async () => {
+  const updateHighlightedPlanItemIds = useCallback(
+    (updater: string[] | ((previous: string[]) => string[])) => {
+      setHighlightedPlanItemIds((previous) => {
+        const rawNext =
+          typeof updater === "function" ? updater(previous) : updater;
+        const next = Array.from(new Set(rawNext));
+        writeStoredPlanUpdates(next);
+        return next;
+      });
+    },
+    []
+  );
+
+  const fetchPlans = useCallback(async (options?: FetchPlansOptions) => {
     if (typeof window === "undefined") return;
 
     const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
     if (!token) {
       setPlans([]);
+      plansRef.current = [];
       setCompletedTasks({});
+      updateHighlightedPlanItemIds([]);
       return;
     }
 
@@ -351,14 +457,27 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
 
       const data = (await response.json()) as CalendarResponse;
       const normalized = normalizeCalendarResponse(data);
+      const previousPlans = plansRef.current;
+      const existingIds = getExistingPlanItemIdSet(normalized.plans);
+
+      updateHighlightedPlanItemIds((previous) => {
+        const stillVisible = previous.filter((id) => existingIds.has(id));
+        if (!options?.trackChanges) return stillVisible;
+
+        const changedIds = getChangedPlanItemIds(previousPlans, normalized.plans);
+        return [...stillVisible, ...changedIds];
+      });
+
+      plansRef.current = normalized.plans;
       setPlans(normalized.plans);
       setCompletedTasks(normalized.completedTasks);
     } catch (error) {
       console.error("Failed to sync plans", error);
       setPlans([]);
+      plansRef.current = [];
       setCompletedTasks({});
     }
-  }, []);
+  }, [updateHighlightedPlanItemIds]);
 
   const fetchUserProfile = useCallback(async () => {
     setIsUserLoading(true);
@@ -515,7 +634,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
           throw new Error("Failed to add recommended exercise.");
         }
 
-        await fetchPlans();
+        await fetchPlans({ trackChanges: true });
         return true;
       } catch (error) {
         console.error("Failed to add recommended exercise", error);
@@ -551,7 +670,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
           throw new Error("Failed to replace recommended meal.");
         }
 
-        await fetchPlans();
+        await fetchPlans({ trackChanges: true });
         return true;
       } catch (error) {
         console.error("Failed to replace recommended meal", error);
@@ -574,11 +693,18 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
       value={{
         plans,
         completedTasks,
+        highlightedPlanItemIds,
+        hasPlanUpdates: highlightedPlanItemIds.length > 0,
         addWorkout,
         replaceDiet,
         completeWorkout,
         completeDiet,
         getPlanByDate,
+        dismissPlanUpdate: (itemId: string) => {
+          updateHighlightedPlanItemIds((previous) =>
+            previous.filter((id) => id !== itemId)
+          );
+        },
         userData,
         isUserLoading,
         fetchPlans,

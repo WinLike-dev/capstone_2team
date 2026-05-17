@@ -1,0 +1,1963 @@
+{
+  "runner": "test_workout_profile_goal_accuracy_suite.py",
+  "summary": {
+    "case_count": 9,
+    "overall_average": 1.0,
+    "pass_count": 9,
+    "review_count": 0,
+    "fail_count": 0,
+    "criterion_pass_rate": {
+      "constraint_fit": 1,
+      "four_category_coverage": 1,
+      "goal_marker_fit": 1,
+      "goal_priority": 1,
+      "home_cardio_duration_fit": 1,
+      "level_time_frequency_fit": 1,
+      "routed_to_workout_plan": 1,
+      "social_orientation_fit": 1
+    }
+  },
+  "cases": [
+    {
+      "case_id": "api_introvert_fat_loss_beginner",
+      "source": "chat_api",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "routed_to_workout_plan": true,
+        "four_category_coverage": true,
+        "goal_priority": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "level_time_frequency_fit": true,
+        "constraint_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {
+        "스트레칭": 3,
+        "유산소": 0,
+        "상체": 2,
+        "하체": 1
+      },
+      "plan_preview": [
+        {
+          "name": "유산소 - Cardio",
+          "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "집에서 제자리 빠른 걷기",
+              "duration_minutes": 15,
+              "calories": 90
+            }
+          ]
+        },
+        {
+          "name": "하체 - Lower Body Session",
+          "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Leg Press",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 80
+            },
+            {
+              "exercise_name": "Bridge",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 40
+            }
+          ]
+        },
+        {
+          "name": "상체 루틴",
+          "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "월 푸시업",
+              "sets": 2,
+              "calories": 55
+            },
+            {
+              "exercise_name": "밴드 로우",
+              "sets": 2,
+              "calories": 55
+            }
+          ]
+        },
+        {
+          "name": "스트레칭 루틴",
+          "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "전신 스트레칭",
+              "sets": 2,
+              "calories": 40
+            }
+          ]
+        }
+      ],
+      "response_debug": {
+        "trace_id": "b1d850f0ed03459db7b2583fe8486d38",
+        "search_results_count": 2,
+        "search_quality": "ok",
+        "action_intent": "create",
+        "domain": "workout",
+        "support_mode": "normal",
+        "draft_components": {
+          "core_message": "Here is a workout plan.",
+          "reason_points": [
+            "I prioritized sustainability and safety.",
+            "사용자 프로필(29세, 성별 female, 체중 73kg, 운동 수준 beginner, 목표 fat_loss, 가능 시간 20분, 운동 빈도 주 3회, 운동 성향 내향형, 생활패턴 퇴근 후 집에서만 운동 가능)에 맞춰 강도와 분량을 조정했어요.",
+            "다이어트/감량 목표와 내향형 성향을 함께 반영해 집에서 하는 유산소를 우선하고 스트레칭, 상체, 하체를 보조로 구성했어요."
+          ],
+          "suggested_action": "If you want, tell me whether to proceed with this plan.",
+          "plan_preview": "- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 집에서 제자리 빠른 걷기 15분\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\n- 2026-04-16 상체 루틴: 상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 월 푸시업 2세트, 밴드 로우 2세트\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 전신 스트레칭 2세트",
+          "safety_notes": [],
+          "approval_question": "Should I proceed with this workout plan?",
+          "search_grounding_summary": "I applied workout guidance and user constraints."
+        },
+        "proposed_plan_count": 4,
+        "proposed_plan": [
+          {
+            "name": "유산소 - Cardio",
+            "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "집에서 제자리 빠른 걷기",
+                "duration_minutes": 15,
+                "calories": 90
+              }
+            ]
+          },
+          {
+            "name": "하체 - Lower Body Session",
+            "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Leg Press",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 80
+              },
+              {
+                "exercise_name": "Bridge",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 40
+              }
+            ]
+          },
+          {
+            "name": "상체 루틴",
+            "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "월 푸시업",
+                "sets": 2,
+                "calories": 55
+              },
+              {
+                "exercise_name": "밴드 로우",
+                "sets": 2,
+                "calories": 55
+              }
+            ]
+          },
+          {
+            "name": "스트레칭 루틴",
+            "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "전신 스트레칭",
+                "sets": 2,
+                "calories": 40
+              }
+            ]
+          }
+        ],
+        "proposed_plan_type": "workout",
+        "proposed_plan_action": "create",
+        "awaiting_plan_confirmation": true,
+        "active_proposal": {
+          "domain": "workout",
+          "write_mode": "create",
+          "items": [
+            {
+              "name": "유산소 - Cardio",
+              "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "집에서 제자리 빠른 걷기",
+                  "duration_minutes": 15,
+                  "calories": 90
+                }
+              ]
+            },
+            {
+              "name": "하체 - Lower Body Session",
+              "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Leg Press",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 80
+                },
+                {
+                  "exercise_name": "Bridge",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 40
+                }
+              ]
+            },
+            {
+              "name": "상체 루틴",
+              "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "월 푸시업",
+                  "sets": 2,
+                  "calories": 55
+                },
+                {
+                  "exercise_name": "밴드 로우",
+                  "sets": 2,
+                  "calories": 55
+                }
+              ]
+            },
+            {
+              "name": "스트레칭 루틴",
+              "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "전신 스트레칭",
+                  "sets": 2,
+                  "calories": 40
+                }
+              ]
+            }
+          ],
+          "summary": "Here is a workout plan.",
+          "last_used_turn": 1
+        },
+        "recent_dialogue": {
+          "recent_turns": [
+            {
+              "turn_id": 1,
+              "user_text": "오늘 운동 계획 짜줘",
+              "assistant_text": "Here is a workout plan. - 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 집에서 제자리 빠른 걷기 15분 - 2026-04-16 하체 - Lower Body Session: Lower-impa…",
+              "user_summary": "오늘 운동 계획 짜줘",
+              "assistant_summary": "운동 생성안 제시",
+              "action_intent": "create",
+              "domain": "workout",
+              "support_mode": "normal",
+              "referenced_object": "none",
+              "state_effect": "proposal_created"
+            }
+          ]
+        },
+        "selected_ai_persona": "default",
+        "resolved_persona_id": "default",
+        "profile_sync_version": 0,
+        "intimacy_level": 1,
+        "user_profile_mbti": null
+      },
+      "response_text": "Here is a workout plan.\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 집에서 제자리 빠른 걷기 15분\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\n- 2026-04-16 상체 루틴: 상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 월 푸시업 2세트, 밴드 로우 2세트\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 전신 스트레칭 2세트\nIf you want, tell me whether to proceed with this plan.\nShould I proceed with this workout plan?\nI applied workout guidance and user constraints.",
+      "home_workout": null
+    },
+    {
+      "case_id": "api_extrovert_fat_loss_busy",
+      "source": "chat_api",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "routed_to_workout_plan": true,
+        "four_category_coverage": true,
+        "goal_priority": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "level_time_frequency_fit": true,
+        "constraint_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {
+        "스트레칭": 3,
+        "유산소": 0,
+        "상체": 2,
+        "하체": 1
+      },
+      "plan_preview": [
+        {
+          "name": "유산소 - Cardio",
+          "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Treadmill Walk",
+              "sets": null,
+              "duration_minutes": 18,
+              "calories": 90
+            }
+          ]
+        },
+        {
+          "name": "하체 - Lower Body Session",
+          "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Leg Press",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 80
+            },
+            {
+              "exercise_name": "Bridge",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 40
+            }
+          ]
+        },
+        {
+          "name": "상체 루틴",
+          "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "월 푸시업",
+              "sets": 2,
+              "calories": 55
+            },
+            {
+              "exercise_name": "밴드 로우",
+              "sets": 2,
+              "calories": 55
+            }
+          ]
+        },
+        {
+          "name": "스트레칭 루틴",
+          "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "전신 스트레칭",
+              "sets": 2,
+              "calories": 40
+            }
+          ]
+        }
+      ],
+      "response_debug": {
+        "trace_id": "8c865a5a95db4157b44bd863630eea02",
+        "search_results_count": 2,
+        "search_quality": "ok",
+        "action_intent": "create",
+        "domain": "workout",
+        "support_mode": "normal",
+        "draft_components": {
+          "core_message": "Here is a workout plan.",
+          "reason_points": [
+            "I prioritized sustainability and safety.",
+            "사용자 프로필(37세, 성별 male, 체중 86kg, 운동 수준 beginner, 목표 fat_loss, 가능 시간 18분, 운동 빈도 주 2회, 운동 성향 외향형, 생활패턴 야근이 잦아 짧게 운동)에 맞춰 강도와 분량을 조정했어요.",
+            "다이어트/감량 목표라 유산소를 우선하되 스트레칭, 상체, 하체를 모두 포함해 균형을 맞췄어요."
+          ],
+          "suggested_action": "If you want, tell me whether to proceed with this plan.",
+          "plan_preview": "- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소 / Treadmill Walk 18분\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\n- 2026-04-16 상체 루틴: 상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 월 푸시업 2세트, 밴드 로우 2세트\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 전신 스트레칭 2세트",
+          "safety_notes": [],
+          "approval_question": "Should I proceed with this workout plan?",
+          "search_grounding_summary": "I applied workout guidance and user constraints."
+        },
+        "proposed_plan_count": 4,
+        "proposed_plan": [
+          {
+            "name": "유산소 - Cardio",
+            "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Treadmill Walk",
+                "sets": null,
+                "duration_minutes": 18,
+                "calories": 90
+              }
+            ]
+          },
+          {
+            "name": "하체 - Lower Body Session",
+            "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Leg Press",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 80
+              },
+              {
+                "exercise_name": "Bridge",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 40
+              }
+            ]
+          },
+          {
+            "name": "상체 루틴",
+            "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "월 푸시업",
+                "sets": 2,
+                "calories": 55
+              },
+              {
+                "exercise_name": "밴드 로우",
+                "sets": 2,
+                "calories": 55
+              }
+            ]
+          },
+          {
+            "name": "스트레칭 루틴",
+            "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "전신 스트레칭",
+                "sets": 2,
+                "calories": 40
+              }
+            ]
+          }
+        ],
+        "proposed_plan_type": "workout",
+        "proposed_plan_action": "create",
+        "awaiting_plan_confirmation": true,
+        "active_proposal": {
+          "domain": "workout",
+          "write_mode": "create",
+          "items": [
+            {
+              "name": "유산소 - Cardio",
+              "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Treadmill Walk",
+                  "sets": null,
+                  "duration_minutes": 18,
+                  "calories": 90
+                }
+              ]
+            },
+            {
+              "name": "하체 - Lower Body Session",
+              "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Leg Press",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 80
+                },
+                {
+                  "exercise_name": "Bridge",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 40
+                }
+              ]
+            },
+            {
+              "name": "상체 루틴",
+              "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "월 푸시업",
+                  "sets": 2,
+                  "calories": 55
+                },
+                {
+                  "exercise_name": "밴드 로우",
+                  "sets": 2,
+                  "calories": 55
+                }
+              ]
+            },
+            {
+              "name": "스트레칭 루틴",
+              "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "전신 스트레칭",
+                  "sets": 2,
+                  "calories": 40
+                }
+              ]
+            }
+          ],
+          "summary": "Here is a workout plan.",
+          "last_used_turn": 1
+        },
+        "recent_dialogue": {
+          "recent_turns": [
+            {
+              "turn_id": 1,
+              "user_text": "오늘 운동 계획 짜줘",
+              "assistant_text": "Here is a workout plan. - 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소 / Treadmill Walk 18분 - 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자…",
+              "user_summary": "오늘 운동 계획 짜줘",
+              "assistant_summary": "운동 생성안 제시",
+              "action_intent": "create",
+              "domain": "workout",
+              "support_mode": "normal",
+              "referenced_object": "none",
+              "state_effect": "proposal_created"
+            }
+          ]
+        },
+        "selected_ai_persona": "default",
+        "resolved_persona_id": "default",
+        "profile_sync_version": 0,
+        "intimacy_level": 1,
+        "user_profile_mbti": null
+      },
+      "response_text": "Here is a workout plan.\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소 / Treadmill Walk 18분\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\n- 2026-04-16 상체 루틴: 상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 월 푸시업 2세트, 밴드 로우 2세트\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 18분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 전신 스트레칭 2세트\nIf you want, tell me whether to proceed with this plan.\nShould I proceed with this workout plan?\nI applied workout guidance and user constraints.",
+      "home_workout": null
+    },
+    {
+      "case_id": "api_introvert_muscle_advanced",
+      "source": "chat_api",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "routed_to_workout_plan": true,
+        "four_category_coverage": true,
+        "goal_priority": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "level_time_frequency_fit": true,
+        "constraint_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {
+        "스트레칭": 3,
+        "유산소": 2,
+        "상체": 0,
+        "하체": 1
+      },
+      "plan_preview": [
+        {
+          "name": "상체 루틴",
+          "detail": "상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "푸시업",
+              "sets": 3,
+              "calories": 55
+            },
+            {
+              "exercise_name": "덤벨 로우",
+              "sets": 3,
+              "calories": 55
+            }
+          ]
+        },
+        {
+          "name": "하체 - Lower Body Session",
+          "detail": "Lower-impact lower body routine / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Leg Press",
+              "sets": 3,
+              "duration_minutes": null,
+              "calories": 80
+            },
+            {
+              "exercise_name": "Bridge",
+              "sets": 3,
+              "duration_minutes": null,
+              "calories": 40
+            }
+          ]
+        },
+        {
+          "name": "유산소 - Cardio",
+          "detail": "Low-intensity walking / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "집에서 제자리 빠른 걷기",
+              "duration_minutes": 18,
+              "calories": 108
+            }
+          ]
+        },
+        {
+          "name": "스트레칭 루틴",
+          "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "전신 스트레칭",
+              "sets": 2,
+              "calories": 40
+            }
+          ]
+        }
+      ],
+      "response_debug": {
+        "trace_id": "42c84f8458a64db5aff18536105fcfeb",
+        "search_results_count": 2,
+        "search_quality": "ok",
+        "action_intent": "create",
+        "domain": "workout",
+        "support_mode": "normal",
+        "draft_components": {
+          "core_message": "Here is a workout plan.",
+          "reason_points": [
+            "I prioritized sustainability and safety.",
+            "사용자 프로필(32세, 성별 male, 체중 76kg, 운동 수준 advanced, 목표 muscle_gain, 가능 시간 45분, 운동 빈도 주 5회, 운동 성향 내향형, 생활패턴 홈짐에서 혼자 운동)에 맞춰 강도와 분량을 조정했어요.",
+            "내향형 성향을 반영해 스트레칭, 유산소, 상체, 하체를 혼자 하기 쉬운 홈트 중심으로 구성했어요."
+          ],
+          "suggested_action": "If you want, tell me whether to proceed with this plan.",
+          "plan_preview": "- 2026-04-16 상체 루틴: 상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도 / 푸시업 3세트, 덤벨 로우 3세트\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체 / Leg Press 3세트, Bridge 3세트\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 집에서 제자리 빠른 걷기 18분\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도 / 전신 스트레칭 2세트",
+          "safety_notes": [],
+          "approval_question": "Should I proceed with this workout plan?",
+          "search_grounding_summary": "I applied workout guidance and user constraints."
+        },
+        "proposed_plan_count": 4,
+        "proposed_plan": [
+          {
+            "name": "상체 루틴",
+            "detail": "상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "푸시업",
+                "sets": 3,
+                "calories": 55
+              },
+              {
+                "exercise_name": "덤벨 로우",
+                "sets": 3,
+                "calories": 55
+              }
+            ]
+          },
+          {
+            "name": "하체 - Lower Body Session",
+            "detail": "Lower-impact lower body routine / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Leg Press",
+                "sets": 3,
+                "duration_minutes": null,
+                "calories": 80
+              },
+              {
+                "exercise_name": "Bridge",
+                "sets": 3,
+                "duration_minutes": null,
+                "calories": 40
+              }
+            ]
+          },
+          {
+            "name": "유산소 - Cardio",
+            "detail": "Low-intensity walking / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "집에서 제자리 빠른 걷기",
+                "duration_minutes": 18,
+                "calories": 108
+              }
+            ]
+          },
+          {
+            "name": "스트레칭 루틴",
+            "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "전신 스트레칭",
+                "sets": 2,
+                "calories": 40
+              }
+            ]
+          }
+        ],
+        "proposed_plan_type": "workout",
+        "proposed_plan_action": "create",
+        "awaiting_plan_confirmation": true,
+        "active_proposal": {
+          "domain": "workout",
+          "write_mode": "create",
+          "items": [
+            {
+              "name": "상체 루틴",
+              "detail": "상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "푸시업",
+                  "sets": 3,
+                  "calories": 55
+                },
+                {
+                  "exercise_name": "덤벨 로우",
+                  "sets": 3,
+                  "calories": 55
+                }
+              ]
+            },
+            {
+              "name": "하체 - Lower Body Session",
+              "detail": "Lower-impact lower body routine / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Leg Press",
+                  "sets": 3,
+                  "duration_minutes": null,
+                  "calories": 80
+                },
+                {
+                  "exercise_name": "Bridge",
+                  "sets": 3,
+                  "duration_minutes": null,
+                  "calories": 40
+                }
+              ]
+            },
+            {
+              "name": "유산소 - Cardio",
+              "detail": "Low-intensity walking / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "집에서 제자리 빠른 걷기",
+                  "duration_minutes": 18,
+                  "calories": 108
+                }
+              ]
+            },
+            {
+              "name": "스트레칭 루틴",
+              "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "전신 스트레칭",
+                  "sets": 2,
+                  "calories": 40
+                }
+              ]
+            }
+          ],
+          "summary": "Here is a workout plan.",
+          "last_used_turn": 1
+        },
+        "recent_dialogue": {
+          "recent_turns": [
+            {
+              "turn_id": 1,
+              "user_text": "오늘 운동 계획 짜줘",
+              "assistant_text": "Here is a workout plan. - 2026-04-16 상체 루틴: 상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도 / 푸시업 3세트, 덤벨 로우 3세트 - 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표…",
+              "user_summary": "오늘 운동 계획 짜줘",
+              "assistant_summary": "운동 생성안 제시",
+              "action_intent": "create",
+              "domain": "workout",
+              "support_mode": "normal",
+              "referenced_object": "none",
+              "state_effect": "proposal_created"
+            }
+          ]
+        },
+        "selected_ai_persona": "default",
+        "resolved_persona_id": "default",
+        "profile_sync_version": 0,
+        "intimacy_level": 1,
+        "user_profile_mbti": null
+      },
+      "response_text": "Here is a workout plan.\n- 2026-04-16 상체 루틴: 상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도 / 푸시업 3세트, 덤벨 로우 3세트\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 하체 / Leg Press 3세트, Bridge 3세트\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 숙련자 기준으로 강도는 유지하되 회복 상태 확인 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 집에서 제자리 빠른 걷기 18분\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 45분 안에서 진행 / 주 5회 기준이라 세션별 부담을 나눠 진행 / 숙련자도 반복 가능한 기본 강도 / 전신 스트레칭 2세트\nIf you want, tell me whether to proceed with this plan.\nShould I proceed with this workout plan?\nI applied workout guidance and user constraints.",
+      "home_workout": null
+    },
+    {
+      "case_id": "api_extrovert_muscle_intermediate",
+      "source": "chat_api",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "routed_to_workout_plan": true,
+        "four_category_coverage": true,
+        "goal_priority": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "level_time_frequency_fit": true,
+        "constraint_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {
+        "스트레칭": 3,
+        "유산소": 2,
+        "상체": 0,
+        "하체": 1
+      },
+      "plan_preview": [
+        {
+          "name": "상체 루틴",
+          "detail": "상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "푸시업",
+              "sets": 3,
+              "calories": 55
+            },
+            {
+              "exercise_name": "밴드 로우",
+              "sets": 3,
+              "calories": 55
+            }
+          ]
+        },
+        {
+          "name": "하체 - Lower Body Session",
+          "detail": "Lower-impact lower body routine / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Leg Press",
+              "sets": 3,
+              "duration_minutes": null,
+              "calories": 80
+            },
+            {
+              "exercise_name": "Bridge",
+              "sets": 3,
+              "duration_minutes": null,
+              "calories": 40
+            }
+          ]
+        },
+        {
+          "name": "유산소 - Cardio",
+          "detail": "Low-intensity walking / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Treadmill Walk",
+              "sets": null,
+              "duration_minutes": 20,
+              "calories": 90
+            }
+          ]
+        },
+        {
+          "name": "스트레칭 루틴",
+          "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "전신 스트레칭",
+              "sets": 2,
+              "calories": 40
+            }
+          ]
+        }
+      ],
+      "response_debug": {
+        "trace_id": "ee0b2eb3029d468f965db32444b69ae6",
+        "search_results_count": 2,
+        "search_quality": "ok",
+        "action_intent": "create",
+        "domain": "workout",
+        "support_mode": "normal",
+        "draft_components": {
+          "core_message": "Here is a workout plan.",
+          "reason_points": [
+            "I prioritized sustainability and safety.",
+            "사용자 프로필(28세, 성별 female, 체중 61kg, 운동 수준 intermediate, 목표 strength, 가능 시간 40분, 운동 빈도 주 4회, 운동 성향 외향형, 생활패턴 동료와 헬스장 수업 선호)에 맞춰 강도와 분량을 조정했어요.",
+            "외향형 성향을 반영해 스트레칭, 유산소, 상체, 하체에 함께 하기 좋은 선택지를 섞었어요."
+          ],
+          "suggested_action": "If you want, tell me whether to proceed with this plan.",
+          "plan_preview": "- 2026-04-16 상체 루틴: 상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 푸시업 3세트, 밴드 로우 3세트\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체 / Leg Press 3세트, Bridge 3세트\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소 / Treadmill Walk 20분\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 전신 스트레칭 2세트",
+          "safety_notes": [],
+          "approval_question": "Should I proceed with this workout plan?",
+          "search_grounding_summary": "I applied workout guidance and user constraints."
+        },
+        "proposed_plan_count": 4,
+        "proposed_plan": [
+          {
+            "name": "상체 루틴",
+            "detail": "상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "푸시업",
+                "sets": 3,
+                "calories": 55
+              },
+              {
+                "exercise_name": "밴드 로우",
+                "sets": 3,
+                "calories": 55
+              }
+            ]
+          },
+          {
+            "name": "하체 - Lower Body Session",
+            "detail": "Lower-impact lower body routine / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Leg Press",
+                "sets": 3,
+                "duration_minutes": null,
+                "calories": 80
+              },
+              {
+                "exercise_name": "Bridge",
+                "sets": 3,
+                "duration_minutes": null,
+                "calories": 40
+              }
+            ]
+          },
+          {
+            "name": "유산소 - Cardio",
+            "detail": "Low-intensity walking / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Treadmill Walk",
+                "sets": null,
+                "duration_minutes": 20,
+                "calories": 90
+              }
+            ]
+          },
+          {
+            "name": "스트레칭 루틴",
+            "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "전신 스트레칭",
+                "sets": 2,
+                "calories": 40
+              }
+            ]
+          }
+        ],
+        "proposed_plan_type": "workout",
+        "proposed_plan_action": "create",
+        "awaiting_plan_confirmation": true,
+        "active_proposal": {
+          "domain": "workout",
+          "write_mode": "create",
+          "items": [
+            {
+              "name": "상체 루틴",
+              "detail": "상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "푸시업",
+                  "sets": 3,
+                  "calories": 55
+                },
+                {
+                  "exercise_name": "밴드 로우",
+                  "sets": 3,
+                  "calories": 55
+                }
+              ]
+            },
+            {
+              "name": "하체 - Lower Body Session",
+              "detail": "Lower-impact lower body routine / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Leg Press",
+                  "sets": 3,
+                  "duration_minutes": null,
+                  "calories": 80
+                },
+                {
+                  "exercise_name": "Bridge",
+                  "sets": 3,
+                  "duration_minutes": null,
+                  "calories": 40
+                }
+              ]
+            },
+            {
+              "name": "유산소 - Cardio",
+              "detail": "Low-intensity walking / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Treadmill Walk",
+                  "sets": null,
+                  "duration_minutes": 20,
+                  "calories": 90
+                }
+              ]
+            },
+            {
+              "name": "스트레칭 루틴",
+              "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "전신 스트레칭",
+                  "sets": 2,
+                  "calories": 40
+                }
+              ]
+            }
+          ],
+          "summary": "Here is a workout plan.",
+          "last_used_turn": 1
+        },
+        "recent_dialogue": {
+          "recent_turns": [
+            {
+              "turn_id": 1,
+              "user_text": "오늘 운동 계획 짜줘",
+              "assistant_text": "Here is a workout plan. - 2026-04-16 상체 루틴: 상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 푸시업 3세트, 밴드 로우 3세트 - 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와…",
+              "user_summary": "오늘 운동 계획 짜줘",
+              "assistant_summary": "운동 생성안 제시",
+              "action_intent": "create",
+              "domain": "workout",
+              "support_mode": "normal",
+              "referenced_object": "none",
+              "state_effect": "proposal_created"
+            }
+          ]
+        },
+        "selected_ai_persona": "default",
+        "resolved_persona_id": "default",
+        "profile_sync_version": 0,
+        "intimacy_level": 1,
+        "user_profile_mbti": null
+      },
+      "response_text": "Here is a workout plan.\n- 2026-04-16 상체 루틴: 상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 푸시업 3세트, 밴드 로우 3세트\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체 / Leg Press 3세트, Bridge 3세트\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 중급자 기준 기본 볼륨 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 근력/근육 증가 목표라 큰 근육 위주로 점진적 과부하 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소 / Treadmill Walk 20분\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 40분 안에서 진행 / 주 4회 루틴으로 반복 가능하게 구성 / 전신 스트레칭 2세트\nIf you want, tell me whether to proceed with this plan.\nShould I proceed with this workout plan?\nI applied workout guidance and user constraints.",
+      "home_workout": null
+    },
+    {
+      "case_id": "api_introvert_mobility_back_pain",
+      "source": "chat_api",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "routed_to_workout_plan": true,
+        "four_category_coverage": true,
+        "goal_priority": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "level_time_frequency_fit": true,
+        "constraint_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {
+        "스트레칭": 0,
+        "유산소": 1,
+        "상체": 3,
+        "하체": 2
+      },
+      "plan_preview": [
+        {
+          "name": "스트레칭 루틴",
+          "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "고양이-소 스트레칭",
+              "sets": 2,
+              "calories": 40
+            }
+          ]
+        },
+        {
+          "name": "유산소 - Cardio",
+          "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "실내 자전거",
+              "duration_minutes": 15,
+              "calories": 90
+            }
+          ]
+        },
+        {
+          "name": "하체 - Lower Body Session",
+          "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 하체",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Leg Press",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 80
+            },
+            {
+              "exercise_name": "Bridge",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 40
+            }
+          ]
+        },
+        {
+          "name": "상체 루틴",
+          "detail": "상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "월 푸시업",
+              "sets": 2,
+              "calories": 55
+            },
+            {
+              "exercise_name": "밴드 로우",
+              "sets": 2,
+              "calories": 55
+            }
+          ]
+        }
+      ],
+      "response_debug": {
+        "trace_id": "adf9bda8baec4d2dbfdf041f7716a39e",
+        "search_results_count": 2,
+        "search_quality": "ok",
+        "action_intent": "create",
+        "domain": "workout",
+        "support_mode": "normal",
+        "draft_components": {
+          "core_message": "Here is a workout plan.",
+          "reason_points": [
+            "I prioritized sustainability and safety.",
+            "사용자 프로필(46세, 성별 female, 체중 64kg, 운동 수준 beginner, 목표 mobility, 가능 시간 15분, 운동 빈도 주 3회, 운동 성향 내향형, 생활패턴 오래 앉아 일하고 조용한 홈트 선호)에 맞춰 강도와 분량을 조정했어요.",
+            "내향형 성향을 반영해 스트레칭, 유산소, 상체, 하체를 혼자 하기 쉬운 홈트 중심으로 구성했어요."
+          ],
+          "suggested_action": "If you want, tell me whether to proceed with this plan.",
+          "plan_preview": "- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려 / 고양이-소 스트레칭 2세트\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 실내 자전거 15분\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\n- 2026-04-16 상체 루틴: 상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려 / 월 푸시업 2세트, 밴드 로우 2세트",
+          "safety_notes": [
+            "lower back pain, 허리 관련 통증이 생기면 즉시 중단하고 강도를 낮추세요."
+          ],
+          "approval_question": "Should I proceed with this workout plan?",
+          "search_grounding_summary": "I applied workout guidance and user constraints. 운동 제약(lower back pain, 허리)을 반영해 위험 요소를 낮췄어요."
+        },
+        "proposed_plan_count": 4,
+        "proposed_plan": [
+          {
+            "name": "스트레칭 루틴",
+            "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "고양이-소 스트레칭",
+                "sets": 2,
+                "calories": 40
+              }
+            ]
+          },
+          {
+            "name": "유산소 - Cardio",
+            "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "실내 자전거",
+                "duration_minutes": 15,
+                "calories": 90
+              }
+            ]
+          },
+          {
+            "name": "하체 - Lower Body Session",
+            "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 하체",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Leg Press",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 80
+              },
+              {
+                "exercise_name": "Bridge",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 40
+              }
+            ]
+          },
+          {
+            "name": "상체 루틴",
+            "detail": "상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "월 푸시업",
+                "sets": 2,
+                "calories": 55
+              },
+              {
+                "exercise_name": "밴드 로우",
+                "sets": 2,
+                "calories": 55
+              }
+            ]
+          }
+        ],
+        "proposed_plan_type": "workout",
+        "proposed_plan_action": "create",
+        "awaiting_plan_confirmation": true,
+        "active_proposal": {
+          "domain": "workout",
+          "write_mode": "create",
+          "items": [
+            {
+              "name": "스트레칭 루틴",
+              "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "고양이-소 스트레칭",
+                  "sets": 2,
+                  "calories": 40
+                }
+              ]
+            },
+            {
+              "name": "유산소 - Cardio",
+              "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "실내 자전거",
+                  "duration_minutes": 15,
+                  "calories": 90
+                }
+              ]
+            },
+            {
+              "name": "하체 - Lower Body Session",
+              "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 하체",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Leg Press",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 80
+                },
+                {
+                  "exercise_name": "Bridge",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 40
+                }
+              ]
+            },
+            {
+              "name": "상체 루틴",
+              "detail": "상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "월 푸시업",
+                  "sets": 2,
+                  "calories": 55
+                },
+                {
+                  "exercise_name": "밴드 로우",
+                  "sets": 2,
+                  "calories": 55
+                }
+              ]
+            }
+          ],
+          "summary": "Here is a workout plan.",
+          "last_used_turn": 1
+        },
+        "recent_dialogue": {
+          "recent_turns": [
+            {
+              "turn_id": 1,
+              "user_text": "오늘 운동 계획 짜줘",
+              "assistant_text": "Here is a workout plan. - 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려 / 고양이-소 스트레칭 2세트 - 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담…",
+              "user_summary": "오늘 운동 계획 짜줘",
+              "assistant_summary": "운동 생성안 제시",
+              "action_intent": "create",
+              "domain": "workout",
+              "support_mode": "normal",
+              "referenced_object": "none",
+              "state_effect": "proposal_created"
+            }
+          ]
+        },
+        "selected_ai_persona": "default",
+        "resolved_persona_id": "default",
+        "profile_sync_version": 0,
+        "intimacy_level": 1,
+        "user_profile_mbti": null
+      },
+      "response_text": "Here is a workout plan.\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려 / 고양이-소 스트레칭 2세트\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 실내 자전거 15분\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 건강/가동성 목표라 관절 부담을 낮춘 가동성, 균형, 저강도 유산소 중심 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 제약(lower back pain, 허리) 고려 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\n- 2026-04-16 상체 루틴: 상체 축 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 15분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(lower back pain, 허리) 고려 / 월 푸시업 2세트, 밴드 로우 2세트\nIf you want, tell me whether to proceed with this plan.\nShould I proceed with this workout plan?\nI applied workout guidance and user constraints.\n운동 제약(lower back pain, 허리)을 반영해 위험 요소를 낮췄어요.\nlower back pain, 허리 관련 통증이 생기면 즉시 중단하고 강도를 낮추세요.",
+      "home_workout": null
+    },
+    {
+      "case_id": "api_extrovert_consistency_beginner",
+      "source": "chat_api",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "routed_to_workout_plan": true,
+        "four_category_coverage": true,
+        "goal_priority": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "level_time_frequency_fit": true,
+        "constraint_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {
+        "스트레칭": 0,
+        "유산소": 1,
+        "상체": 2,
+        "하체": 3
+      },
+      "plan_preview": [
+        {
+          "name": "스트레칭 루틴",
+          "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "전신 스트레칭",
+              "sets": 2,
+              "calories": 40
+            }
+          ]
+        },
+        {
+          "name": "유산소 - Cardio",
+          "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Treadmill Walk",
+              "sets": null,
+              "duration_minutes": 15,
+              "calories": 90
+            }
+          ]
+        },
+        {
+          "name": "상체 루틴",
+          "detail": "상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "월 푸시업",
+              "sets": 2,
+              "calories": 55
+            },
+            {
+              "exercise_name": "밴드 로우",
+              "sets": 2,
+              "calories": 55
+            }
+          ]
+        },
+        {
+          "name": "하체 - Lower Body Session",
+          "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Leg Press",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 80
+            },
+            {
+              "exercise_name": "Bridge",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 40
+            }
+          ]
+        }
+      ],
+      "response_debug": {
+        "trace_id": "0c1fc6b4745e44e18e2314d222443349",
+        "search_results_count": 2,
+        "search_quality": "ok",
+        "action_intent": "create",
+        "domain": "workout",
+        "support_mode": "normal",
+        "draft_components": {
+          "core_message": "Here is a workout plan.",
+          "reason_points": [
+            "I prioritized sustainability and safety.",
+            "사용자 프로필(41세, 성별 male, 체중 79kg, 운동 수준 beginner, 목표 consistency, 가능 시간 15분, 운동 빈도 주 2회, 운동 성향 외향형, 생활패턴 운동 실패 경험이 많아 낮은 부담 선호)에 맞춰 강도와 분량을 조정했어요.",
+            "외향형 성향을 반영해 스트레칭, 유산소, 상체, 하체에 함께 하기 좋은 선택지를 섞었어요."
+          ],
+          "suggested_action": "If you want, tell me whether to proceed with this plan.",
+          "plan_preview": "- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 전신 스트레칭 2세트\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소 / Treadmill Walk 15분\n- 2026-04-16 상체 루틴: 상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 월 푸시업 2세트, 밴드 로우 2세트\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트",
+          "safety_notes": [],
+          "approval_question": "Should I proceed with this workout plan?",
+          "search_grounding_summary": "I applied workout guidance and user constraints."
+        },
+        "proposed_plan_count": 4,
+        "proposed_plan": [
+          {
+            "name": "스트레칭 루틴",
+            "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "전신 스트레칭",
+                "sets": 2,
+                "calories": 40
+              }
+            ]
+          },
+          {
+            "name": "유산소 - Cardio",
+            "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Treadmill Walk",
+                "sets": null,
+                "duration_minutes": 15,
+                "calories": 90
+              }
+            ]
+          },
+          {
+            "name": "상체 루틴",
+            "detail": "상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "월 푸시업",
+                "sets": 2,
+                "calories": 55
+              },
+              {
+                "exercise_name": "밴드 로우",
+                "sets": 2,
+                "calories": 55
+              }
+            ]
+          },
+          {
+            "name": "하체 - Lower Body Session",
+            "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Leg Press",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 80
+              },
+              {
+                "exercise_name": "Bridge",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 40
+              }
+            ]
+          }
+        ],
+        "proposed_plan_type": "workout",
+        "proposed_plan_action": "create",
+        "awaiting_plan_confirmation": true,
+        "active_proposal": {
+          "domain": "workout",
+          "write_mode": "create",
+          "items": [
+            {
+              "name": "스트레칭 루틴",
+              "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "전신 스트레칭",
+                  "sets": 2,
+                  "calories": 40
+                }
+              ]
+            },
+            {
+              "name": "유산소 - Cardio",
+              "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Treadmill Walk",
+                  "sets": null,
+                  "duration_minutes": 15,
+                  "calories": 90
+                }
+              ]
+            },
+            {
+              "name": "상체 루틴",
+              "detail": "상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "월 푸시업",
+                  "sets": 2,
+                  "calories": 55
+                },
+                {
+                  "exercise_name": "밴드 로우",
+                  "sets": 2,
+                  "calories": 55
+                }
+              ]
+            },
+            {
+              "name": "하체 - Lower Body Session",
+              "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Leg Press",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 80
+                },
+                {
+                  "exercise_name": "Bridge",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 40
+                }
+              ]
+            }
+          ],
+          "summary": "Here is a workout plan.",
+          "last_used_turn": 1
+        },
+        "recent_dialogue": {
+          "recent_turns": [
+            {
+              "turn_id": 1,
+              "user_text": "오늘 운동 계획 짜줘",
+              "assistant_text": "Here is a workout plan. - 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 전신 스트레칭 2세트 - 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친…",
+              "user_summary": "오늘 운동 계획 짜줘",
+              "assistant_summary": "운동 생성안 제시",
+              "action_intent": "create",
+              "domain": "workout",
+              "support_mode": "normal",
+              "referenced_object": "none",
+              "state_effect": "proposal_created"
+            }
+          ]
+        },
+        "selected_ai_persona": "default",
+        "resolved_persona_id": "default",
+        "profile_sync_version": 0,
+        "intimacy_level": 1,
+        "user_profile_mbti": null
+      },
+      "response_text": "Here is a workout plan.\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 전신 스트레칭 2세트\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 유산소 / Treadmill Walk 15분\n- 2026-04-16 상체 루틴: 상체 축 / 외향형 성향에 맞춰 함께 하기 쉬운 선택지 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 저강도 / 월 푸시업 2세트, 밴드 로우 2세트\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 15분 안에서 진행 / 주 2회 기준으로 회복일을 충분히 남김 / 지속성 목표라 실패해도 이어갈 수 있는 낮은 기준 / 외향형 성향이라 그룹 수업, 친구와 걷기, 함께 하는 챌린지 중 하나를 선택지로 둠 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\nIf you want, tell me whether to proceed with this plan.\nShould I proceed with this workout plan?\nI applied workout guidance and user constraints.",
+      "home_workout": null
+    },
+    {
+      "case_id": "api_introvert_knee_fat_loss",
+      "source": "chat_api",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "routed_to_workout_plan": true,
+        "four_category_coverage": true,
+        "goal_priority": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "level_time_frequency_fit": true,
+        "constraint_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {
+        "스트레칭": 3,
+        "유산소": 0,
+        "상체": 2,
+        "하체": 1
+      },
+      "plan_preview": [
+        {
+          "name": "유산소 - Cardio",
+          "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "실내 자전거",
+              "duration_minutes": 15,
+              "calories": 90
+            }
+          ]
+        },
+        {
+          "name": "하체 - Lower Body Session",
+          "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 하체",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "Leg Press",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 80
+            },
+            {
+              "exercise_name": "Bridge",
+              "sets": 2,
+              "duration_minutes": null,
+              "calories": 40
+            }
+          ]
+        },
+        {
+          "name": "상체 루틴",
+          "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "월 푸시업",
+              "sets": 2,
+              "calories": 55
+            },
+            {
+              "exercise_name": "밴드 로우",
+              "sets": 2,
+              "calories": 55
+            }
+          ]
+        },
+        {
+          "name": "스트레칭 루틴",
+          "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려",
+          "day": "2026-04-16",
+          "ex_list": [
+            {
+              "exercise_name": "전신 스트레칭",
+              "sets": 2,
+              "calories": 40
+            }
+          ]
+        }
+      ],
+      "response_debug": {
+        "trace_id": "240779a502fd4a71b41ce4d7730f59f4",
+        "search_results_count": 2,
+        "search_quality": "ok",
+        "action_intent": "create",
+        "domain": "workout",
+        "support_mode": "normal",
+        "draft_components": {
+          "core_message": "Here is a workout plan.",
+          "reason_points": [
+            "I prioritized sustainability and safety.",
+            "사용자 프로필(52세, 성별 female, 체중 92kg, 운동 수준 beginner, 목표 weight_loss, 가능 시간 20분, 운동 빈도 주 3회, 운동 성향 내향형, 생활패턴 헬스장보다 집에서 운동)에 맞춰 강도와 분량을 조정했어요.",
+            "다이어트/감량 목표와 내향형 성향을 함께 반영해 집에서 하는 유산소를 우선하고 스트레칭, 상체, 하체를 보조로 구성했어요."
+          ],
+          "suggested_action": "If you want, tell me whether to proceed with this plan.",
+          "plan_preview": "- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 실내 자전거 15분\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\n- 2026-04-16 상체 루틴: 상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려 / 월 푸시업 2세트, 밴드 로우 2세트\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려 / 전신 스트레칭 2세트",
+          "safety_notes": [
+            "knee osteoarthritis, 무릎 관련 통증이 생기면 즉시 중단하고 강도를 낮추세요."
+          ],
+          "approval_question": "Should I proceed with this workout plan?",
+          "search_grounding_summary": "I applied workout guidance and user constraints. 운동 제약(knee osteoarthritis, 무릎)을 반영해 위험 요소를 낮췄어요."
+        },
+        "proposed_plan_count": 4,
+        "proposed_plan": [
+          {
+            "name": "유산소 - Cardio",
+            "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "실내 자전거",
+                "duration_minutes": 15,
+                "calories": 90
+              }
+            ]
+          },
+          {
+            "name": "하체 - Lower Body Session",
+            "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 하체",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "Leg Press",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 80
+              },
+              {
+                "exercise_name": "Bridge",
+                "sets": 2,
+                "duration_minutes": null,
+                "calories": 40
+              }
+            ]
+          },
+          {
+            "name": "상체 루틴",
+            "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "월 푸시업",
+                "sets": 2,
+                "calories": 55
+              },
+              {
+                "exercise_name": "밴드 로우",
+                "sets": 2,
+                "calories": 55
+              }
+            ]
+          },
+          {
+            "name": "스트레칭 루틴",
+            "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려",
+            "day": "2026-04-16",
+            "ex_list": [
+              {
+                "exercise_name": "전신 스트레칭",
+                "sets": 2,
+                "calories": 40
+              }
+            ]
+          }
+        ],
+        "proposed_plan_type": "workout",
+        "proposed_plan_action": "create",
+        "awaiting_plan_confirmation": true,
+        "active_proposal": {
+          "domain": "workout",
+          "write_mode": "create",
+          "items": [
+            {
+              "name": "유산소 - Cardio",
+              "detail": "Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "실내 자전거",
+                  "duration_minutes": 15,
+                  "calories": 90
+                }
+              ]
+            },
+            {
+              "name": "하체 - Lower Body Session",
+              "detail": "Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 하체",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "Leg Press",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 80
+                },
+                {
+                  "exercise_name": "Bridge",
+                  "sets": 2,
+                  "duration_minutes": null,
+                  "calories": 40
+                }
+              ]
+            },
+            {
+              "name": "상체 루틴",
+              "detail": "상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "월 푸시업",
+                  "sets": 2,
+                  "calories": 55
+                },
+                {
+                  "exercise_name": "밴드 로우",
+                  "sets": 2,
+                  "calories": 55
+                }
+              ]
+            },
+            {
+              "name": "스트레칭 루틴",
+              "detail": "스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려",
+              "day": "2026-04-16",
+              "ex_list": [
+                {
+                  "exercise_name": "전신 스트레칭",
+                  "sets": 2,
+                  "calories": 40
+                }
+              ]
+            }
+          ],
+          "summary": "Here is a workout plan.",
+          "last_used_turn": 1
+        },
+        "recent_dialogue": {
+          "recent_turns": [
+            {
+              "turn_id": 1,
+              "user_text": "오늘 운동 계획 짜줘",
+              "assistant_text": "Here is a workout plan. - 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로…",
+              "user_summary": "오늘 운동 계획 짜줘",
+              "assistant_summary": "운동 생성안 제시",
+              "action_intent": "create",
+              "domain": "workout",
+              "support_mode": "normal",
+              "referenced_object": "none",
+              "state_effect": "proposal_created"
+            }
+          ]
+        },
+        "selected_ai_persona": "default",
+        "resolved_persona_id": "default",
+        "profile_sync_version": 0,
+        "intimacy_level": 1,
+        "user_profile_mbti": null
+      },
+      "response_text": "Here is a workout plan.\n- 2026-04-16 유산소 - Cardio: Low-intensity walking / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 유산소 / 내향형 감량 목표에 맞춰 집에서 가능한 유산소로 보정 / 실내 자전거 15분\n- 2026-04-16 하체 - Lower Body Session: Lower-impact lower body routine / 초보자 기준 저강도 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 다이어트/감량 목표라 저충격 유산소와 전신 근력 조합 / 내향형 성향이라 혼자 조용히 할 수 있는 홈트, 고정 루틴, 이어폰 걷기 중심 / 체중 부담을 고려해 점프보다 저충격 유산소와 안정적인 근력 중심 / 제약(knee osteoarthritis, 무릎) 고려 / 운동 종류: 하체 / Leg Press 2세트, Bridge 2세트\n- 2026-04-16 상체 루틴: 상체 축 / 감량 중 근손실 방지를 위한 보조 근력 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려 / 월 푸시업 2세트, 밴드 로우 2세트\n- 2026-04-16 스트레칭 루틴: 스트레칭 축 / 부상 예방과 회복을 위한 준비/마무리 / 내향형 성향에 맞춘 집에서 혼자 가능한 구성 / 가능 시간 20분 안에서 진행 / 주 3회 루틴으로 반복 가능하게 구성 / 저강도 / 제약(knee osteoarthritis, 무릎) 고려 / 전신 스트레칭 2세트\nIf you want, tell me whether to proceed with this plan.\nShould I proceed with this workout plan?\nI applied workout guidance and user constraints.\n운동 제약(knee osteoarthritis, 무릎)을 반영해 위험 요소를 낮췄어요.\nknee osteoarthritis, 무릎 관련 통증이 생기면 즉시 중단하고 강도를 낮추세요.",
+      "home_workout": null
+    },
+    {
+      "case_id": "home_introvert_fat_loss",
+      "source": "home_service",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "four_category_coverage": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "home_cardio_duration_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {},
+      "plan_preview": [],
+      "response_debug": null,
+      "response_text": null,
+      "home_workout": {
+        "upper_body": {
+          "exercise_name": "월 푸시업",
+          "summary": "집에서 혼자 하기 쉬운 강도를 낮춘 가벼운 상체 운동입니다.",
+          "sets": 3,
+          "duration_minutes": null,
+          "calories": 90
+        },
+        "lower_body": {
+          "exercise_name": "글루트 브릿지",
+          "summary": "집에서 혼자 하기 쉬운 무릎 부담을 줄이며 둔근을 쓰는 하체 운동입니다.",
+          "sets": 3,
+          "duration_minutes": null,
+          "calories": 100
+        },
+        "cardio": {
+          "exercise_name": "실내 자전거",
+          "summary": "관절 부담을 줄인 유산소 운동입니다. 감량 목표에 맞춰 유산소 비중을 높였습니다.",
+          "sets": null,
+          "duration_minutes": 25,
+          "calories": 170
+        },
+        "stretching": {
+          "exercise_name": "전신 스트레칭",
+          "summary": "집에서 혼자 하기 쉬운 온몸을 가볍게 풀어주는 회복 루틴입니다.",
+          "sets": 2,
+          "duration_minutes": null,
+          "calories": 50
+        }
+      }
+    },
+    {
+      "case_id": "home_extrovert_fat_loss",
+      "source": "home_service",
+      "score": 1.0,
+      "grade": "pass",
+      "checks": {
+        "four_category_coverage": true,
+        "social_orientation_fit": true,
+        "goal_marker_fit": true,
+        "home_cardio_duration_fit": true
+      },
+      "failed_checks": [],
+      "category_positions": {},
+      "plan_preview": [],
+      "response_debug": null,
+      "response_text": null,
+      "home_workout": {
+        "upper_body": {
+          "exercise_name": "푸시업",
+          "summary": "상체를 안정적으로 자극하는 기본 운동입니다. 친구와 함께 하거나 그룹 루틴에 넣기 좋습니다.",
+          "sets": 3,
+          "duration_minutes": null,
+          "calories": 120
+        },
+        "lower_body": {
+          "exercise_name": "스쿼트",
+          "summary": "하체 전반을 고르게 쓰는 기본 운동입니다. 친구와 함께 하거나 그룹 루틴에 넣기 좋습니다.",
+          "sets": 3,
+          "duration_minutes": null,
+          "calories": 140
+        },
+        "cardio": {
+          "exercise_name": "친구와 빠른 걷기",
+          "summary": "친구와 함께 하거나 그룹 챌린지로 이어가기 쉬운 유산소 운동입니다. 감량 목표에 맞춰 유산소 비중을 높였습니다.",
+          "sets": null,
+          "duration_minutes": 25,
+          "calories": 160
+        },
+        "stretching": {
+          "exercise_name": "전신 스트레칭",
+          "summary": "온몸을 가볍게 풀어주는 회복 루틴입니다. 친구와 함께 하거나 그룹 루틴에 넣기 좋습니다.",
+          "sets": 2,
+          "duration_minutes": null,
+          "calories": 50
+        }
+      }
+    }
+  ]
+}

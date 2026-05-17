@@ -132,6 +132,14 @@ def evaluate_trace_quality(trace: dict[str, Any]) -> dict[str, Any]:
             message="Response contains fallback or error-like wording.",
             penalty=0.18,
         )
+    if action_intent == "fallback":
+        _issue(
+            issues,
+            severity="warning",
+            code="fallback_intent_selected",
+            message="Intent routing selected fallback clarification.",
+            penalty=0.22,
+        )
 
     if search_quality == "degraded":
         _issue(
@@ -264,6 +272,85 @@ def record_quality_for_trace(trace_store: TraceStore, trace_id: str) -> dict[str
     return quality
 
 
+def _node_event_summary(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    summary: list[dict[str, Any]] = []
+    for event in trace.get("events") or []:
+        detail = event.get("detail") or {}
+        compact_detail = {
+            key: value
+            for key, value in detail.items()
+            if key
+            in {
+                "reason",
+                "raw_intent",
+                "coerced_intent",
+                "confidence",
+                "fallback_reason",
+                "resolved_reference",
+                "resolved_domain",
+                "ambiguous",
+                "targets",
+            }
+        }
+        if "signals" in detail:
+            signals = detail.get("signals") or {}
+            compact_detail["signals"] = {
+                key: signals.get(key)
+                for key in (
+                    "inferred_domain",
+                    "resolved_reference",
+                    "resolved_domain",
+                    "context_ambiguous",
+                    "safety_match",
+                    "care_match",
+                    "health_context_match",
+                    "offtopic_match",
+                    "question_followup_match",
+                    "plan_request_match",
+                    "info_request_match",
+                    "modify_request_match",
+                    "profile_record_match",
+                    "memory_query_match",
+                    "has_question_mark",
+                )
+                if key in signals
+            }
+        summary.append(
+            {
+                "stage": event.get("stage"),
+                "status": event.get("status"),
+                "title": event.get("title"),
+                "detail": compact_detail,
+                "duration_ms": event.get("duration_ms"),
+            }
+        )
+    return summary
+
+
+def _fallback_diagnosis(trace: dict[str, Any]) -> dict[str, Any] | None:
+    state_summary = trace.get("state_summary") or {}
+    if state_summary.get("action_intent") != "fallback" and not any(
+        event.get("stage") == "fallback" for event in trace.get("events") or []
+    ):
+        return None
+
+    diagnosis = {
+        "action_intent": state_summary.get("action_intent"),
+        "domain": state_summary.get("domain"),
+        "reason": "unknown",
+        "intent_signals": {},
+    }
+    for event in trace.get("events") or []:
+        if event.get("stage") == "intent" and event.get("title") in {
+            "Intent fallback selected",
+            "LLM intent decision",
+        }:
+            detail = event.get("detail") or {}
+            diagnosis["reason"] = detail.get("reason") or detail.get("fallback_reason") or diagnosis["reason"]
+            diagnosis["intent_signals"] = detail.get("signals") or diagnosis["intent_signals"]
+    return diagnosis
+
+
 @dataclass(frozen=True)
 class LangSmithQualityExporter:
     enabled: bool
@@ -357,6 +444,8 @@ class LangSmithQualityExporter:
         outputs = {
             "status": trace.get("status"),
             "state_summary": trace.get("state_summary") or {},
+            "node_events": _node_event_summary(trace),
+            "fallback_diagnosis": _fallback_diagnosis(trace),
             "response_length": len(response_text),
             "quality": quality,
         }

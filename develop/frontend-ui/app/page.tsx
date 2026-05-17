@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, CheckSquare, Plus, Trash2, X, Droplets, Utensils, Activity, RefreshCw, Heart, Info, Dumbbell, PersonStanding } from 'lucide-react';
+import { ArrowRight, Calendar, CheckCircle2, CheckSquare, Plus, Trash2, X, Droplets, Utensils, Activity, RefreshCw, Heart, Info, Dumbbell, PersonStanding } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePlan } from './context/PlanContext';
 import { formatKstDate, formatKstDisplayDate } from '@/lib/date';
@@ -76,6 +76,28 @@ type DietPopupState = {
 };
 
 type RequestedRecommendationScope = Exclude<RecommendationScope, 'all'>;
+type HomeRecommendationHighlightId = `workout:${WorkoutSlot}` | `diet:${DietSlot}`;
+type PlanSyncToastState = {
+  isOpen: boolean;
+  title: string;
+  message: string;
+};
+
+const getWorkoutRecommendationHighlightId = (
+  slot: WorkoutSlot
+): HomeRecommendationHighlightId => `workout:${slot}`;
+
+const getDietRecommendationHighlightId = (
+  mealType: DietSlot
+): HomeRecommendationHighlightId => `diet:${mealType}`;
+
+const isRecommendationHighlightInScope = (
+  id: HomeRecommendationHighlightId,
+  scope: RecommendationScope
+) => {
+  if (scope === 'all') return true;
+  return id.startsWith(`${scope}:`);
+};
 
 const getFoodEmoji = (name: string) => {
   if (name.includes('샐러드') || name.includes('야채')) return '🥗';
@@ -402,6 +424,13 @@ export default function Home() {
     workout: false,
     diet: false,
   });
+  const [highlightedRecommendationIds, setHighlightedRecommendationIds] =
+    useState<HomeRecommendationHighlightId[]>([]);
+  const [planSyncToast, setPlanSyncToast] = useState<PlanSyncToastState>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
 
   const [workoutPopup, setWorkoutPopup] = useState<WorkoutPopupState>({ isOpen: false, target: null });
   const [dietPopup, setDietPopup] = useState<DietPopupState>({ isOpen: false, target: null, mealType: null });
@@ -412,6 +441,7 @@ export default function Home() {
   const isMountedRef = useRef(false);
   const isLeavingHomeRef = useRef(false);
   const recommendationAbortControllersRef = useRef<Set<AbortController>>(new Set());
+  const planSyncToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistNutritionSnapshot = (
     nextTargets = targets,
@@ -458,6 +488,72 @@ export default function Home() {
     };
   }, []);
 
+  const markRecommendationHighlighted = useCallback(
+    (id: HomeRecommendationHighlightId) => {
+      setHighlightedRecommendationIds((previous) =>
+        previous.includes(id) ? previous : [...previous, id]
+      );
+    },
+    []
+  );
+
+  const dismissRecommendationHighlight = useCallback(
+    (id: HomeRecommendationHighlightId) => {
+      setHighlightedRecommendationIds((previous) =>
+        previous.includes(id)
+          ? previous.filter((highlightId) => highlightId !== id)
+          : previous
+      );
+    },
+    []
+  );
+
+  const clearRecommendationHighlightsForScope = useCallback(
+    (scope: RecommendationScope) => {
+      setHighlightedRecommendationIds((previous) =>
+        previous.filter((id) => !isRecommendationHighlightInScope(id, scope))
+      );
+    },
+    []
+  );
+
+  const hidePlanSyncToast = useCallback(() => {
+    if (planSyncToastTimeoutRef.current) {
+      clearTimeout(planSyncToastTimeoutRef.current);
+      planSyncToastTimeoutRef.current = null;
+    }
+
+    setPlanSyncToast((previous) => ({ ...previous, isOpen: false }));
+  }, []);
+
+  const showPlanSyncToast = useCallback(
+    (kind: 'workout' | 'diet', itemName: string) => {
+      if (planSyncToastTimeoutRef.current) {
+        clearTimeout(planSyncToastTimeoutRef.current);
+      }
+
+      setPlanSyncToast({
+        isOpen: true,
+        title:
+          kind === 'workout'
+            ? '운동이 오늘 플랜에 추가됐어요'
+            : '식단이 오늘 플랜에 반영됐어요',
+        message: itemName,
+      });
+
+      planSyncToastTimeoutRef.current = setTimeout(() => {
+        setPlanSyncToast((previous) => ({ ...previous, isOpen: false }));
+        planSyncToastTimeoutRef.current = null;
+      }, 6500);
+    },
+    []
+  );
+
+  const openPlanFromToast = useCallback(() => {
+    hidePlanSyncToast();
+    router.push('/recommend');
+  }, [hidePlanSyncToast, router]);
+
   const hasNavigatedAwayFromHome = useCallback(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -482,6 +578,8 @@ export default function Home() {
   useEffect(() => {
     isMountedRef.current = true;
     isLeavingHomeRef.current = false;
+    const recommendationAbortControllers =
+      recommendationAbortControllersRef.current;
 
     const markLeavingHome = () => {
       isLeavingHomeRef.current = true;
@@ -495,8 +593,11 @@ export default function Home() {
       isMountedRef.current = false;
       window.removeEventListener('beforeunload', markLeavingHome);
       window.removeEventListener('pagehide', markLeavingHome);
-      recommendationAbortControllersRef.current.forEach((controller) => controller.abort());
-      recommendationAbortControllersRef.current.clear();
+      recommendationAbortControllers.forEach((controller) => controller.abort());
+      recommendationAbortControllers.clear();
+      if (planSyncToastTimeoutRef.current) {
+        clearTimeout(planSyncToastTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -532,8 +633,9 @@ export default function Home() {
     setAiRecommendations(mapRecommendationsToLegacyCards(nextRaw));
     setRecommendationAdded(nextAdded);
     setRecommendationHistory(nextHistory);
+    clearRecommendationHighlightsForScope(scope);
     persistHomeRecommendationCache(nextRaw, nextAdded, nextHistory);
-  }, [persistHomeRecommendationCache]);
+  }, [clearRecommendationHighlightsForScope, persistHomeRecommendationCache]);
 
   const fetchRecommendationScope = useCallback(async (
     scope: RequestedRecommendationScope,
@@ -769,6 +871,8 @@ export default function Home() {
         nextAdded,
         recommendationHistoryRef.current
       );
+      markRecommendationHighlighted(getWorkoutRecommendationHighlightId(slot));
+      showPlanSyncToast('workout', target.name);
     }
 
     setWorkoutPopup({ isOpen: false, target: null });
@@ -781,9 +885,10 @@ export default function Home() {
     }
 
     const todayStr = formatKstDate();
+    const mealType = dietPopup.mealType;
     const todayPlan = getPlanByDate(todayStr);
     const existingDiet = todayPlan?.diets.find((d) =>
-      matchesMealSlot(d.type, dietPopup.mealType as DietSlot)
+      matchesMealSlot(d.type, mealType)
     );
 
     if (existingDiet && existingDiet.name === dietPopup.target.name) {
@@ -792,7 +897,7 @@ export default function Home() {
       return;
     }
 
-    const didReplace = await replaceDiet(todayStr, dietPopup.mealType, {
+    const didReplace = await replaceDiet(todayStr, mealType, {
       name: dietPopup.target.name,
       desc: dietPopup.target.desc,
       kcal: `${dietPopup.target.calories || 0} kcal`,
@@ -805,7 +910,7 @@ export default function Home() {
           ...prev,
           diet: {
             ...prev.diet,
-            [dietPopup.mealType as DietSlot]: true,
+            [mealType]: true,
           },
         };
         return nextAdded;
@@ -815,6 +920,8 @@ export default function Home() {
         nextAdded,
         recommendationHistoryRef.current
       );
+      markRecommendationHighlighted(getDietRecommendationHighlightId(mealType));
+      showPlanSyncToast('diet', dietPopup.target.name);
     }
 
     setDietPopup({ isOpen: false, target: null, mealType: null });
@@ -1102,6 +1209,15 @@ export default function Home() {
     );
   };
 
+  const upperWorkoutHighlightId = getWorkoutRecommendationHighlightId('upper_body');
+  const lowerWorkoutHighlightId = getWorkoutRecommendationHighlightId('lower_body');
+  const cardioWorkoutHighlightId = getWorkoutRecommendationHighlightId('cardio');
+  const stretchingWorkoutHighlightId = getWorkoutRecommendationHighlightId('stretching');
+  const isUpperWorkoutHighlighted = highlightedRecommendationIds.includes(upperWorkoutHighlightId);
+  const isLowerWorkoutHighlighted = highlightedRecommendationIds.includes(lowerWorkoutHighlightId);
+  const isCardioWorkoutHighlighted = highlightedRecommendationIds.includes(cardioWorkoutHighlightId);
+  const isStretchingWorkoutHighlighted = highlightedRecommendationIds.includes(stretchingWorkoutHighlightId);
+
 return (
   <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans p-6 pb-32 md:p-8 lg:p-12 md:pb-36 lg:pb-40">
     <div className="max-w-4xl mx-auto space-y-8">
@@ -1331,11 +1447,20 @@ return (
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Strength Upper */}
-            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-[0_8px_24px_rgba(37,99,235,0.1)] transition-all flex flex-col relative group">
+            <div
+              onMouseEnter={() => dismissRecommendationHighlight(upperWorkoutHighlightId)}
+              onPointerDown={() => dismissRecommendationHighlight(upperWorkoutHighlightId)}
+              className={`rounded-xl p-5 border shadow-sm hover:shadow-[0_8px_24px_rgba(37,99,235,0.1)] transition-all flex flex-col relative group ${isUpperWorkoutHighlighted ? 'bg-emerald-50/70 border-emerald-200 ring-2 ring-emerald-200' : 'bg-white border-gray-100'}`}
+            >
+              {isUpperWorkoutHighlighted && (
+                <span className="absolute right-4 top-14 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                  방금 반영됨
+                </span>
+              )}
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-600 rounded-full text-xs font-bold shadow-sm">근력 (상체)</span>
                 {aiRecommendations.workout?.strength?.upper && (
-                  <button onClick={() => openWorkoutRecommendationPopup('upper_body', aiRecommendations.workout.strength.upper!)} disabled={isWorkoutRecommendationAdded('upper_body', aiRecommendations.workout.strength.upper)} className="p-1.5 bg-blue-500 shadow-md text-white hover:bg-blue-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button aria-label="상체 운동 추천 추가" onClick={() => openWorkoutRecommendationPopup('upper_body', aiRecommendations.workout.strength.upper!)} disabled={isWorkoutRecommendationAdded('upper_body', aiRecommendations.workout.strength.upper)} className="p-1.5 bg-blue-500 shadow-md text-white hover:bg-blue-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1356,11 +1481,20 @@ return (
             </div>
 
             {/* Strength Lower */}
-            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-[0_8px_24px_rgba(37,99,235,0.1)] transition-all flex flex-col relative group">
+            <div
+              onMouseEnter={() => dismissRecommendationHighlight(lowerWorkoutHighlightId)}
+              onPointerDown={() => dismissRecommendationHighlight(lowerWorkoutHighlightId)}
+              className={`rounded-xl p-5 border shadow-sm hover:shadow-[0_8px_24px_rgba(37,99,235,0.1)] transition-all flex flex-col relative group ${isLowerWorkoutHighlighted ? 'bg-emerald-50/70 border-emerald-200 ring-2 ring-emerald-200' : 'bg-white border-gray-100'}`}
+            >
+              {isLowerWorkoutHighlighted && (
+                <span className="absolute right-4 top-14 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                  방금 반영됨
+                </span>
+              )}
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full text-xs font-bold shadow-sm">근력 (하체)</span>
                 {aiRecommendations.workout?.strength?.lower && (
-                  <button onClick={() => openWorkoutRecommendationPopup('lower_body', aiRecommendations.workout.strength.lower!)} disabled={isWorkoutRecommendationAdded('lower_body', aiRecommendations.workout.strength.lower)} className="p-1.5 bg-indigo-500 shadow-md text-white hover:bg-indigo-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button aria-label="하체 운동 추천 추가" onClick={() => openWorkoutRecommendationPopup('lower_body', aiRecommendations.workout.strength.lower!)} disabled={isWorkoutRecommendationAdded('lower_body', aiRecommendations.workout.strength.lower)} className="p-1.5 bg-indigo-500 shadow-md text-white hover:bg-indigo-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1381,11 +1515,20 @@ return (
             </div>
 
             {/* Cardio */}
-            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-[0_8px_24px_rgba(244,63,94,0.15)] transition-all flex flex-col relative group">
+            <div
+              onMouseEnter={() => dismissRecommendationHighlight(cardioWorkoutHighlightId)}
+              onPointerDown={() => dismissRecommendationHighlight(cardioWorkoutHighlightId)}
+              className={`rounded-xl p-5 border shadow-sm hover:shadow-[0_8px_24px_rgba(244,63,94,0.15)] transition-all flex flex-col relative group ${isCardioWorkoutHighlighted ? 'bg-emerald-50/70 border-emerald-200 ring-2 ring-emerald-200' : 'bg-white border-gray-100'}`}
+            >
+              {isCardioWorkoutHighlighted && (
+                <span className="absolute right-4 top-14 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                  방금 반영됨
+                </span>
+              )}
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-full text-xs font-bold shadow-sm">유산소</span>
                 {aiRecommendations.workout?.cardio && (
-                  <button onClick={() => openWorkoutRecommendationPopup('cardio', aiRecommendations.workout.cardio!)} disabled={isWorkoutRecommendationAdded('cardio', aiRecommendations.workout.cardio)} className="p-1.5 bg-rose-500 shadow-md text-white hover:bg-rose-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button aria-label="유산소 운동 추천 추가" onClick={() => openWorkoutRecommendationPopup('cardio', aiRecommendations.workout.cardio!)} disabled={isWorkoutRecommendationAdded('cardio', aiRecommendations.workout.cardio)} className="p-1.5 bg-rose-500 shadow-md text-white hover:bg-rose-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1406,11 +1549,20 @@ return (
             </div>
 
             {/* Stretching */}
-            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-[0_8px_24px_rgba(16,185,129,0.15)] transition-all flex flex-col relative group">
+            <div
+              onMouseEnter={() => dismissRecommendationHighlight(stretchingWorkoutHighlightId)}
+              onPointerDown={() => dismissRecommendationHighlight(stretchingWorkoutHighlightId)}
+              className={`rounded-xl p-5 border shadow-sm hover:shadow-[0_8px_24px_rgba(16,185,129,0.15)] transition-all flex flex-col relative group ${isStretchingWorkoutHighlighted ? 'bg-emerald-50/70 border-emerald-200 ring-2 ring-emerald-200' : 'bg-white border-gray-100'}`}
+            >
+              {isStretchingWorkoutHighlighted && (
+                <span className="absolute right-4 top-14 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                  방금 반영됨
+                </span>
+              )}
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-500 rounded-full text-xs font-bold shadow-sm">스트레칭</span>
                 {aiRecommendations.workout?.stretching && (
-                  <button onClick={() => openWorkoutRecommendationPopup('stretching', aiRecommendations.workout.stretching!)} disabled={isWorkoutRecommendationAdded('stretching', aiRecommendations.workout.stretching)} className="p-1.5 bg-emerald-500 shadow-md text-white hover:bg-emerald-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                  <button aria-label="스트레칭 추천 추가" onClick={() => openWorkoutRecommendationPopup('stretching', aiRecommendations.workout.stretching!)} disabled={isWorkoutRecommendationAdded('stretching', aiRecommendations.workout.stretching)} className="p-1.5 bg-emerald-500 shadow-md text-white hover:bg-emerald-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -1450,13 +1602,25 @@ return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {DIET_SLOTS.map((mealType) => {
               const dietData = aiRecommendations.diet[mealType as 'breakfast' | 'lunch' | 'dinner'];
+              const dietHighlightId = getDietRecommendationHighlightId(mealType);
+              const isDietHighlighted = highlightedRecommendationIds.includes(dietHighlightId);
               const mealLabel = mealType === 'breakfast' ? '아침' : mealType === 'lunch' ? '점심' : '저녁';
               return (
-                <div key={mealType} className="bg-orange-50/30 rounded-2xl p-4 border border-orange-100/50 relative group flex flex-col">
+                <div
+                  key={mealType}
+                  onMouseEnter={() => dismissRecommendationHighlight(dietHighlightId)}
+                  onPointerDown={() => dismissRecommendationHighlight(dietHighlightId)}
+                  className={`rounded-2xl p-4 border relative group flex flex-col transition-all ${isDietHighlighted ? 'bg-emerald-50/70 border-emerald-200 ring-2 ring-emerald-200 shadow-sm' : 'bg-orange-50/30 border-orange-100/50'}`}
+                >
+                  {isDietHighlighted && (
+                    <span className="absolute right-4 top-12 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                      방금 반영됨
+                    </span>
+                  )}
                   <div className="flex justify-between items-center mb-3">
                     <span className="px-2.5 py-1 bg-orange-50 border border-orange-100 text-orange-600 rounded-full text-xs font-bold shadow-sm">{mealLabel}</span>
                     {dietData && (
-                      <button onClick={() => openDietRecommendationPopup(dietData, mealType)} disabled={isDietRecommendationAdded(mealType, dietData)} className="p-1.5 bg-orange-500 shadow-md text-white hover:bg-orange-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
+                      <button aria-label={`${mealType} 식단 추천 변경`} onClick={() => openDietRecommendationPopup(dietData, mealType)} disabled={isDietRecommendationAdded(mealType, dietData)} className="p-1.5 bg-orange-500 shadow-md text-white hover:bg-orange-600 rounded-full transition-colors z-10 disabled:bg-gray-300 disabled:hover:bg-gray-300">
                         <Plus className="w-4 h-4" />
                       </button>
                     )}
@@ -1933,6 +2097,53 @@ return (
             </button>
           </motion.div>
         </div>
+      )}
+    </AnimatePresence>
+
+    <AnimatePresence>
+      {planSyncToast.isOpen && (
+        <motion.div
+          data-testid="plan-sync-toast"
+          role="status"
+          aria-live="polite"
+          initial={{ opacity: 0, y: 24, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 16, scale: 0.98 }}
+          transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+          className="fixed inset-x-4 bottom-24 z-[115] mx-auto max-w-md rounded-2xl border border-emerald-100 bg-white p-4 shadow-[0_18px_50px_-20px_rgba(15,23,42,0.45)] md:bottom-8"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-gray-900">
+                {planSyncToast.title}
+              </p>
+              <p className="mt-1 truncate text-xs font-semibold text-gray-500">
+                {planSyncToast.message}
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  data-testid="plan-sync-toast-plan-link"
+                  type="button"
+                  onClick={openPlanFromToast}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm transition-colors hover:bg-emerald-700"
+                >
+                  플랜 보기
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={hidePlanSyncToast}
+                  className="rounded-xl bg-gray-100 px-3 py-2 text-xs font-black text-gray-600 transition-colors hover:bg-gray-200"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
 
