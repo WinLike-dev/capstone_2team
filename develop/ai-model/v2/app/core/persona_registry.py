@@ -126,6 +126,7 @@ def list_active_personas() -> list[dict[str, str | bool]]:
                 "id": persona_id,
                 "label": str(entry.get("label", persona_id)),
                 "prompt_file": str(entry.get("prompt_file", f"{persona_id}.md")),
+                "avatar_file": str(entry.get("avatar_file", "")),
                 "is_default": persona_id == default_id,
             }
         )

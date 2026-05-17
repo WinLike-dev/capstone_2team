@@ -1,0 +1,24 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="26" y1="28" x2="222" y2="231" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="cardigan" x1="75" y1="166" x2="188" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#34D399"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <circle cx="52" cy="58" r="18" fill="#ECFDF5" opacity=".42"/>
+  <circle cx="129" cy="118" r="55" fill="#F9CFA8"/>
+  <path d="M75 124c-7-37 14-72 52-75 43-4 70 29 61 78-21-2-41-14-53-34-13 19-32 29-60 31z" fill="#4B2B1D"/>
+  <circle cx="109" cy="124" r="5" fill="#2E1B13"/>
+  <circle cx="151" cy="124" r="5" fill="#2E1B13"/>
+  <path d="M117 146c8 7 23 7 31 0" stroke="#7F1D1D" stroke-width="5" stroke-linecap="round"/>
+  <path d="M70 240c8-45 31-70 60-70s53 25 61 70H70z" fill="url(#cardigan)"/>
+  <path d="M98 173l31 43 31-43" stroke="#ECFDF5" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M185 58c10-11 29-4 29 12 0 18-29 35-29 35s-29-17-29-35c0-16 19-23 29-12z" fill="#ECFDF5" opacity=".92"/>
+  <path d="M42 165c18-4 32-17 37-35" stroke="#ECFDF5" stroke-width="8" stroke-linecap="round" opacity=".7"/>
+  <path d="M217 166c-18-4-32-17-37-35" stroke="#ECFDF5" stroke-width="8" stroke-linecap="round" opacity=".7"/>
+</svg>
