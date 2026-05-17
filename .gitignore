@@ -2,3 +2,32 @@ CLAUDE.md
 .deploy-package.tar.gz
 develop/deploy/gcp-two-vm/deploy_key
 develop/deploy/gcp-two-vm/deploy_key.pub
+
+# Dependency installs
+node_modules/
+**/node_modules/
+
+# Local logs and runtime output
+*.log
+logs/
+**/logs/
+
+# Test and browser automation artifacts
+test-results/
+**/test-results/
+playwright-report/
+**/playwright-report/
+scratch_pw/reports/
+
+# Python/runtime caches
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+**/.pytest_cache/
+
+# Local deploy bundles and scratch packages
+*.tar.gz
+*.tgz
+
+# Local tool caches
+.firecrawl/
