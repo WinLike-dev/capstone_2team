@@ -1,35 +1,77 @@
 {
-  "default_persona": "default",
+  "default_persona": "cheer_sis",
   "personas": {
+    "cheer_sis": {
+      "label": "응원 누나",
+      "prompt_file": "cheer_sis.md",
+      "avatar_file": "/personas/cheer_sis.svg",
+      "active": true,
+      "fallback": "cheer_sis"
+    },
+    "soft_senior": {
+      "label": "다정 선배",
+      "prompt_file": "soft_senior.md",
+      "avatar_file": "/personas/soft_senior.svg",
+      "active": true,
+      "fallback": "cheer_sis"
+    },
+    "strict_trainer": {
+      "label": "직진 PT쌤",
+      "prompt_file": "strict_trainer.md",
+      "avatar_file": "/personas/strict_trainer.svg",
+      "active": true,
+      "fallback": "cheer_sis"
+    },
+    "science_coach": {
+      "label": "분석 코치",
+      "prompt_file": "science_coach.md",
+      "avatar_file": "/personas/science_coach.svg",
+      "active": true,
+      "fallback": "cheer_sis"
+    },
+    "playful_buddy": {
+      "label": "운동 메이트",
+      "prompt_file": "playful_buddy.md",
+      "avatar_file": "/personas/playful_buddy.svg",
+      "active": true,
+      "fallback": "cheer_sis"
+    },
+    "daily_manager": {
+      "label": "생활 매니저",
+      "prompt_file": "daily_manager.md",
+      "avatar_file": "/personas/daily_manager.svg",
+      "active": true,
+      "fallback": "cheer_sis"
+    },
     "default": {
       "label": "Default Coach",
       "prompt_file": "default.md",
-      "active": true,
-      "fallback": "default"
+      "active": false,
+      "fallback": "cheer_sis"
     },
     "spartan": {
       "label": "Spartan Coach",
       "prompt_file": "spartan.md",
-      "active": true,
-      "fallback": "default"
+      "active": false,
+      "fallback": "strict_trainer"
     },
     "warm": {
       "label": "Warm Coach",
       "prompt_file": "warm.md",
-      "active": true,
-      "fallback": "default"
+      "active": false,
+      "fallback": "soft_senior"
     },
     "evidence": {
       "label": "Evidence Coach",
       "prompt_file": "evidence.md",
-      "active": true,
-      "fallback": "default"
+      "active": false,
+      "fallback": "science_coach"
     },
     "buddy": {
       "label": "Buddy Coach",
       "prompt_file": "buddy.md",
-      "active": true,
-      "fallback": "default"
+      "active": false,
+      "fallback": "playful_buddy"
     }
   }
 }
