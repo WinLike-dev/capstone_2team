@@ -8,6 +8,7 @@ import {
   Check,
   Loader2,
   Send,
+  Settings,
   ThumbsDown,
   ThumbsUp,
   User,
@@ -20,6 +21,10 @@ import {
   CHAT_SESSION_STORAGE_KEY,
   redirectToLoginForExpiredSession,
 } from "@/lib/auth";
+import {
+  PERSONA_CHAT_STARTERS,
+  resolveVisiblePersona as resolvePersonaConversation,
+} from "@/lib/personas";
 import { usePlan } from "../context/PlanContext";
 
 type FeedbackRating = "up" | "down";
@@ -180,7 +185,7 @@ function createClientMessageId() {
 
 export default function ChatPage() {
   const router = useRouter();
-  const { fetchPlans, isUserLoading, updateUserData, userData } = usePlan();
+  const { fetchPlans, isUserLoading, userData } = usePlan();
   const initialMessages: Message[] = [
     {
       id: "welcome",
@@ -198,8 +203,6 @@ export default function ChatPage() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isPersonaSaving, setIsPersonaSaving] = useState(false);
-  const [personaError, setPersonaError] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [feedbackModal, setFeedbackModal] = useState<{
     messageId: string;
@@ -210,6 +213,12 @@ export default function ChatPage() {
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const selectedPersona = resolveVisiblePersona(userData?.selected_ai_persona);
+  const personaConversation = resolvePersonaConversation(
+    userData?.selected_ai_persona
+  );
+  const hasUserStartedConversation = messages.some(
+    (message) => message.role === "user"
+  );
 
   useEffect(() => {
     const storedToken = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
@@ -440,61 +449,6 @@ export default function ChatPage() {
     setFeedbackModal(null);
   };
 
-  const handlePersonaSelect = async (personaId: AiPersonaId) => {
-    if (personaId === selectedPersona.id || isPersonaSaving) return;
-
-    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-    if (!token) {
-      redirectToLoginForExpiredSession();
-      return;
-    }
-
-    const userId = userData?.user_id || userData?.login_id || userData?.email;
-    if (!userId) {
-      setPersonaError("프로필을 불러온 뒤 다시 선택해주세요.");
-      return;
-    }
-
-    const previousPersona = userData?.selected_ai_persona || selectedPersona.id;
-    setIsPersonaSaving(true);
-    setPersonaError("");
-    updateUserData({ selected_ai_persona: personaId });
-
-    try {
-      const response = await fetch(
-        buildApiUrl(
-          `/api/v1/users/${encodeURIComponent(userId)}/settings/persona`
-        ),
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            selected_ai_persona: personaId,
-          }),
-        }
-      );
-
-      if (response.status === 401) {
-        redirectToLoginForExpiredSession();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Persona API request failed.");
-      }
-    } catch (error) {
-      console.error("Persona save error:", error);
-      updateUserData({ selected_ai_persona: previousPersona });
-      setPersonaError("코치 설정 저장에 실패했습니다. 다시 시도해주세요.");
-    } finally {
-      setIsPersonaSaving(false);
-    }
-  };
-
   const handleThumbsDownSubmit = async () => {
     if (!feedbackModal) return;
 
@@ -619,7 +573,7 @@ export default function ChatPage() {
       const planSyncApplied = data.plan_sync_applied === true;
 
       if (planSyncApplied) {
-        void fetchPlans();
+        void fetchPlans({ trackChanges: true });
       }
 
       setIsLoading(false);
@@ -645,8 +599,8 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-[#f8fafc] font-sans">
-      <header className="sticky top-0 z-10 border-b border-gray-200/60 bg-white/90 px-6 pb-4 pt-12 shadow-sm backdrop-blur-md">
-        <div className="mx-auto flex max-w-2xl items-center gap-4">
+      <header className="sticky top-0 z-10 border-b border-gray-200/60 bg-white/90 px-5 pb-4 pt-12 shadow-sm backdrop-blur-md">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
           <button
             onClick={() => router.push("/")}
             className="rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-100"
@@ -673,76 +627,73 @@ export default function ChatPage() {
                 AI 건강 비서
               </h1>
               <p className="text-xs font-semibold text-emerald-600">
-                {selectedPersona.name}
-                {isPersonaSaving ? " 저장 중" : " 연결 중"}
+                {isUserLoading
+                  ? "프로필 확인 중"
+                  : `${selectedPersona.name}와 대화 중`}
               </p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => router.push("/profile")}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50"
+          >
+            <Settings className="h-4 w-4" />
+            코치 설정
+          </button>
         </div>
 
-        <div className="mx-auto mt-4 max-w-2xl">
-          <div className="mb-2 flex items-center justify-between gap-3 px-1">
-            <span className="text-xs font-bold text-gray-500">
-              코치 캐릭터
-            </span>
-            <span className="truncate text-xs font-semibold text-gray-400">
-              {isUserLoading ? "프로필 확인 중" : selectedPersona.tone}
-            </span>
-          </div>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            {AI_PERSONAS.map((persona) => {
-              const isSelected = persona.id === selectedPersona.id;
-
-              return (
-                <button
-                  key={persona.id}
-                  type="button"
-                  onClick={() => handlePersonaSelect(persona.id)}
-                  disabled={isPersonaSaving || isUserLoading}
-                  title={`${persona.name} - ${persona.description}`}
-                  aria-pressed={isSelected}
-                  className={`group flex min-w-[118px] items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-70 ${
-                    isSelected
-                      ? persona.selectedClass
-                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br ${persona.accent} text-white shadow-sm`}
-                  >
-                    <Image
-                      src={persona.imageSrc}
-                      alt={persona.imageAlt}
-                      width={36}
-                      height={36}
-                      unoptimized
-                      className="h-full w-full object-cover"
-                    />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-extrabold">
-                      {persona.shortLabel}
-                    </span>
-                    <span className="block truncate text-[11px] font-semibold opacity-75">
-                      {persona.name}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {personaError && (
-            <p className="mt-2 px-1 text-xs font-semibold text-rose-500">
-              {personaError}
-            </p>
-          )}
-        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6 pb-32 md:px-8">
         <div className="mx-auto flex min-h-full max-w-2xl flex-col gap-6">
+          {!hasUserStartedConversation && !isLoading && (
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.24 }}
+              className="mx-auto flex w-full max-w-xl flex-col items-center text-center"
+            >
+              <div
+                className={`relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br ${selectedPersona.accent} shadow-[0_24px_60px_-22px_rgba(15,23,42,0.55)] ring-1 ring-white md:h-52 md:w-52`}
+              >
+                <Image
+                  src={selectedPersona.imageSrc}
+                  alt={selectedPersona.imageAlt}
+                  width={208}
+                  height={208}
+                  priority
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="mt-6">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-600">
+                  지금 대화할 코치
+                </p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-gray-950 md:text-4xl">
+                  {selectedPersona.name}
+                </h2>
+                <p className="mx-auto mt-4 max-w-md whitespace-pre-wrap text-[15px] font-semibold leading-relaxed text-gray-600">
+                  “{personaConversation.intro}”
+                </p>
+              </div>
+              <div className="mt-6 grid w-full gap-2 sm:grid-cols-3">
+                {PERSONA_CHAT_STARTERS.map((starter) => (
+                  <button
+                    key={starter.label}
+                    type="button"
+                    onClick={() => setInput(starter.prompt)}
+                    className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-extrabold text-gray-700 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50"
+                  >
+                    {starter.label}
+                  </button>
+                ))}
+              </div>
+            </motion.section>
+          )}
           <AnimatePresence initial={false}>
-            {messages.map((message) => (
+            {messages.filter((message) => message.id !== "welcome").map((message) => (
               <motion.div
                 key={message.id}
                 initial={{ opacity: 0, y: 12, scale: 0.96 }}

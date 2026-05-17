@@ -3,7 +3,7 @@
 import { Info, Clock, Flame, ChevronRight, Apple, Calendar as CalendarIcon, ChevronLeft, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePlan, DailyPlan } from '../context/PlanContext';
+import { usePlan, DailyPlan, getPlanItemKey } from '../context/PlanContext';
 
 const getFoodEmoji = (name: string) => {
   if (name.includes('샐러드') || name.includes('야채')) return '🥗';
@@ -33,8 +33,28 @@ const mapWorkoutType = (typeRaw: string) => {
   return '전신 운동';
 };
 
+const hasHighlightedItems = (plan: DailyPlan, highlightedIds: string[]) => {
+  return (
+    plan.exercises.some((item, index) =>
+      highlightedIds.includes(getPlanItemKey(plan.date, 'workout', item, index))
+    ) ||
+    plan.diets.some((item, index) =>
+      highlightedIds.includes(getPlanItemKey(plan.date, 'diet', item, index))
+    )
+  );
+};
+
 export default function RecommendPage() {
-  const { completedTasks, completeWorkout, completeDiet, getPlanByDate, userData, isUserLoading } = usePlan();
+  const {
+    completedTasks,
+    completeWorkout,
+    completeDiet,
+    getPlanByDate,
+    highlightedPlanItemIds,
+    dismissPlanUpdate,
+    userData,
+    isUserLoading,
+  } = usePlan();
   const initialToday = new Date();
   
   const [currentDate, setCurrentDate] = useState(
@@ -197,6 +217,7 @@ export default function RecommendPage() {
 
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const planForDay = getPlanByDate(dateStr);
+                const hasPlanUpdate = planForDay ? hasHighlightedItems(planForDay, highlightedPlanItemIds) : false;
 
                 const isToday = today && day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
                 const isWeekend = idx % 7 === 0 || idx % 7 === 6;
@@ -247,7 +268,7 @@ export default function RecommendPage() {
                         setIsModalOpen(true);
                       }
                     }}
-                    className={`relative h-[110px] md:h-32 p-1.5 md:p-2.5 rounded-2xl flex flex-col items-center md:items-start border transition-all cursor-pointer ${cellBgColor} ${isToday && cellBgColor.includes('bg-white') ? '!bg-blue-50/50 !border-blue-100' : ''}`}
+                    className={`relative h-[110px] md:h-32 p-1.5 md:p-2.5 rounded-2xl flex flex-col items-center md:items-start border transition-all cursor-pointer ${cellBgColor} ${isToday && cellBgColor.includes('bg-white') ? '!bg-blue-50/50 !border-blue-100' : ''} ${hasPlanUpdate ? 'ring-2 ring-rose-300 ring-offset-1 ring-offset-white' : ''}`}
                   >
                     <div className="flex justify-between w-full items-start">
                       <span className={`text-sm md:text-base font-bold relative z-10 ${isToday ? 'text-white bg-[#2563eb] w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center -ml-1 -mt-1 shadow-sm' : isWeekend ? 'text-gray-400' : 'text-gray-700'} pl-1 pt-0.5`}>
@@ -258,6 +279,9 @@ export default function RecommendPage() {
                         <motion.div initial={{scale:0, rotate:-180}} animate={{scale:1, rotate:0}} transition={{type:'spring', stiffness:200}} className="text-yellow-500 drop-shadow-sm text-sm md:text-base">
                           ✨
                         </motion.div>
+                      )}
+                      {hasPlanUpdate && (
+                        <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" aria-label="변경된 플랜" />
                       )}
                     </div>
                     {planForDay && (
@@ -319,9 +343,26 @@ export default function RecommendPage() {
               {todayPlan.exercises.map((ex, idx) => {
                 const todayDateStr = todayPlan.date;
                 const isCompleted = (completedTasks[todayDateStr]?.workouts || []).includes(idx);
+                const updateId = getPlanItemKey(todayDateStr, 'workout', ex, idx);
+                const isHighlighted = highlightedPlanItemIds.includes(updateId);
 
                 return (
-                  <div key={idx} className={`bg-white rounded-2xl p-5 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100 flex items-center hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] hover:-translate-y-1 transition-all duration-300 group`}>
+                  <div
+                    key={updateId}
+                    data-plan-update-highlight={isHighlighted ? 'true' : undefined}
+                    onMouseEnter={() => {
+                      if (isHighlighted) dismissPlanUpdate(updateId);
+                    }}
+                    onPointerDown={() => {
+                      if (isHighlighted) dismissPlanUpdate(updateId);
+                    }}
+                    className={`relative rounded-2xl p-5 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border flex items-center hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] hover:-translate-y-1 transition-all duration-300 group ${isHighlighted ? 'bg-rose-50/70 border-rose-200 ring-2 ring-rose-200' : 'bg-white border-gray-100'}`}
+                  >
+                    {isHighlighted && (
+                      <span className="absolute right-4 top-3 rounded-full bg-rose-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                        새로 반영됨
+                      </span>
+                    )}
                     <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${ex.color} flex items-center justify-center text-white shadow-inner flex-shrink-0`}>
                       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -331,7 +372,7 @@ export default function RecommendPage() {
                     <div className={`ml-4 flex-1`}>
                       <div className="flex items-center space-x-2 mb-1">
                         <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full shadow-sm">{mapWorkoutType(ex.type || '')}</span>
-                        <h3 className="font-bold text-gray-900 text-[17px]">{ex.title}</h3>
+                        <h3 className="font-bold text-gray-900 text-[17px] pr-20">{ex.title}</h3>
                       </div>
                       <div className="flex items-center space-x-3 text-xs font-semibold text-gray-500">
                         <span className="flex items-center"><Clock className="w-3.5 h-3.5 mr-1" />{ex.time}</span>
@@ -372,9 +413,26 @@ export default function RecommendPage() {
               {todayPlan.diets.map((diet, idx) => {
                 const todayDateStr = todayPlan.date;
                 const isCompleted = (completedTasks[todayDateStr]?.diets || []).includes(idx);
+                const updateId = getPlanItemKey(todayDateStr, 'diet', diet, idx);
+                const isHighlighted = highlightedPlanItemIds.includes(updateId);
 
                 return (
-                  <div key={idx} className={`bg-white rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border border-gray-100 hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] transition-all shrink-0 ${isCompleted ? 'opacity-50 grayscale bg-gray-50/50' : ''}`}>
+                  <div
+                    key={updateId}
+                    data-plan-update-highlight={isHighlighted ? 'true' : undefined}
+                    onMouseEnter={() => {
+                      if (isHighlighted) dismissPlanUpdate(updateId);
+                    }}
+                    onPointerDown={() => {
+                      if (isHighlighted) dismissPlanUpdate(updateId);
+                    }}
+                    className={`relative rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_4px_16px_-6px_rgba(0,0,0,0.06)] border hover:shadow-[0_8px_24px_-6px_rgba(37,99,235,0.12)] transition-all shrink-0 ${isHighlighted ? 'bg-rose-50/70 border-rose-200 ring-2 ring-rose-200' : 'bg-white border-gray-100'} ${isCompleted ? 'opacity-50 grayscale bg-gray-50/50' : ''}`}
+                  >
+                    {isHighlighted && (
+                      <span className="absolute right-3 top-3 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                        새로 반영됨
+                      </span>
+                    )}
                     <div className="text-xs font-bold text-[#2563eb] bg-blue-50 px-3 py-1 rounded-full mb-3">
                       {diet.type}
                     </div>
@@ -441,14 +499,31 @@ export default function RecommendPage() {
                   <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-4 space-y-3">
                     {selectedPlan.exercises.map((ex, idx) => {
                       const isCompleted = (completedTasks[selectedPlan.date]?.workouts || []).includes(idx);
+                      const updateId = getPlanItemKey(selectedPlan.date, 'workout', ex, idx);
+                      const isHighlighted = highlightedPlanItemIds.includes(updateId);
                       return (
-                        <div key={idx} className="flex justify-between items-center group">
+                        <div
+                          key={updateId}
+                          data-plan-update-highlight={isHighlighted ? 'true' : undefined}
+                          onMouseEnter={() => {
+                            if (isHighlighted) dismissPlanUpdate(updateId);
+                          }}
+                          onPointerDown={() => {
+                            if (isHighlighted) dismissPlanUpdate(updateId);
+                          }}
+                          className={`relative flex justify-between items-center group rounded-xl px-2 py-2 transition-colors ${isHighlighted ? 'bg-rose-50 ring-1 ring-rose-200' : ''}`}
+                        >
                           <div className="flex items-center flex-1 pr-3">
                             <span className={`text-[10px] font-bold ${isCompleted ? 'text-gray-400 bg-gray-100 border-gray-200' : 'text-orange-700 bg-orange-50'} px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap transition-colors`}>
                               {mapWorkoutType(ex.type || '')}
                             </span>
                             <span className={`text-sm font-bold text-left ml-4 transition-all ${isCompleted ? 'text-gray-400 line-through decoration-gray-400' : 'text-gray-900'}`}>{ex.title}</span>
                           </div>
+                          {isHighlighted && (
+                            <span className="mr-2 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                              새로 반영됨
+                            </span>
+                          )}
                           <button 
                             onClick={(e) => { e.stopPropagation(); if(!isCompleted) handleWorkoutComplete(selectedPlan.date, ex.title, idx); }}
                             disabled={isCompleted}
@@ -470,16 +545,31 @@ export default function RecommendPage() {
                   <div className="bg-green-50/50 border border-green-100 rounded-xl p-4 space-y-3">
                     {selectedPlan.diets.map((diet, idx) => {
                       const isCompleted = (completedTasks[selectedPlan.date]?.diets || []).includes(idx);
-                      // selectedPlan uses diet.breakfast, diet.lunch, diet.dinner strings in plan.diets. Wait, no.
-                      // Checking structure... selectedPlan.diets is an array of objects
+                      const updateId = getPlanItemKey(selectedPlan.date, 'diet', diet, idx);
+                      const isHighlighted = highlightedPlanItemIds.includes(updateId);
                       return (
-                        <div key={idx} className="flex justify-between items-center group">
+                        <div
+                          key={updateId}
+                          data-plan-update-highlight={isHighlighted ? 'true' : undefined}
+                          onMouseEnter={() => {
+                            if (isHighlighted) dismissPlanUpdate(updateId);
+                          }}
+                          onPointerDown={() => {
+                            if (isHighlighted) dismissPlanUpdate(updateId);
+                          }}
+                          className={`flex justify-between items-center group rounded-xl px-2 py-2 transition-colors ${isHighlighted ? 'bg-rose-50 ring-1 ring-rose-200' : ''}`}
+                        >
                           <div className="flex items-center flex-1 pr-3">
                             <span className={`text-[10px] font-bold ${isCompleted ? 'text-gray-400 bg-gray-100 border-gray-200' : 'text-green-700 bg-green-50'} px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap transition-colors`}>
                               {diet.type}
                             </span>
                             <span className={`text-sm font-bold text-left ml-4 transition-all ${isCompleted ? 'text-gray-400 line-through decoration-gray-400' : 'text-gray-900'}`}>{diet.name}</span>
                           </div>
+                          {isHighlighted && (
+                            <span className="mr-2 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                              새로 반영됨
+                            </span>
+                          )}
                           <button 
                             onClick={(e) => { e.stopPropagation(); if(!isCompleted) handleDietComplete(selectedPlan.date, diet.name, idx); }}
                             disabled={isCompleted}
